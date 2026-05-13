@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": ["Bash(dotnet build *)", "Bash(dotnet test *)"]
+  },
+  "enabledPlugins": {
+    "csharp-lsp@claude-plugins-official": true
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  }
+}

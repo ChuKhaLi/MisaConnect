@@ -1,0 +1,41 @@
+name: integration
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"  # Monday 06:00 UTC
+
+jobs:
+  sandbox-tests:
+    runs-on: ubuntu-latest
+    environment: misa-sandbox
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore MisaConnect.slnx
+
+      - name: Build
+        run: dotnet build MisaConnect.slnx --no-restore --configuration Release
+
+      - name: Integration tests
+        env:
+          Misa__EInvoice__Environment: Sandbox
+          Misa__EInvoice__BaseUrl: https://testapi.meinvoice.vn/api/integration
+          Misa__EInvoice__TaxCode: ${{ secrets.MISA_TAX_CODE }}
+          Misa__EInvoice__UserName: ${{ secrets.MISA_USERNAME }}
+          Misa__EInvoice__Password: ${{ secrets.MISA_PASSWORD }}
+          Misa__EInvoice__AppId: ${{ secrets.MISA_APP_ID }}
+        run: dotnet test MisaConnect.slnx --no-build --configuration Release --filter "Category=Integration" --logger "trx;LogFileName=integration-tests.trx" --results-directory artifacts/test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: artifacts/test-results

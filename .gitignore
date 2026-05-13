@@ -55,3 +55,10 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Sandbox fixture pool — contains real RefIds/InvNos tied to operator credentials
+tests/MisaConnect.EInvoice.IntegrationTests/Sandbox/issued-invoice-fixtures.json
+tests/MisaConnect.EInvoice.IntegrationTests/Sandbox/issued-invoice-fixtures.consumption.log

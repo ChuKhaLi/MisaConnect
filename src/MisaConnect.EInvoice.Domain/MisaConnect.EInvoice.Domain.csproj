@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>MisaConnect.EInvoice.Domain</RootNamespace>
+    <AssemblyName>MisaConnect.EInvoice.Domain</AssemblyName>
+    <Description>Domain entities and value objects for the MISA MeInvoice integration.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

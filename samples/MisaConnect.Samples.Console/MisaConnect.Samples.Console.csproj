@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>MisaConnect.Samples.Console</RootNamespace>
+    <AssemblyName>MisaConnect.Samples.Console</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <UserSecretsId>misaconnect-samples-console-2b9e1f5a-7c3d-4b6e-9a5d-3b8e2c1f4d9e</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Application\MisaConnect.EInvoice.Application.csproj" />
+    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Client\MisaConnect.EInvoice.Client.csproj" />
+    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Domain\MisaConnect.EInvoice.Domain.csproj" />
+    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Infrastructure\MisaConnect.EInvoice.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+  </ItemGroup>
+
+</Project>

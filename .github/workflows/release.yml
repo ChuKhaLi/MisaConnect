@@ -1,0 +1,47 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  pack-and-publish:
+    runs-on: ubuntu-latest
+    environment: nuget-publish
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Derive version from tag
+        id: ver
+        run: |
+          REF="${GITHUB_REF#refs/tags/v}"
+          echo "version=$REF" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore MisaConnect.slnx
+
+      - name: Build
+        run: dotnet build MisaConnect.slnx --no-restore --configuration Release -p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Unit tests
+        run: dotnet test MisaConnect.slnx --no-build --configuration Release --filter "Category!=Integration"
+
+      - name: Pack
+        run: dotnet pack src/MisaConnect.EInvoice.Client/MisaConnect.EInvoice.Client.csproj --no-build --configuration Release -p:Version=${{ steps.ver.outputs.version }} -o artifacts
+
+      - name: Push to NuGet
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts/*.nupkg

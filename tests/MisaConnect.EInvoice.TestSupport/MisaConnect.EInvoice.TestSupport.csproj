@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>MisaConnect.EInvoice.TestSupport</RootNamespace>
+    <AssemblyName>MisaConnect.EInvoice.TestSupport</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <Description>Shared canonical invoice fixtures and helpers for unit and integration test suites.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Domain\MisaConnect.EInvoice.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

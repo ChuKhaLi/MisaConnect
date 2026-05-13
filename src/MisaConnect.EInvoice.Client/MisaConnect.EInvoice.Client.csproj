@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>MisaConnect.EInvoice.Client</RootNamespace>
+    <AssemblyName>MisaConnect.EInvoice.Client</AssemblyName>
+    <PackageId>MisaConnect.EInvoice</PackageId>
+    <Description>Community .NET SDK for MISA MeInvoice. Provides a port-and-adapter facade for the MISA eInvoice HTTP API: token acquisition, template lookup, invoice preview/save/PDF/delete, lookup, and amendments.</Description>
+    <PackageTags>misa;meinvoice;einvoice;vietnam;invoice;sdk;hoadon</PackageTags>
+    <IsPackable>true</IsPackable>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);BundleReferencedProjects</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MisaConnect.EInvoice.Application\MisaConnect.EInvoice.Application.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\MisaConnect.EInvoice.Domain\MisaConnect.EInvoice.Domain.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\MisaConnect.EInvoice.Infrastructure\MisaConnect.EInvoice.Infrastructure.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Condition="Exists('..\..\README.md')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MisaConnect.Samples.Api" />
+    <InternalsVisibleTo Include="MisaConnect.EInvoice.UnitTests" />
+    <InternalsVisibleTo Include="MisaConnect.EInvoice.IntegrationTests" />
+  </ItemGroup>
+
+  <Target Name="BundleReferencedProjects" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BundledAssembly Include="@(ReferenceCopyLocalPaths)"
+                       Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference' and '%(ReferenceCopyLocalPaths.Extension)' == '.dll'" />
+      <BuildOutputInPackage Include="@(BundledAssembly)" TargetPath="%(Filename)%(Extension)" />
+      <BuildOutputInPackage Include="@(BundledAssembly->'%(RootDir)%(Directory)%(Filename).pdb')"
+                            Condition="Exists('%(RootDir)%(Directory)%(Filename).pdb')"
+                            TargetPath="%(Filename).pdb" />
+    </ItemGroup>
+  </Target>
+
+</Project>
