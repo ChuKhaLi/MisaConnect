@@ -11,7 +11,7 @@ jobs:
     environment: nuget-publish
     permissions:
       id-token: write
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,6 +48,17 @@ jobs:
 
       - name: Push to NuGet
         run: dotnet nuget push "artifacts/*.nupkg" --api-key ${{ steps.nuget_login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > RELEASE_NOTES.md
+          gh release create "v$VERSION" \
+            --title "MisaConnect.EInvoice $VERSION" \
+            --notes-file RELEASE_NOTES.md \
+            artifacts/*.nupkg artifacts/*.snupkg
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
