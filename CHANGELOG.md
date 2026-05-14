@@ -4,6 +4,8 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-15
+
 ### Added
 - Package icon (`icon.png`, 256x256) embedded in the NuGet listing.
 
