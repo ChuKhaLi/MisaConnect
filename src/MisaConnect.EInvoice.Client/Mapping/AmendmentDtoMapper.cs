@@ -11,7 +11,7 @@ namespace MisaConnect.EInvoice.Client.Mapping;
 /// plus a result-side projection from the domain <see cref="SaveResult"/>
 /// to <see cref="AmendmentResultDto"/> echoing the caller's <c>OrgRefID</c>.
 /// </summary>
-public static class AmendmentDtoMapper
+internal static class AmendmentDtoMapper
 {
     public static OriginalInvoiceReference ToDomain(OriginalInvoiceReferenceDto dto)
     {
