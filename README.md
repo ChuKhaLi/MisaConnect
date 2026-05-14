@@ -2,7 +2,7 @@
 
 Community .NET SDK for MISA cloud APIs. Currently covers **MISA MeInvoice** (eInvoice). MISA eSign is planned for v2.0.
 
-> Status: pre-release. Public API may change before v1.0.0.
+> Status: v1.0.0 released on NuGet. Targets .NET 8. See the [CHANGELOG](CHANGELOG.md).
 
 ## Install
 

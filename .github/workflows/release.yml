@@ -9,6 +9,9 @@ jobs:
   pack-and-publish:
     runs-on: ubuntu-latest
     environment: nuget-publish
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,8 +40,14 @@ jobs:
       - name: Pack
         run: dotnet pack src/MisaConnect.EInvoice.Client/MisaConnect.EInvoice.Client.csproj --no-build --configuration Release -p:Version=${{ steps.ver.outputs.version }} -o artifacts
 
+      - name: NuGet login (OIDC -> temp API key)
+        id: nuget_login
+        uses: NuGet/login@v1
+        with:
+          user: ChuKhaLi
+
       - name: Push to NuGet
-        run: dotnet nuget push "artifacts/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key ${{ steps.nuget_login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

@@ -4,6 +4,8 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-05-14
+
 ### Added
 - Initial public release of `MisaConnect.EInvoice` targeting .NET 8.
 - Use cases: `EnsureAccessToken`, `ListActiveTemplates`, `PreviewInvoice`, `SaveDraftInvoices`, `GetDraftPdfByRefId`, `DeleteDraftInvoice`, `LookupByRefIds`, `LookupStandard`, `LookupCalculating`, `IssueReplacementInvoice`, `IssueAdjustmentInvoice`.
