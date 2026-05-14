@@ -38,7 +38,7 @@ jobs:
         run: dotnet test MisaConnect.slnx --no-build --configuration Release --filter "Category!=Integration"
 
       - name: Pack
-        run: dotnet pack src/MisaConnect.EInvoice.Client/MisaConnect.EInvoice.Client.csproj --no-build --configuration Release -p:Version=${{ steps.ver.outputs.version }} -o artifacts
+        run: dotnet pack src/MisaConnect.EInvoice.Client/MisaConnect.EInvoice.Client.csproj --configuration Release -p:Version=${{ steps.ver.outputs.version }} -o artifacts
 
       - name: NuGet login (OIDC -> temp API key)
         id: nuget_login
