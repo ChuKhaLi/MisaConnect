@@ -2,6 +2,19 @@ name: integration
 
 on:
   workflow_dispatch:
+    inputs:
+      test_filter:
+        description: "Test filter expression passed to --filter"
+        required: false
+        default: "Category=Integration"
+      configuration:
+        description: "Build configuration"
+        required: false
+        default: "Release"
+        type: choice
+        options:
+          - Release
+          - Debug
   schedule:
     - cron: "0 6 * * 1"  # Monday 06:00 UTC
 
@@ -21,7 +34,7 @@ jobs:
         run: dotnet restore MisaConnect.slnx
 
       - name: Build
-        run: dotnet build MisaConnect.slnx --no-restore --configuration Release
+        run: dotnet build MisaConnect.slnx --no-restore --configuration ${{ inputs.configuration || 'Release' }}
 
       - name: Integration tests
         env:
@@ -31,7 +44,7 @@ jobs:
           Misa__EInvoice__UserName: ${{ secrets.MISA_USERNAME }}
           Misa__EInvoice__Password: ${{ secrets.MISA_PASSWORD }}
           Misa__EInvoice__AppId: ${{ secrets.MISA_APP_ID }}
-        run: dotnet test MisaConnect.slnx --no-build --configuration Release --filter "Category=Integration" --logger "trx;LogFileName=integration-tests.trx" --results-directory artifacts/test-results
+        run: dotnet test MisaConnect.slnx --no-build --configuration ${{ inputs.configuration || 'Release' }} --filter "${{ inputs.test_filter || 'Category=Integration' }}" --logger "trx;LogFileName=integration-tests.trx" --results-directory artifacts/test-results
 
       - name: Upload test results
         if: always()

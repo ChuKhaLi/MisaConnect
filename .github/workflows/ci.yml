@@ -5,6 +5,20 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      test_filter:
+        description: "Test filter expression passed to --filter"
+        required: false
+        default: "Category!=Integration"
+      configuration:
+        description: "Build configuration"
+        required: false
+        default: "Release"
+        type: choice
+        options:
+          - Release
+          - Debug
 
 jobs:
   build-test:
@@ -21,10 +35,10 @@ jobs:
         run: dotnet restore MisaConnect.slnx
 
       - name: Build
-        run: dotnet build MisaConnect.slnx --no-restore --configuration Release
+        run: dotnet build MisaConnect.slnx --no-restore --configuration ${{ inputs.configuration || 'Release' }}
 
       - name: Unit tests
-        run: dotnet test MisaConnect.slnx --no-build --configuration Release --filter "Category!=Integration" --logger "trx;LogFileName=unit-tests.trx" --results-directory artifacts/test-results
+        run: dotnet test MisaConnect.slnx --no-build --configuration ${{ inputs.configuration || 'Release' }} --filter "${{ inputs.test_filter || 'Category!=Integration' }}" --logger "trx;LogFileName=unit-tests.trx" --results-directory artifacts/test-results
 
       - name: Upload test results
         if: always()
