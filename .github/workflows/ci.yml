@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       test_filter:
-        description: "Test filter expression passed to --filter"
+        description: "Optional --filter expression (leave blank to run all unit tests)"
         required: false
-        default: "Category!=Integration"
+        default: ""
       configuration:
         description: "Build configuration"
         required: false
@@ -38,7 +38,7 @@ jobs:
         run: dotnet build MisaConnect.slnx --no-restore --configuration ${{ inputs.configuration || 'Release' }}
 
       - name: Unit tests
-        run: dotnet test MisaConnect.slnx --no-build --configuration ${{ inputs.configuration || 'Release' }} --filter "${{ inputs.test_filter || 'Category!=Integration' }}" --logger "trx;LogFileName=unit-tests.trx" --results-directory artifacts/test-results
+        run: dotnet test tests/MisaConnect.EInvoice.UnitTests/MisaConnect.EInvoice.UnitTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFileName=unit-tests.trx" --results-directory artifacts/test-results
 
       - name: Upload test results
         if: always()

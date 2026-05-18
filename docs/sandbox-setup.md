@@ -30,9 +30,10 @@ Same pattern for `samples/MisaConnect.Samples.Api`.
 
 ## 3. Integration test secrets
 
-Integration tests skip cleanly when credentials are absent. To run them, set environment variables (or repo secrets in CI):
+Sandbox tests use `[SandboxFact]`, which reads the `MISACONNECT_SANDBOX_*` env vars and skips cleanly when any are missing or the sandbox host is unreachable. The `Misa__EInvoice__*` vars feed the API/Client wiring inside the integration project — set both pairs to actually exercise live sandbox calls:
 
 ```bash
+# Configuration for the Misa:EInvoice options binder
 export Misa__EInvoice__Environment=Sandbox
 export Misa__EInvoice__BaseUrl=https://testapi.meinvoice.vn/api/integration
 export Misa__EInvoice__TaxCode=0000000000
@@ -40,10 +41,16 @@ export Misa__EInvoice__UserName=...
 export Misa__EInvoice__Password=...
 export Misa__EInvoice__AppId=...
 
-dotnet test --filter Category=Integration
+# Sandbox credentials read by [SandboxFact]
+export MISACONNECT_SANDBOX_TAXCODE=0000000000
+export MISACONNECT_SANDBOX_USERNAME=...
+export MISACONNECT_SANDBOX_PASSWORD=...
+export MISACONNECT_SANDBOX_APPID=...
+
+dotnet test tests/MisaConnect.EInvoice.IntegrationTests
 ```
 
-In GitHub Actions, set repo secrets `MISA_TAX_CODE`, `MISA_USERNAME`, `MISA_PASSWORD`, `MISA_APP_ID` and map them in `.github/workflows/integration.yml`.
+In GitHub Actions, set environment secrets `MISA_TAX_CODE`, `MISA_USERNAME`, `MISA_PASSWORD`, `MISA_APP_ID` on the `misa-sandbox` environment; `.github/workflows/integration.yml` maps them into both env-var sets.
 
 ## 4. Production cutover
 

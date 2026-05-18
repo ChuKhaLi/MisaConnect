@@ -25,7 +25,7 @@ Thanks for considering a contribution. MisaConnect is a community .NET SDK for M
 ## PR requirements
 
 - `dotnet build MisaConnect.slnx` — clean, no warnings (`TreatWarningsAsErrors=true`).
-- `dotnet test --filter Category!=Integration` — all unit tests green.
+- `dotnet test tests/MisaConnect.EInvoice.UnitTests` — all unit tests green.
 - New public types or DI-exposed types need XML doc comments.
 - One slice per PR. Bundle test + code + docs + changelog into a single change.
 

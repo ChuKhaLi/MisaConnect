@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       test_filter:
-        description: "Test filter expression passed to --filter"
+        description: "Optional --filter expression (leave blank to run all integration tests)"
         required: false
-        default: "Category=Integration"
+        default: ""
       configuration:
         description: "Build configuration"
         required: false
@@ -44,7 +44,11 @@ jobs:
           Misa__EInvoice__UserName: ${{ secrets.MISA_USERNAME }}
           Misa__EInvoice__Password: ${{ secrets.MISA_PASSWORD }}
           Misa__EInvoice__AppId: ${{ secrets.MISA_APP_ID }}
-        run: dotnet test MisaConnect.slnx --no-build --configuration ${{ inputs.configuration || 'Release' }} --filter "${{ inputs.test_filter || 'Category=Integration' }}" --logger "trx;LogFileName=integration-tests.trx" --results-directory artifacts/test-results
+          MISACONNECT_SANDBOX_TAXCODE: ${{ secrets.MISA_TAX_CODE }}
+          MISACONNECT_SANDBOX_USERNAME: ${{ secrets.MISA_USERNAME }}
+          MISACONNECT_SANDBOX_PASSWORD: ${{ secrets.MISA_PASSWORD }}
+          MISACONNECT_SANDBOX_APPID: ${{ secrets.MISA_APP_ID }}
+        run: dotnet test tests/MisaConnect.EInvoice.IntegrationTests/MisaConnect.EInvoice.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFileName=integration-tests.trx" --results-directory artifacts/test-results
 
       - name: Upload test results
         if: always()

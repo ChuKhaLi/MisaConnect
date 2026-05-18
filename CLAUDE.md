@@ -10,11 +10,13 @@ This repository is **MisaConnect** — a community .NET SDK for MISA cloud APIs.
 
 ```
 dotnet build MisaConnect.slnx
-dotnet test --filter Category!=Integration       # fast unit tests, no network
-dotnet test --filter Category=Integration        # sandbox tests (require MISA creds)
-dotnet test tests/MisaConnect.EInvoice.UnitTests --filter "FullyQualifiedName~SaveDraftInvoicesTests"   # single test class
-dotnet format MisaConnect.slnx                   # required before PR
+dotnet test tests/MisaConnect.EInvoice.UnitTests                                                         # fast unit tests, no network
+dotnet test tests/MisaConnect.EInvoice.IntegrationTests                                                  # integration + sandbox tests (sandbox facts skip cleanly without MISA creds)
+dotnet test tests/MisaConnect.EInvoice.UnitTests --filter "FullyQualifiedName~SaveDraftInvoicesTests"    # single test class
+dotnet format MisaConnect.slnx                                                                           # required before PR
 ```
+
+The unit/integration split is by project, not by xUnit trait — no test uses `[Trait("Category", ...)]`. Sandbox-credential-requiring tests inside the integration project use `[SandboxFact]`, which skips when the `MISACONNECT_SANDBOX_*` env vars are absent or the sandbox host is unreachable.
 
 - `TreatWarningsAsErrors=true` is set in `Directory.Build.props` — warnings break the build, including in PRs.
 - Unit tests must stay under 30s total and never touch the network.

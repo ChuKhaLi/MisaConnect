@@ -35,7 +35,7 @@ jobs:
         run: dotnet build MisaConnect.slnx --no-restore --configuration Release -p:Version=${{ steps.ver.outputs.version }}
 
       - name: Unit tests
-        run: dotnet test MisaConnect.slnx --no-build --configuration Release --filter "Category!=Integration"
+        run: dotnet test tests/MisaConnect.EInvoice.UnitTests/MisaConnect.EInvoice.UnitTests.csproj --no-build --configuration Release
 
       - name: Pack
         run: dotnet pack src/MisaConnect.EInvoice.Client/MisaConnect.EInvoice.Client.csproj --configuration Release -p:Version=${{ steps.ver.outputs.version }} -o artifacts
