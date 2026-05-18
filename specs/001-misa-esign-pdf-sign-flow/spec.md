@@ -5,6 +5,14 @@
 **Status**: Draft
 **Input**: User description: "Integrate with MISA eSign RemoteSigning so an authenticated caller of our service can sign a PDF end-to-end via MISA's remote certificate service. The slice covers: logging in with userName/password against /api/auth/api/v1/auth/login-api to obtain an accessToken, a remoteSigningAccessToken, a refreshToken, and an expiresIn lifetime (cached and refreshed on HTTP 401 via /auth/refreshtoken); listing the user's digital certificates via /external/esrm/service/general/api/v1/Certificates/by-userId and selecting one whose keyStatus = ACTIVE; hashing a PDF document via /external/esrm/service/document/api/v1/documents/hash using SHA256 with the selected certificate and certificate chain; submitting the resulting digest to /external/esrm/service/signing/api/v1/Signing/hash to obtain a transactionId; polling /external/esrm/service/signing/api/v1/Signing/status/{transactionId} until status is SUCCESS, FAILED, or CANCELLED; and attaching the returned signature to the original PDF via /external/esrm/service/document/api/v1/documents/attachment to produce the final signed PDF bytes. The slice wires up x-clientId / x-clientKey / AuthorizationRM header handling, sandbox vs production base URL via the Misa:ESign configuration section, and the consumer-facing services.AddMisaConnectESign(IConfiguration) DI entry point. The deliverable also includes a unit test suite using mock fixtures (no network) covering validation, ResponseError mapping, refresh-on-401, ACTIVE-cert filtering, and the polling state machine; plus an end-to-end integration test suite that exercises the full happy path against the MISA eSign sandbox using credentials from MISACONNECT_ESIGN_SANDBOX_* env vars (see docs/sandbox-setup.md). Out of scope: 2FA / OTP flow (slice 2), non-PDF document types (slice 3), and the webhook receiver as an alternative to polling (slice 4). Source doc: docs/misa-api-reference/Tài liệu tích hợp API eSign RemoteSigning - V2.md."
 
+## Clarifications
+
+### Session 2026-05-18
+
+- Q: Transport-level retry policy for transient failures (5xx, network errors, 429)? → A: Bounded exponential backoff with jitter (default ~3 attempts), configurable + disable-able via `MisaESignOptions`. Auth-401 refresh-then-retry-once (FR-004) is governed separately.
+- Q: Token-cache key identity? → A: Swappable `ITokenCacheKeySelector` port; default selector composes the key from `userName + clientId + base-URL host`.
+- Q: Concurrency / thread-safety contract? → A: `IMisaESignClient` is thread-safe by contract; concurrent sign calls supported per cache key; refresh is single-flight (one in-flight refresh per cache key, other waiters reuse its result).
+
 ## User Scenarios & Testing *(mandatory)*
 
 This feature is the foundational slice of a new product family (`MisaConnect.ESign`) parallel to the existing `MisaConnect.EInvoice`. The actor is a **consumer developer** integrating the SDK into their .NET service so that an end user of that service can have a PDF signed by their own MISA-issued remote certificate. The "user" in each story below is that consumer developer.
@@ -63,7 +71,9 @@ When MISA returns a `ResponseError` envelope (`error`, `errorCode`, `devMsg`, `u
 - **Sign transaction terminates in FAILED or CANCELLED** → the SDK does not retry; it surfaces a typed terminal-state error carrying MISA's `errorCode` and `devMsg`.
 - **Polling exceeds the configured total timeout** → typed `SignTimeout`-class error; the partially-completed transaction is left as-is on MISA's side (no implicit cancellation).
 - **Refresh token itself is rejected** → typed auth error; no refresh-loop; consumer must re-authenticate explicitly.
-- **MISA sandbox unreachable** at test time → `[SandboxFact]` integration tests skip cleanly; runtime SDK calls surface a typed transport error and do not silently swallow the failure.
+- **MISA sandbox unreachable** at test time → `[SandboxFact]` integration tests skip cleanly; runtime SDK calls exhaust the configured transport-retry budget (FR-023) and then surface a typed transport error — never silently swallowed.
+- **Transient transport failure** mid-pipeline (5xx, network, 429) → SDK retries within the configured budget; if a sign transaction has already produced a `transactionId` before the failure, retries resume polling that same `transactionId` (no duplicate sign submission).
+- **Refresh stampede** — multiple parallel sign calls observe a 401 for the same cached token simultaneously → exactly one outbound `refreshtoken` request is issued for that cache key; the rest await its result and proceed with the refreshed token (FR-028).
 - **Cached token deemed expired by the system clock** but not yet rejected by MISA → SDK refreshes proactively rather than waiting for the 401.
 
 ## Requirements *(mandatory)*
@@ -73,10 +83,22 @@ When MISA returns a `ResponseError` envelope (`error`, `errorCode`, `devMsg`, `u
 **Authentication and token lifecycle**
 
 - **FR-001**: System MUST authenticate via the MISA `login-api` endpoint using a configured `userName` and `password`, and capture the returned `accessToken`, `remoteSigningAccessToken`, `refreshToken`, and `expiresIn`.
-- **FR-002**: System MUST cache the captured tokens in the registered `ITokenCache` (default: in-memory) keyed by the configured credential identity, with a TTL derived from `expiresIn`.
+- **FR-002**: System MUST cache the captured tokens in the registered `ITokenCache` (default: in-memory) using a key produced by the registered `ITokenCacheKeySelector` (FR-026), with a TTL derived from `expiresIn`.
 - **FR-003**: System MUST reuse cached tokens for subsequent operations until the cached entry expires.
 - **FR-004**: On HTTP 401 from any signing-pipeline endpoint, System MUST attempt a single refresh via the MISA `refreshtoken` endpoint using the cached `refreshToken`, then retry the original request exactly once. If the refresh itself fails, System MUST NOT loop and MUST surface a typed auth error.
 - **FR-005**: System MUST proactively refresh when the cached token's clock-based remaining lifetime is exhausted, without waiting for a 401.
+- **FR-026**: System MUST expose a swappable `ITokenCacheKeySelector` port. The default adapter MUST compose the cache key from the configured `userName`, `clientId`, and base-URL host (in that order). Consumers register their own selector before `AddMisaConnectESign` to alter the identity scheme (e.g. add a tenant discriminator).
+
+**Transport reliability**
+
+- **FR-023**: System MUST retry transient HTTP failures — connection errors, request timeouts, 5xx status codes, and 429 — using bounded exponential backoff with jitter, applied to every MISA call in the slice-1 pipeline. The retry budget MUST be a configurable policy in `MisaESignOptions` (default: at most 3 attempts total, starting delay ~200 ms with full jitter, doubled per retry, capped at ~2 s). On 429 with a `Retry-After` header, System MUST honor the header value (clamped to the configured max delay) instead of the computed backoff.
+- **FR-024**: The transport-retry policy MUST be disable-able via configuration (e.g. `MaxAttempts = 1`). The auth-refresh retry defined in FR-004 is a separate budget — it is not affected by the transport-retry policy and is not consumed by it.
+- **FR-025**: When the configured retry budget is exhausted, System MUST surface a typed transport error carrying the last response's status (if any), the correlation ID, and the attempt count, without ever entering an unbounded retry loop.
+
+**Concurrency and thread safety**
+
+- **FR-027**: The `IMisaESignClient` facade and the SDK's default port adapters (`ITokenCache`, `ITokenCacheKeySelector`, `ICertificateSelector`) MUST be safe for use as a DI singleton with multiple in-flight sign calls per cache key. Consumer-supplied adapters are expected to honor the same contract; the SDK does not introduce extra serialization for them.
+- **FR-028**: Concurrent calls that observe a 401 for the same cached token MUST result in exactly one in-flight refresh per cache key. Other waiters MUST await that refresh and reuse its result rather than issuing duplicate `refreshtoken` requests. If the in-flight refresh fails, all waiters MUST surface the same typed auth error.
 
 **Certificate selection**
 
@@ -129,6 +151,7 @@ When MISA returns a `ResponseError` envelope (`error`, `errorCode`, `devMsg`, `u
 - **SC-004**: After the first sign of a given credential identity, subsequent signs within the cached `expiresIn` window perform zero additional login requests.
 - **SC-005**: Every MISA `errorCode` documented for the seven slice-1 endpoints maps to a typed SDK error whose surfaced payload carries that `errorCode` and a non-empty correlation ID — verified by unit-test coverage of each documented code.
 - **SC-006**: A captured-log scan over the full unit and integration suites yields zero hits for any cached token value, refresh token value, certificate private-key material, raw document byte sequence, or end-user PII string.
+- **SC-007**: Under at least 8 parallel sign calls that all observe a 401 for the same cached token, exactly 1 outbound `refreshtoken` request is issued — verified by request counting against the in-repo fake server.
 
 ## Assumptions
 
@@ -136,6 +159,7 @@ When MISA returns a `ResponseError` envelope (`error`, `errorCode`, `devMsg`, `u
 - The consumer holds and securely stores MISA `userName`/`password`/`clientId`/`clientKey`, e.g. via .NET user secrets or a secret manager — matching the existing eInvoice convention in [docs/sandbox-setup.md](../../docs/sandbox-setup.md).
 - The MISA production base URL is `esignapp.misa.vn` (per the slice-1 input); the sandbox base URL is the value MISA issues with sandbox credentials and is supplied via the `Misa:ESign` configuration section.
 - Default poll interval and total timeout for `Signing/status` are reasonable web-service defaults (e.g. interval ~2 s, total ~60 s), both configurable via `MisaESignOptions`.
-- Default `ITokenCache` is in-memory; consumers register a distributed adapter (e.g. Redis) by binding their own implementation before `AddMisaConnectESign`.
+- Default transport-retry settings (FR-023): up to 3 attempts, starting delay ~200 ms with full jitter, doubled per retry, capped at ~2 s. Consumers tighten or disable via `MisaESignOptions`.
+- Default `ITokenCache` is in-memory; consumers register a distributed adapter (e.g. Redis) by binding their own implementation before `AddMisaConnectESign`. The default `ITokenCacheKeySelector` (FR-026) composes the cache key from `userName + clientId + base-URL host`, so the same process can hold sandbox and production sessions without collision; consumers register their own selector to add further discriminators (e.g. a tenant ID).
 - 2FA / OTP (slice 2), non-PDF document types (slice 3), and the webhook receiver (slice 4) are explicitly out of scope for this slice and will be specified separately per [docs/misa-esign-spec-plan.md](../../docs/misa-esign-spec-plan.md).
 - The constitution principles in [.specify/memory/constitution.md](../../.specify/memory/constitution.md) — especially zero-dep Domain, port-and-adapter extensibility, wire-format fidelity, and no-PII-in-logs — apply to every requirement above.
