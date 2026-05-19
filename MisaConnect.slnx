@@ -8,10 +8,16 @@
     <Project Path="src/MisaConnect.EInvoice.Client/MisaConnect.EInvoice.Client.csproj" />
     <Project Path="src/MisaConnect.EInvoice.Domain/MisaConnect.EInvoice.Domain.csproj" />
     <Project Path="src/MisaConnect.EInvoice.Infrastructure/MisaConnect.EInvoice.Infrastructure.csproj" />
+    <Project Path="src/MisaConnect.ESign.Application/MisaConnect.ESign.Application.csproj" />
+    <Project Path="src/MisaConnect.ESign.Client/MisaConnect.ESign.Client.csproj" />
+    <Project Path="src/MisaConnect.ESign.Domain/MisaConnect.ESign.Domain.csproj" />
+    <Project Path="src/MisaConnect.ESign.Infrastructure/MisaConnect.ESign.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MisaConnect.EInvoice.IntegrationTests/MisaConnect.EInvoice.IntegrationTests.csproj" />
     <Project Path="tests/MisaConnect.EInvoice.TestSupport/MisaConnect.EInvoice.TestSupport.csproj" />
     <Project Path="tests/MisaConnect.EInvoice.UnitTests/MisaConnect.EInvoice.UnitTests.csproj" />
+    <Project Path="tests/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj" />
+    <Project Path="tests/MisaConnect.ESign.UnitTests/MisaConnect.ESign.UnitTests.csproj" />
   </Folder>
 </Solution>

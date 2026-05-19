@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>MisaConnect.ESign.Client</RootNamespace>
+    <AssemblyName>MisaConnect.ESign.Client</AssemblyName>
+    <PackageId>MisaConnect.ESign</PackageId>
+    <Description>Community .NET SDK for MISA eSign RemoteSigning. Provides a port-and-adapter facade for the MISA eSign HTTP API: PDF signing end-to-end (login, certificate listing, server-side hashing, sign submission, status polling, signature attachment).</Description>
+    <PackageTags>misa;esign;remotesigning;vietnam;pdf;signature;sdk</PackageTags>
+    <IsPackable>true</IsPackable>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);BundleReferencedProjects</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MisaConnect.ESign.Application\MisaConnect.ESign.Application.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\MisaConnect.ESign.Domain\MisaConnect.ESign.Domain.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\MisaConnect.ESign.Infrastructure\MisaConnect.ESign.Infrastructure.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Condition="Exists('..\..\README.md')" />
+    <None Include="..\..\icon.png" Pack="true" PackagePath="\" Condition="Exists('..\..\icon.png')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MisaConnect.ESign.UnitTests" />
+    <InternalsVisibleTo Include="MisaConnect.ESign.IntegrationTests" />
+  </ItemGroup>
+
+  <Target Name="BundleReferencedProjects" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BundledAssembly Include="@(ReferenceCopyLocalPaths)"
+                       Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference' and '%(ReferenceCopyLocalPaths.Extension)' == '.dll'" />
+      <BuildOutputInPackage Include="@(BundledAssembly)" TargetPath="%(Filename)%(Extension)" />
+      <BuildOutputInPackage Include="@(BundledAssembly->'%(RootDir)%(Directory)%(Filename).pdb')"
+                            Condition="Exists('%(RootDir)%(Directory)%(Filename).pdb')"
+                            TargetPath="%(Filename).pdb" />
+    </ItemGroup>
+  </Target>
+
+</Project>

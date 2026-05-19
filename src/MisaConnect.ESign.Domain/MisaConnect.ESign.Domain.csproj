@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>MisaConnect.ESign.Domain</RootNamespace>
+    <AssemblyName>MisaConnect.ESign.Domain</AssemblyName>
+    <Description>Domain entities and value objects for the MISA eSign RemoteSigning integration.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

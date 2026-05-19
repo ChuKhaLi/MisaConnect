@@ -69,7 +69,24 @@ See [docs/sandbox-setup.md](docs/sandbox-setup.md) for sandbox credential setup 
 | Issue replacement | `IssueReplacementInvoice` | ✅ v1.0 |
 | Issue adjustment | `IssueAdjustmentInvoice` | ✅ v1.0 |
 | Issue invoice (cấp số / sign) | — | 🛑 not yet |
-| MISA eSign integration | — | 🛑 v2.0 |
+| MISA eSign integration | — | 🟡 v2.0-preview.1 (slice 1) |
+
+## MisaConnect.ESign (v2.0 preview)
+
+Slice 1 of the `MisaConnect.ESign` product family adds end-to-end PDF signing via the MISA eSign RemoteSigning API. Installable separately:
+
+```
+dotnet add package MisaConnect.ESign --version 2.0.0-preview.1
+```
+
+| Operation | Facade method | Status |
+| --- | --- | --- |
+| Sign PDF end-to-end (login → list certs → hash → sign → poll → attach) | `IMisaESignClient.SignPdfAsync` | 🟡 v2.0-preview.1 |
+| 2FA / OTP authentication | — | 🛑 slice 2 |
+| Non-PDF document types (XML, Word, Excel) | — | 🛑 slice 3 |
+| Webhook receiver (vs polling) | — | 🛑 slice 4 |
+
+Bind options under the `Misa:ESign` configuration section, then call `services.AddMisaConnectESign(IConfiguration)`. See [specs/001-misa-esign-pdf-sign-flow/quickstart.md](specs/001-misa-esign-pdf-sign-flow/quickstart.md) for the full walkthrough.
 
 ## Project layout
 

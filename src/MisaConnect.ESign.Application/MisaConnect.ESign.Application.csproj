@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>MisaConnect.ESign.Application</RootNamespace>
+    <AssemblyName>MisaConnect.ESign.Application</AssemblyName>
+    <Description>Use-cases, ports, and orchestration for the MISA eSign RemoteSigning integration.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MisaConnect.ESign.Domain\MisaConnect.ESign.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MisaConnect.ESign.Infrastructure" />
+    <InternalsVisibleTo Include="MisaConnect.ESign.Client" />
+    <InternalsVisibleTo Include="MisaConnect.ESign.UnitTests" />
+    <InternalsVisibleTo Include="MisaConnect.ESign.IntegrationTests" />
+  </ItemGroup>
+
+</Project>
