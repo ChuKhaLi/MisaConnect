@@ -230,7 +230,7 @@ The only existing components that gain new edits are:
 
 **Rationale**:
 - FR-066 and FR-067 explicitly require slice 3 to be additive on top of slice 1 + 2. Discipline is enforced by:
-  1. The slice-1 PDF integration test (`SignPdfHappyPathSandboxTests.cs` + `SignPdfHappyPathFakeServerTests.cs`) must continue to pass byte-identically (FR-065 / SC-021) — any change to slice-1 wire shaping breaks them.
+  1. The slice-1 PDF integration test (`SignPdfHappyPathFakeServerTests.cs`) must continue to pass byte-identically (FR-065 / SC-021) — any change to slice-1 wire shaping breaks it. (Slice 1 currently has no PDF sandbox happy-path test, only the fake-server one; the FR-065 regression gate is enforced exclusively against the fake-server test.)
   2. The slice-2 OTP integration tests (`TwoFactorAuthHappyPathFakeServerTests.cs` etc.) must continue to pass — any change to slice-1/2 token caching breaks them.
   3. The layer-audit unit test (`MisaConnectESignLayerAuditTests.cs`) flags any new layer-crossing.
 - Refactoring `SignPdf` into a state machine or extracting a shared base class would churn slice-1 code for no gain. The thin per-format orchestrator clone is the lowest-friction shape.
