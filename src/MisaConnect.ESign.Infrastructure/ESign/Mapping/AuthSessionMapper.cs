@@ -5,6 +5,9 @@ namespace MisaConnect.ESign.Infrastructure.ESign.Mapping;
 
 internal static class AuthSessionMapper
 {
+    public static AuthSession FromTwoFactorAuthResponse(LoginResponseDto? dto, DateTimeOffset now) =>
+        FromLoginResponse(dto, now);
+
     public static AuthSession FromLoginResponse(LoginResponseDto? dto, DateTimeOffset now)
     {
         if (dto?.Data is null)

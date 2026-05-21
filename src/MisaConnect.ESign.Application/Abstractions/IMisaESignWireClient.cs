@@ -10,6 +10,10 @@ public interface IMisaESignWireClient
 
     Task<AuthSession> RefreshAsync(string refreshToken, CancellationToken ct);
 
+    Task<AuthSession> TwoFactorAuthAsync(string userName, string code, OtpDeliveryChannel otpType, bool remember, CancellationToken ct);
+
+    Task<OtpResendResult> ResendOtpAsync(string userName, string language, CancellationToken ct);
+
     Task<IReadOnlyList<Certificate>> ListCertificatesByUserIdAsync(string accessToken, CancellationToken ct);
 
     Task<PdfHashOutput> HashPdfAsync(

@@ -27,6 +27,12 @@ internal sealed class ESignCallLogger : IMisaESignWireClient
     public Task<AuthSession> RefreshAsync(string refreshToken, CancellationToken ct) =>
         Wrap("refreshtoken", "POST", () => _inner.RefreshAsync(refreshToken, ct));
 
+    public Task<AuthSession> TwoFactorAuthAsync(string userName, string code, OtpDeliveryChannel otpType, bool remember, CancellationToken ct) =>
+        Wrap("two-factor-auth", "POST", () => _inner.TwoFactorAuthAsync(userName, code, otpType, remember, ct));
+
+    public Task<OtpResendResult> ResendOtpAsync(string userName, string language, CancellationToken ct) =>
+        Wrap("resend-otp-auth", "POST", () => _inner.ResendOtpAsync(userName, language, ct));
+
     public Task<IReadOnlyList<Certificate>> ListCertificatesByUserIdAsync(string accessToken, CancellationToken ct) =>
         Wrap("Certificates/by-userId", "GET", () => _inner.ListCertificatesByUserIdAsync(accessToken, ct));
 

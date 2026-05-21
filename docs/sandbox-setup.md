@@ -52,6 +52,30 @@ dotnet test tests/MisaConnect.EInvoice.IntegrationTests
 
 In GitHub Actions, set environment secrets `MISA_TAX_CODE`, `MISA_USERNAME`, `MISA_PASSWORD`, `MISA_APP_ID` on the `misa-sandbox` environment; `.github/workflows/integration.yml` maps them into both env-var sets.
 
+## 3a. MisaConnect.ESign sandbox
+
+The `MisaConnect.ESign` integration suite reads its own `MISACONNECT_ESIGN_SANDBOX_*` env-var family. `[SandboxFact]` skips cleanly when any of these are absent:
+
+```bash
+export MISACONNECT_ESIGN_SANDBOX_BASE_URL=https://esign-sandbox.example.com/
+export MISACONNECT_ESIGN_SANDBOX_CLIENT_ID=...
+export MISACONNECT_ESIGN_SANDBOX_CLIENT_KEY=...
+export MISACONNECT_ESIGN_SANDBOX_USERNAME=...
+export MISACONNECT_ESIGN_SANDBOX_PASSWORD=...
+```
+
+For slice-2 two-factor tests (`[SandboxFact(SandboxRequirement.TwoFactorAuth)]`), additionally set:
+
+```bash
+# Either a static OTP value (sandbox-only — never use in production) OR an
+# absolute path to a console binary that prints the current OTP on stdout.
+export MISACONNECT_ESIGN_SANDBOX_OTP_PROVIDER=123456
+# Confirms the sandbox account is enrolled in 2FA (any non-empty value suffices).
+export MISACONNECT_ESIGN_SANDBOX_USER_2FA_ENABLED=1
+```
+
+When either of the two-factor env vars is absent the 2FA sandbox test skips cleanly with `ESign sandbox not configured. Missing: ...`. The test never throws on missing credentials — failures only surface when MISA itself rejects the configured account.
+
 ## 4. Production cutover
 
 Flip:

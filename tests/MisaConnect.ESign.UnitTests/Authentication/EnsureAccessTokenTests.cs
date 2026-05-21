@@ -1,6 +1,7 @@
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Application.UseCases;
 using MisaConnect.ESign.Domain.Authentication;
+using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Infrastructure.Caching;
 using MisaConnect.ESign.UnitTests.TestSupport;
 using Xunit;
@@ -70,6 +71,32 @@ public class EnsureAccessTokenTests
 
         Assert.Equal(0, wire.LoginCalls);
         Assert.Equal("rs", token.Value);
+    }
+
+    [Fact]
+    public async Task Surfaces_122_without_propagating_password()
+    {
+        var wire = new StubWireClient
+        {
+            OnLogin = (u, _, _) => throw new AuthenticationFailedException(
+                "122", "2fa required", "cid", requires2FA: true, username: u),
+        };
+        var cache = new InMemoryTokenCache();
+        var ensure = new EnsureAccessToken(
+            wire: wire,
+            cache: cache,
+            keySelector: new StaticKeySelector("k"),
+            clock: new FakeClock(DateTimeOffset.UtcNow),
+            credentialsAccessor: () => ("alice", "super-secret-password"),
+            refreshUseCase: new RefreshAccessToken(wire));
+
+        var ex = await Assert.ThrowsAsync<AuthenticationFailedException>(() =>
+            ensure.ExecuteAsync(CancellationToken.None));
+
+        Assert.True(ex.Requires2FA);
+        Assert.Equal("alice", ex.Username);
+        Assert.DoesNotContain("super-secret-password", ex.Detail);
+        Assert.DoesNotContain("super-secret-password", ex.Message);
     }
 
     [Fact]

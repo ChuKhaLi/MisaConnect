@@ -107,7 +107,9 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
     {
         var path = request.RequestUri?.AbsolutePath ?? string.Empty;
         return path.EndsWith("/login-api", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith("/refreshtoken", StringComparison.OrdinalIgnoreCase);
+            || path.EndsWith("/refreshtoken", StringComparison.OrdinalIgnoreCase)
+            || path.EndsWith("/two-factor-auth", StringComparison.OrdinalIgnoreCase)
+            || path.EndsWith("/resend-otp-auth", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void ApplyAuth(HttpRequestMessage request, string accessToken)

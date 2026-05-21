@@ -56,4 +56,27 @@ public class ESignLogScrubberTests
         Assert.Contains("Signing/hash", scrubbed);
         Assert.Contains("42", scrubbed);
     }
+
+    [Fact]
+    public void Otp_code_field_replaced()
+    {
+        var scrubbed = ESignLogScrubber.Scrub("{\"userName\":\"alice\",\"code\":\"123456\",\"otpType\":0,\"remember\":true}");
+        Assert.DoesNotContain("\"123456\"", scrubbed);
+        Assert.Contains("alice", scrubbed);
+    }
+
+    [Fact]
+    public void Password_field_replaced()
+    {
+        var scrubbed = ESignLogScrubber.Scrub("{\"userName\":\"alice\",\"password\":\"super-secret\"}");
+        Assert.DoesNotContain("super-secret", scrubbed);
+    }
+
+    [Fact]
+    public void Device_prefixed_field_replaced_defensively()
+    {
+        var scrubbed = ESignLogScrubber.Scrub("{\"deviceId\":\"device-1234567890\",\"deviceName\":\"My-Phone\"}");
+        Assert.DoesNotContain("device-1234567890", scrubbed);
+        Assert.DoesNotContain("My-Phone", scrubbed);
+    }
 }

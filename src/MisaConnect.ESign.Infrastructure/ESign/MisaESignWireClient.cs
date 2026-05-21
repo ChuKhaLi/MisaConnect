@@ -53,13 +53,13 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
 
         if (!resp.IsSuccessStatusCode)
         {
-            await ThrowMappedAsync(resp, json, ESignHttpRoutes.AuthLoginApi, ct).ConfigureAwait(false);
+            await ThrowMappedAsync(resp, json, ESignHttpRoutes.AuthLoginApi, ct, userName).ConfigureAwait(false);
         }
 
         var dto = Deserialize<LoginResponseDto>(json);
         if (dto?.Status is { Error: true })
         {
-            ThrowFromLoginEnvelope(dto.Status, ESignHttpRoutes.AuthLoginApi);
+            ThrowFromLoginEnvelope(dto.Status, ESignHttpRoutes.AuthLoginApi, userName);
         }
         if (dto?.Data is null)
         {
@@ -70,6 +70,130 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
                 _correlation.Current);
         }
         return AuthSessionMapper.FromLoginResponse(dto, _clock.UtcNow);
+    }
+
+    public async Task<AuthSession> TwoFactorAuthAsync(
+        string userName,
+        string code,
+        OtpDeliveryChannel otpType,
+        bool remember,
+        CancellationToken ct)
+    {
+        var body = new TwoFactorAuthRequestDto
+        {
+            UserName = userName,
+            Code = code,
+            OtpType = (int)otpType,
+            Remember = remember,
+        };
+        var req = NewRequest(HttpMethod.Post, ESignHttpRoutes.AuthTwoFactor, attachAuthorization: false);
+        req.Content = JsonContent.Create(body, options: ESignJsonOptions.Wire);
+
+        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+        var json = await ReadStringAsync(resp, ct).ConfigureAwait(false);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            ThrowFromTwoFactorEnvelope(json, (int)resp.StatusCode, resp.StatusCode, userName);
+        }
+
+        var dto = Deserialize<LoginResponseDto>(json);
+        if (dto?.Status is { Error: true })
+        {
+            ThrowFromTwoFactorStatus(dto.Status, userName);
+        }
+        if (dto?.Data is null)
+        {
+            throw new ESignGeneralException(
+                ESignErrorCategory.MisaUnknown,
+                "EmptyResponse",
+                $"MISA {ESignHttpRoutes.AuthTwoFactor} returned an empty data block.",
+                _correlation.Current);
+        }
+        return AuthSessionMapper.FromTwoFactorAuthResponse(dto, _clock.UtcNow);
+    }
+
+    public async Task<OtpResendResult> ResendOtpAsync(string userName, string language, CancellationToken ct)
+    {
+        var body = new ResendOtpRequestDto { UserName = userName, Language = language };
+        var req = NewRequest(HttpMethod.Post, ESignHttpRoutes.AuthResendOtp, attachAuthorization: false);
+        req.Content = JsonContent.Create(body, options: ESignJsonOptions.Wire);
+
+        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+        var json = await ReadStringAsync(resp, ct).ConfigureAwait(false);
+
+        var statusCode = (int)resp.StatusCode;
+        if (statusCode == 429 || statusCode >= 500)
+        {
+            throw new ESignTransportException(
+                lastStatusCode: resp.StatusCode,
+                attemptCount: 1,
+                detail: $"MISA {ESignHttpRoutes.AuthResendOtp} returned transport failure (statusCode={statusCode}).",
+                correlationId: _correlation.Current);
+        }
+
+        ResponseError? envelope = null;
+        var dto = Deserialize<ResendOtpResponseDto>(json);
+        if (dto?.Status is not null)
+        {
+            envelope = ResponseErrorMapper.FromLoginStatus(dto.Status);
+        }
+        else if (!string.IsNullOrEmpty(json))
+        {
+            var errDto = Deserialize<ResponseErrorDto>(json);
+            if (errDto is not null)
+            {
+                envelope = ResponseErrorMapper.ToDomain(errDto);
+            }
+        }
+
+        return Application.Errors.OtpErrorMapper.MapResendResult(
+            statusCode: statusCode,
+            envelope: envelope,
+            correlationId: _correlation.Current,
+            includeRawErrorMessage: _options.Value.Errors.IncludeRawErrorMessage);
+    }
+
+    private void ThrowFromTwoFactorEnvelope(string body, int statusCode, HttpStatusCode httpStatus, string userName)
+    {
+        ResponseError? envelope = null;
+        if (!string.IsNullOrEmpty(body))
+        {
+            var statusDto = Deserialize<LoginResponseDto>(body);
+            if (statusDto?.Status is not null)
+            {
+                envelope = ResponseErrorMapper.FromLoginStatus(statusDto.Status);
+            }
+            if (envelope is null)
+            {
+                var errDto = Deserialize<ResponseErrorDto>(body);
+                if (errDto is not null)
+                {
+                    envelope = ResponseErrorMapper.ToDomain(errDto);
+                }
+            }
+        }
+        throw Application.Errors.OtpErrorMapper.MapTwoFactor(
+            statusCode: statusCode,
+            envelope: envelope,
+            correlationId: _correlation.Current,
+            includeRawErrorMessage: _options.Value.Errors.IncludeRawErrorMessage,
+            lastStatusCode: httpStatus,
+            attemptCount: 1,
+            userName: userName);
+    }
+
+    private void ThrowFromTwoFactorStatus(LoginStatusBlockDto status, string userName)
+    {
+        var envelope = ResponseErrorMapper.FromLoginStatus(status);
+        throw Application.Errors.OtpErrorMapper.MapTwoFactor(
+            statusCode: status.Code ?? (int)HttpStatusCode.BadRequest,
+            envelope: envelope,
+            correlationId: _correlation.Current,
+            includeRawErrorMessage: _options.Value.Errors.IncludeRawErrorMessage,
+            lastStatusCode: null,
+            attemptCount: 1,
+            userName: userName);
     }
 
     public async Task<AuthSession> RefreshAsync(string refreshToken, CancellationToken ct)
@@ -335,7 +459,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         }
     }
 
-    private async Task ThrowMappedAsync(HttpResponseMessage resp, string body, string endpoint, CancellationToken ct)
+    private async Task ThrowMappedAsync(HttpResponseMessage resp, string body, string endpoint, CancellationToken ct, string? userName = null)
     {
         await Task.CompletedTask;
         _ = ct;
@@ -357,7 +481,8 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             includeRawErrorMessage: _options.Value.Errors.IncludeRawErrorMessage,
             transactionId: null,
             attemptCount: null,
-            lastStatusCode: resp.StatusCode);
+            lastStatusCode: resp.StatusCode,
+            userName: userName);
     }
 
     private async Task<ESignException> BuildAuthFailureAsync(HttpResponseMessage resp, string body, string endpoint, CancellationToken ct)
@@ -384,7 +509,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             lastStatusCode: resp.StatusCode);
     }
 
-    private void ThrowFromLoginEnvelope(LoginStatusBlockDto status, string endpoint)
+    private void ThrowFromLoginEnvelope(LoginStatusBlockDto status, string endpoint, string? userName = null)
     {
         var envelope = ResponseErrorMapper.FromLoginStatus(status);
         throw Application.Errors.ESignErrorMapper.Map(
@@ -395,7 +520,8 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             includeRawErrorMessage: _options.Value.Errors.IncludeRawErrorMessage,
             transactionId: null,
             attemptCount: null,
-            lastStatusCode: null);
+            lastStatusCode: null,
+            userName: userName);
     }
 
     private static SignatureInfoDto ToWireSignatureInfo(SignatureInfo source)

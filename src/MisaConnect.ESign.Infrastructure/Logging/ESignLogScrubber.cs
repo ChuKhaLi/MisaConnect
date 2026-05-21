@@ -21,7 +21,11 @@ public static class ESignLogScrubber
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex SensitiveJsonField = new(
-        "\"(accessToken|remoteSigningAccessToken|refreshToken|authorizationRM|authorization|password|certificate|certiticateChain|certificateChain|fileToSign|documentBytes|documentHash|sh|digest|signature|fontData|signatureImage|logoImage|email|emailName|phoneNumber|firstName|lastName)\"\\s*:\\s*\"[^\"]*\"",
+        "\"(accessToken|remoteSigningAccessToken|refreshToken|authorizationRM|authorization|password|code|certificate|certiticateChain|certificateChain|fileToSign|documentBytes|documentHash|sh|digest|signature|fontData|signatureImage|logoImage|email|emailName|phoneNumber|firstName|lastName)\"\\s*:\\s*\"[^\"]*\"",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex DeviceJsonField = new(
+        "\"device[A-Za-z0-9_]*\"\\s*:\\s*\"[^\"]*\"",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex Base64Chunk = new(
@@ -34,6 +38,13 @@ public static class ESignLogScrubber
         var result = AuthHeaderPattern.Replace(input, m => $"{m.Groups[1].Value}: {Mask}");
         result = BearerPattern.Replace(result, $"Bearer {Mask}");
         result = SensitiveJsonField.Replace(result, m =>
+        {
+            var fieldStart = m.Value.IndexOf('"') + 1;
+            var fieldEnd = m.Value.IndexOf('"', fieldStart);
+            var fieldName = m.Value.Substring(fieldStart, fieldEnd - fieldStart);
+            return $"\"{fieldName}\":\"{Mask}\"";
+        });
+        result = DeviceJsonField.Replace(result, m =>
         {
             var fieldStart = m.Value.IndexOf('"') + 1;
             var fieldEnd = m.Value.IndexOf('"', fieldStart);

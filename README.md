@@ -73,16 +73,18 @@ See [docs/sandbox-setup.md](docs/sandbox-setup.md) for sandbox credential setup 
 
 ## MisaConnect.ESign (v2.0 preview)
 
-Slice 1 of the `MisaConnect.ESign` product family adds end-to-end PDF signing via the MISA eSign RemoteSigning API. Installable separately:
+Slices 1–2 of the `MisaConnect.ESign` product family cover end-to-end PDF signing and two-factor (OTP) authentication via the MISA eSign RemoteSigning API. Installable separately:
 
 ```
-dotnet add package MisaConnect.ESign --version 2.0.0-preview.1
+dotnet add package MisaConnect.ESign --version 2.0.0-preview.2
 ```
 
 | Operation | Facade method | Status |
 | --- | --- | --- |
 | Sign PDF end-to-end (login → list certs → hash → sign → poll → attach) | `IMisaESignClient.SignPdfAsync` | 🟡 v2.0-preview.1 |
-| 2FA / OTP authentication | — | 🛑 slice 2 |
+| 2FA / OTP — explicit completion of a captured challenge | `IMisaESignClient.SignInWithOtpAsync` | 🟡 v2.0-preview.2 |
+| 2FA / OTP — request re-delivery | `IMisaESignClient.ResendOtpAsync` | 🟡 v2.0-preview.2 |
+| 2FA / OTP — transparent (DI-registered `IOtpProvider`) | `Application.Abstractions.IOtpProvider` | 🟡 v2.0-preview.2 |
 | Non-PDF document types (XML, Word, Excel) | — | 🛑 slice 3 |
 | Webhook receiver (vs polling) | — | 🛑 slice 4 |
 

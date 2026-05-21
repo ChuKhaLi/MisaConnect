@@ -76,6 +76,20 @@ internal static class ServiceCollectionExtensions
         services.AddScoped<PollSignStatus>();
         services.AddScoped<AttachSignature>();
         services.AddScoped<SignPdfRequestValidator>();
+        services.AddScoped<OtpSubmissionValidator>();
+        services.AddScoped<ExchangeOtp>(sp => new ExchangeOtp(
+            wire: sp.GetRequiredService<IMisaESignWireClient>(),
+            cache: sp.GetRequiredService<ITokenCache>(),
+            keySelector: sp.GetRequiredService<ITokenCacheKeySelector>(),
+            singleFlight: (cacheKey, factory, ct) =>
+                sp.GetRequiredService<SingleFlightRefresh>().RefreshAsync(cacheKey, factory, ct)));
+        services.AddScoped<ResendOtp>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<MisaESignOptions>>();
+            return new ResendOtp(
+                wire: sp.GetRequiredService<IMisaESignWireClient>(),
+                defaultLanguageAccessor: () => options.Value.Otp.DefaultResendLanguage);
+        });
         services.AddScoped<SignPdf>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<MisaESignOptions>>();
@@ -90,7 +104,11 @@ internal static class ServiceCollectionExtensions
                 clock: sp.GetRequiredService<ISystemClock>(),
                 validator: sp.GetRequiredService<SignPdfRequestValidator>(),
                 intervalAccessor: () => options.Value.Polling.Interval,
-                totalTimeoutAccessor: () => options.Value.Polling.TotalTimeout);
+                totalTimeoutAccessor: () => options.Value.Polling.TotalTimeout,
+                otpProvider: sp.GetService<IOtpProvider>(),
+                exchangeOtp: sp.GetService<ExchangeOtp>(),
+                otpSubmissionValidator: sp.GetService<OtpSubmissionValidator>(),
+                correlation: sp.GetService<ICorrelationIdAccessor>());
         });
 
         services.AddTransient<ClientHeadersHandler>();

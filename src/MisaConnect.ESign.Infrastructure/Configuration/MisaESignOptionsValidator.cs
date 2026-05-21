@@ -62,6 +62,11 @@ public sealed class MisaESignOptionsValidator : IValidateOptions<MisaESignOption
             errors.Add("Misa:ESign:TransportRetry:MaxDelay must be >= BaseDelay.");
         }
 
+        if (string.IsNullOrWhiteSpace(options.Otp.DefaultResendLanguage))
+        {
+            errors.Add("Misa:ESign:Otp:DefaultResendLanguage must be non-empty.");
+        }
+
         return errors.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(errors);

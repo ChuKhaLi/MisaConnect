@@ -1,4 +1,8 @@
 using MisaConnect.ESign.Application.Abstractions;
+using MisaConnect.ESign.Application.Errors;
+using MisaConnect.ESign.Application.UseCases;
+using MisaConnect.ESign.Application.Validation;
+using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Infrastructure.Configuration;
 using Xunit;
@@ -65,6 +69,25 @@ public class MisaConnectESignLayerAuditTests
         return fullName.StartsWith("MisaConnect.ESign.Infrastructure.Configuration.", StringComparison.Ordinal)
             || fullName == "MisaConnect.ESign.Infrastructure.Time.SystemClock"
             || fullName == "MisaConnect.ESign.Infrastructure.Logging.ESignLogScrubber";
+    }
+
+    [Fact]
+    public void Slice2_otp_types_live_at_expected_layers()
+    {
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(OtpDeliveryChannel).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(InvalidOtpException).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(ExpiredOtpException).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(ExhaustedOtpAttemptsException).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(OtpRejectedException).Assembly.GetName().Name);
+
+        Assert.Equal("MisaConnect.ESign.Application", typeof(IOtpProvider).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(OtpChallenge).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(OtpSubmission).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(OtpResendResult).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(ExchangeOtp).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(ResendOtp).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(OtpErrorMapper).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(OtpSubmissionValidator).Assembly.GetName().Name);
     }
 
     private static bool IsSystemAssembly(string name) =>

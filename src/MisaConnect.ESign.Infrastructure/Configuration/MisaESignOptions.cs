@@ -15,6 +15,17 @@ public sealed class MisaESignOptions
     public MisaESignPollingOptions Polling { get; set; } = new();
     public MisaESignTransportRetryOptions TransportRetry { get; set; } = new();
     public MisaESignErrorOptions Errors { get; set; } = new();
+    public MisaESignOtpOptions Otp { get; set; } = new();
+}
+
+public sealed class MisaESignOtpOptions
+{
+    /// <summary>
+    /// Default value supplied to <c>/resend-otp-auth</c> when the consumer's
+    /// <c>ResendOtpAsync</c> call does not override the language. The SDK does
+    /// not validate the value — MISA is the authority on supported values.
+    /// </summary>
+    public string DefaultResendLanguage { get; set; } = "en-US";
 }
 
 public sealed class MisaESignPollingOptions

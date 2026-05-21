@@ -1,6 +1,7 @@
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Application.Validation;
 using MisaConnect.ESign.Domain.Documents;
+using MisaConnect.ESign.Domain.Errors;
 
 namespace MisaConnect.ESign.Application.UseCases;
 
@@ -17,6 +18,10 @@ public sealed class SignPdf
     private readonly SignPdfRequestValidator _validator;
     private readonly Func<TimeSpan> _intervalAccessor;
     private readonly Func<TimeSpan> _totalTimeoutAccessor;
+    private readonly IOtpProvider? _otpProvider;
+    private readonly ExchangeOtp? _exchangeOtp;
+    private readonly OtpSubmissionValidator? _otpSubmissionValidator;
+    private readonly ICorrelationIdAccessor? _correlation;
 
     public SignPdf(
         EnsureAccessToken ensureToken,
@@ -29,7 +34,11 @@ public sealed class SignPdf
         ISystemClock clock,
         SignPdfRequestValidator validator,
         Func<TimeSpan> intervalAccessor,
-        Func<TimeSpan> totalTimeoutAccessor)
+        Func<TimeSpan> totalTimeoutAccessor,
+        IOtpProvider? otpProvider = null,
+        ExchangeOtp? exchangeOtp = null,
+        OtpSubmissionValidator? otpSubmissionValidator = null,
+        ICorrelationIdAccessor? correlation = null)
     {
         _ensureToken = ensureToken;
         _listCerts = listCerts;
@@ -42,9 +51,40 @@ public sealed class SignPdf
         _validator = validator;
         _intervalAccessor = intervalAccessor;
         _totalTimeoutAccessor = totalTimeoutAccessor;
+        _otpProvider = otpProvider;
+        _exchangeOtp = exchangeOtp;
+        _otpSubmissionValidator = otpSubmissionValidator;
+        _correlation = correlation;
     }
 
-    public async Task<SignPdfWorkResult> ExecuteAsync(SignPdfWorkRequest request, CancellationToken ct)
+    public Task<SignPdfWorkResult> ExecuteAsync(SignPdfWorkRequest request, CancellationToken ct) =>
+        ExecuteCoreAsync(request, allowOtpRecursion: _otpProvider is not null && _exchangeOtp is not null, ct);
+
+    private async Task<SignPdfWorkResult> ExecuteCoreAsync(
+        SignPdfWorkRequest request,
+        bool allowOtpRecursion,
+        CancellationToken ct)
+    {
+        try
+        {
+            return await ExecuteSignAsync(request, ct).ConfigureAwait(false);
+        }
+        catch (AuthenticationFailedException ex) when (allowOtpRecursion && ex.Requires2FA && _otpProvider is not null && _exchangeOtp is not null)
+        {
+            var challenge = new OtpChallenge(
+                UserName: ex.Username,
+                CorrelationId: _correlation?.Current ?? ex.CorrelationId);
+
+            var submission = await _otpProvider.ProvideAsync(challenge, ct).ConfigureAwait(false);
+            _otpSubmissionValidator?.Validate(submission);
+
+            await _exchangeOtp.ExecuteAsync(ex.Username, submission, ct).ConfigureAwait(false);
+
+            return await ExecuteCoreAsync(request, allowOtpRecursion: false, ct).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<SignPdfWorkResult> ExecuteSignAsync(SignPdfWorkRequest request, CancellationToken ct)
     {
         _validator.Validate(request);
 

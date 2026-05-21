@@ -9,6 +9,8 @@ internal sealed class StubWireClient : IMisaESignWireClient
 {
     public Func<string, string, CancellationToken, Task<AuthSession>>? OnLogin { get; set; }
     public Func<string, CancellationToken, Task<AuthSession>>? OnRefresh { get; set; }
+    public Func<string, string, OtpDeliveryChannel, bool, CancellationToken, Task<AuthSession>>? OnTwoFactorAuth { get; set; }
+    public Func<string, string, CancellationToken, Task<OtpResendResult>>? OnResendOtp { get; set; }
     public Func<string, CancellationToken, Task<IReadOnlyList<Certificate>>>? OnListCerts { get; set; }
     public Func<string, Certificate, byte[], string, SignatureInfo, CancellationToken, Task<PdfHashOutput>>? OnHash { get; set; }
     public Func<string, Certificate, string, string, PdfHashOutput, string, CancellationToken, Task<SignTransaction>>? OnSubmitSignHash { get; set; }
@@ -22,6 +24,8 @@ internal sealed class StubWireClient : IMisaESignWireClient
     public int SubmitSignHashCalls;
     public int GetStatusCalls;
     public int AttachCalls;
+    public int TwoFactorAuthCalls;
+    public int ResendOtpCalls;
 
     public Task<AuthSession> LoginAsync(string userName, string password, CancellationToken ct)
     {
@@ -63,5 +67,17 @@ internal sealed class StubWireClient : IMisaESignWireClient
     {
         AttachCalls++;
         return OnAttach!(accessToken, cert, hash, signatureData, ct);
+    }
+
+    public Task<AuthSession> TwoFactorAuthAsync(string userName, string code, OtpDeliveryChannel otpType, bool remember, CancellationToken ct)
+    {
+        TwoFactorAuthCalls++;
+        return OnTwoFactorAuth!(userName, code, otpType, remember, ct);
+    }
+
+    public Task<OtpResendResult> ResendOtpAsync(string userName, string language, CancellationToken ct)
+    {
+        ResendOtpCalls++;
+        return OnResendOtp!(userName, language, ct);
     }
 }

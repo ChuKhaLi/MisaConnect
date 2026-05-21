@@ -20,11 +20,22 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
     private readonly Counters _counters = new();
     private readonly Scenario _scenario = new();
     private readonly ConcurrentDictionary<string, int> _statusCallsByTx = new();
+    private readonly List<RecordedTwoFactorRequest> _twoFactorBodies = new();
+    private readonly List<RecordedResendOtpRequest> _resendBodies = new();
+    private readonly object _twoFactorLock = new();
 
     public string BaseUrl { get; }
     public Counters Calls => _counters;
     public Scenario Configure => _scenario;
     public byte[] SignedPdfBytes { get; set; } = new byte[] { 0x25, 0x50, 0x44, 0x46, 0xAA, 0xBB };
+    public IReadOnlyList<RecordedTwoFactorRequest> TwoFactorBodies
+    {
+        get { lock (_twoFactorLock) { return _twoFactorBodies.ToArray(); } }
+    }
+    public IReadOnlyList<RecordedResendOtpRequest> ResendBodies
+    {
+        get { lock (_twoFactorLock) { return _resendBodies.ToArray(); } }
+    }
 
     private FakeMisaESignServer(WebApplication app, string baseUrl)
     {
@@ -52,10 +63,83 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
                 await ctx.Response.WriteAsync("{\"error\":true,\"errorCode\":\"InvalidPassword\"}");
                 return;
             }
+            if (self._scenario.LoginRequires2FAOnFirstCall && Interlocked.Exchange(ref self._scenario._login122Consumed, 1) == 0)
+            {
+                ctx.Response.StatusCode = 200;
+                ctx.Response.ContentType = "application/json";
+                await ctx.Response.WriteAsync("{\"status\":{\"code\":200,\"error\":true,\"errorCode\":\"122\"}}");
+                return;
+            }
             ctx.Response.StatusCode = 200;
             ctx.Response.ContentType = "application/json";
             var body = "{\"status\":{\"code\":200,\"error\":false},\"data\":{\"accessToken\":\"raw-token\",\"remoteSigningAccessToken\":\"rs-token\",\"refreshToken\":\"refresh-token\",\"expiresIn\":3600,\"tokenType\":\"Bearer\",\"user\":{\"id\":\"user-id\",\"username\":\"alice\"}}}";
             await ctx.Response.WriteAsync(body);
+        });
+
+        app.MapPost("/api/auth/api/v1/auth/two-factor-auth", async (HttpContext ctx) =>
+        {
+            self!._counters.TwoFactorAuth++;
+            using var reader = new StreamReader(ctx.Request.Body);
+            var body = await reader.ReadToEndAsync();
+            var hasAuthorizationRm = ctx.Request.Headers.ContainsKey("AuthorizationRM");
+            lock (self._twoFactorLock)
+            {
+                self._twoFactorBodies.Add(new RecordedTwoFactorRequest(body, hasAuthorizationRm));
+            }
+            var errCode = self._scenario.NextTwoFactorErrorCode;
+            if (!string.IsNullOrEmpty(errCode))
+            {
+                ctx.Response.StatusCode = errCode == "122" ? 400 : 400;
+                ctx.Response.ContentType = "application/json";
+                await ctx.Response.WriteAsync($"{{\"status\":{{\"code\":400,\"error\":true,\"errorCode\":\"{errCode}\"}}}}");
+                return;
+            }
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentType = "application/json";
+            var ok = "{\"status\":{\"code\":200,\"error\":false},\"data\":{\"accessToken\":\"raw-token-2fa\",\"remoteSigningAccessToken\":\"rs-token-2fa\",\"refreshToken\":\"refresh-token-2fa\",\"expiresIn\":3600,\"tokenType\":\"Bearer\",\"user\":{\"id\":\"user-id\",\"username\":\"alice\"}}}";
+            await ctx.Response.WriteAsync(ok);
+        });
+
+        app.MapPost("/webdev/api/auth/api/v1/auth/resend-otp-auth", async (HttpContext ctx) =>
+        {
+            self!._counters.ResendOtp++;
+            using var reader = new StreamReader(ctx.Request.Body);
+            var body = await reader.ReadToEndAsync();
+            var hasAuthorizationRm = ctx.Request.Headers.ContainsKey("AuthorizationRM");
+            lock (self._twoFactorLock)
+            {
+                self._resendBodies.Add(new RecordedResendOtpRequest(body, hasAuthorizationRm));
+            }
+            switch (self._scenario.ResendOtpMode)
+            {
+                case ResendOtpResponseMode.Success200:
+                    ctx.Response.StatusCode = 200;
+                    ctx.Response.ContentType = "application/json";
+                    await ctx.Response.WriteAsync("{\"status\":{\"code\":200,\"error\":false},\"data\":{\"user\":{\"username\":\"alice\"}}}");
+                    return;
+                case ResendOtpResponseMode.TypedFailure200:
+                    ctx.Response.StatusCode = 200;
+                    ctx.Response.ContentType = "application/json";
+                    await ctx.Response.WriteAsync("{\"status\":{\"code\":200,\"error\":true,\"errorCode\":\"RateLimited\",\"devMsg\":\"too soon\",\"userMsg\":\"please wait\"}}");
+                    return;
+                case ResendOtpResponseMode.TypedFailure4xx:
+                    ctx.Response.StatusCode = 400;
+                    ctx.Response.ContentType = "application/json";
+                    await ctx.Response.WriteAsync("{\"status\":{\"code\":400,\"error\":true,\"errorCode\":\"BadRequest\",\"devMsg\":\"bad\",\"userMsg\":\"u-bad\"}}");
+                    return;
+                case ResendOtpResponseMode.NoEnvelope4xx:
+                    ctx.Response.StatusCode = 400;
+                    ctx.Response.ContentType = "application/json";
+                    await ctx.Response.WriteAsync("");
+                    return;
+                case ResendOtpResponseMode.Transport500:
+                    ctx.Response.StatusCode = 500;
+                    return;
+                default:
+                    ctx.Response.StatusCode = 200;
+                    await ctx.Response.WriteAsync("{\"status\":{\"code\":200,\"error\":false}}");
+                    return;
+            }
         });
 
         app.MapPost("/webdev/api/auth/api/v1/auth/refreshtoken", async (HttpContext ctx) =>
@@ -179,6 +263,8 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         public int SignHash;
         public int SignStatus;
         public int Attachment;
+        public int TwoFactorAuth;
+        public int ResendOtp;
     }
 
     public sealed class Scenario
@@ -189,6 +275,23 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         public bool StatusAlwaysPending { get; set; }
         public bool LoginAlways401 { get; set; }
         public bool CertsForce401Once { get; set; }
+        public bool LoginRequires2FAOnFirstCall { get; set; }
+        public string? NextTwoFactorErrorCode { get; set; }
+        public ResendOtpResponseMode ResendOtpMode { get; set; } = ResendOtpResponseMode.Success200;
         internal int _certs401Consumed;
+        internal int _login122Consumed;
     }
 }
+
+public enum ResendOtpResponseMode
+{
+    Success200,
+    TypedFailure200,
+    TypedFailure4xx,
+    NoEnvelope4xx,
+    Transport500,
+}
+
+internal sealed record RecordedTwoFactorRequest(string Body, bool HasAuthorizationRm);
+
+internal sealed record RecordedResendOtpRequest(string Body, bool HasAuthorizationRm);

@@ -4,6 +4,8 @@ internal static class ESignHttpRoutes
 {
     public const string AuthLoginApi = "api/auth/api/v1/auth/login-api";
     public const string AuthRefreshToken = "webdev/api/auth/api/v1/auth/refreshtoken";
+    public const string AuthTwoFactor = "api/auth/api/v1/auth/two-factor-auth";
+    public const string AuthResendOtp = "webdev/api/auth/api/v1/auth/resend-otp-auth";
     public const string CertificatesByUserId = "external/esrm/service/general/api/v1/Certificates/by-userId";
     public const string DocumentsHash = "external/esrm/service/document/api/v1/documents/hash";
     public const string SigningHash = "external/esrm/service/signing/api/v1/Signing/hash";

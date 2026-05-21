@@ -29,7 +29,8 @@ public static class ESignErrorMapper
         bool includeRawErrorMessage = false,
         string? transactionId = null,
         int? attemptCount = null,
-        HttpStatusCode? lastStatusCode = null)
+        HttpStatusCode? lastStatusCode = null,
+        string? userName = null)
     {
         var rawCode = envelope?.ErrorCode;
         var detail = BuildDetail(endpoint, rawCode, envelope, includeRawErrorMessage);
@@ -50,7 +51,7 @@ public static class ESignErrorMapper
 
         return endpoint switch
         {
-            EndpointLogin => MapLogin(rawCode, detail, correlationId),
+            EndpointLogin => MapLogin(rawCode, detail, correlationId, userName ?? string.Empty),
             EndpointRefresh => new AuthenticationFailedException(rawCode, detail, correlationId, requires2FA: false),
             EndpointCertificates => new ESignGeneralException(ESignErrorCategory.CertificateLookupFailed, rawCode ?? "EmptyErrorCode", detail, correlationId),
             EndpointHash => MapHash(rawCode, envelope, detail, correlationId),
@@ -67,10 +68,15 @@ public static class ESignErrorMapper
     private static bool IsTransportFailure(int statusCode) =>
         statusCode == 429 || statusCode >= 500;
 
-    private static AuthenticationFailedException MapLogin(string? rawCode, string detail, string correlationId)
+    private static AuthenticationFailedException MapLogin(string? rawCode, string detail, string correlationId, string userName)
     {
         var requires2FA = string.Equals(rawCode, "122", StringComparison.OrdinalIgnoreCase);
-        return new AuthenticationFailedException(rawCode, detail, correlationId, requires2FA);
+        return new AuthenticationFailedException(
+            rawCode,
+            detail,
+            correlationId,
+            requires2FA,
+            username: requires2FA ? userName : string.Empty);
     }
 
     private static ESignException MapHash(string? rawCode, ResponseError? envelope, string detail, string correlationId)

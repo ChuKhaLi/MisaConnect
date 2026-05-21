@@ -127,4 +127,22 @@ public class MisaESignOptionsValidatorTests
         var result = validator.Validate(null, opts);
         Assert.True(result.Failed);
     }
+
+    [Fact]
+    public void Default_otp_resend_language_is_en_us()
+    {
+        var opts = ValidOptions();
+        Assert.Equal("en-US", opts.Otp.DefaultResendLanguage);
+        var result = new MisaESignOptionsValidator().Validate(null, opts);
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Empty_otp_resend_language_fails()
+    {
+        var opts = ValidOptions();
+        opts.Otp.DefaultResendLanguage = "";
+        var result = new MisaESignOptionsValidator().Validate(null, opts);
+        Assert.True(result.Failed);
+    }
 }

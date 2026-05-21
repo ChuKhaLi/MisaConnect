@@ -20,6 +20,25 @@ public class ESignErrorMapperTests
     }
 
     [Fact]
+    public void Login_122_populates_username_from_request()
+    {
+        var envelope = new ResponseError(Error: true, ErrorCode: "122", DevMsg: null, UserMsg: null);
+        var ex = ESignErrorMapper.Map(ESignErrorMapper.EndpointLogin, 400, envelope, "cid", userName: "alice");
+        var auth = Assert.IsType<AuthenticationFailedException>(ex);
+        Assert.True(auth.Requires2FA);
+        Assert.Equal("alice", auth.Username);
+    }
+
+    [Fact]
+    public void Login_non_122_does_not_carry_username()
+    {
+        var envelope = new ResponseError(true, "InvalidPassword", null, null);
+        var ex = ESignErrorMapper.Map(ESignErrorMapper.EndpointLogin, 401, envelope, "cid", userName: "alice");
+        var auth = Assert.IsType<AuthenticationFailedException>(ex);
+        Assert.Equal(string.Empty, auth.Username);
+    }
+
+    [Fact]
     public void Login_generic_4xx_is_authentication_failure()
     {
         var envelope = new ResponseError(true, "InvalidPassword", null, null);
