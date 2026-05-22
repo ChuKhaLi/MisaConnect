@@ -135,4 +135,26 @@ public class ESignErrorMapperTests
         Assert.Contains("sensitive-dev", ex.Detail);
         Assert.Contains("sensitive-user", ex.Detail);
     }
+
+    [Theory]
+    [InlineData("api/auth/api/v1/auth/login-api", 401)]
+    [InlineData("webdev/api/auth/api/v1/auth/refreshtoken", 401)]
+    [InlineData("external/esrm/service/general/api/v1/Certificates/by-userId", 400)]
+    [InlineData("external/esrm/service/document/api/v1/documents/hash", 400)]
+    [InlineData("external/esrm/service/signing/api/v1/Signing/hash", 400)]
+    [InlineData("external/esrm/service/signing/api/v1/Signing/status", 400)]
+    [InlineData("external/esrm/service/document/api/v1/documents/attachment", 400)]
+    public void Slice1_default_format_is_Pdf_on_every_endpoint(string endpoint, int statusCode)
+    {
+        var envelope = new ResponseError(true, "X", null, null);
+        var ex = ESignErrorMapper.Map(endpoint, statusCode, envelope, "cid");
+        Assert.Equal(MisaConnect.ESign.Domain.Documents.DocumentFormat.Pdf, ex.Format);
+    }
+
+    [Fact]
+    public void MapStatusTerminal_default_format_is_Pdf()
+    {
+        var ex = ESignErrorMapper.MapStatusTerminal("tx-1", SignStatus.FAILED, "X", null, "cid");
+        Assert.Equal(MisaConnect.ESign.Domain.Documents.DocumentFormat.Pdf, ex.Format);
+    }
 }

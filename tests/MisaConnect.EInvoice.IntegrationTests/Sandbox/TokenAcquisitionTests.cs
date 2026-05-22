@@ -1,12 +1,12 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Application.UseCases;
 using MisaConnect.EInvoice.Client.DependencyInjection;
 using MisaConnect.EInvoice.Domain.Errors;
 using MisaConnect.EInvoice.Infrastructure.Configuration;
 using MisaConnect.EInvoice.Infrastructure.MeInvoice.Auth;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace MisaConnect.EInvoice.IntegrationTests.Sandbox;

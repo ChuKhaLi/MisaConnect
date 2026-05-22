@@ -14,16 +14,55 @@ internal sealed class HashRequestDto
     public List<PdfDocRequestDto> PdfDocs { get; set; } = new();
 
     [JsonPropertyName("xmlDocs")]
-    public List<object> XmlDocs { get; set; } = new();
+    public List<XmlHashDocRequestDto> XmlDocs { get; set; } = new();
 
     [JsonPropertyName("wordDocs")]
-    public List<object> WordDocs { get; set; } = new();
+    public List<WordHashDocRequestDto> WordDocs { get; set; } = new();
 
     [JsonPropertyName("excelDocs")]
-    public List<object> ExcelDocs { get; set; } = new();
+    public List<ExcelHashDocRequestDto> ExcelDocs { get; set; } = new();
 }
 
 internal sealed class PdfDocRequestDto
+{
+    [JsonPropertyName("DocumentId")]
+    public string DocumentId { get; set; } = string.Empty;
+
+    [JsonPropertyName("FileToSign")]
+    public string FileToSign { get; set; } = string.Empty;
+
+    [JsonPropertyName("SignatureInfo")]
+    public SignatureInfoDto SignatureInfo { get; set; } = new();
+}
+
+// MISA §4.1.2 — XML hash request entry. `FileToSign` carries raw XML text.
+internal sealed class XmlHashDocRequestDto
+{
+    [JsonPropertyName("DocumentId")]
+    public string DocumentId { get; set; } = string.Empty;
+
+    [JsonPropertyName("FileToSign")]
+    public string FileToSign { get; set; } = string.Empty;
+
+    [JsonPropertyName("SignatureInfo")]
+    public SignatureInfoDto SignatureInfo { get; set; } = new();
+}
+
+// MISA §4.1.1 — Word hash request entry. `FileToSign` carries base64.
+internal sealed class WordHashDocRequestDto
+{
+    [JsonPropertyName("DocumentId")]
+    public string DocumentId { get; set; } = string.Empty;
+
+    [JsonPropertyName("FileToSign")]
+    public string FileToSign { get; set; } = string.Empty;
+
+    [JsonPropertyName("SignatureInfo")]
+    public SignatureInfoDto SignatureInfo { get; set; } = new();
+}
+
+// MISA §4.1.1 — Excel hash request entry. `FileToSign` carries base64.
+internal sealed class ExcelHashDocRequestDto
 {
     [JsonPropertyName("DocumentId")]
     public string DocumentId { get; set; } = string.Empty;
@@ -129,13 +168,13 @@ internal sealed class HashResponseDto
     public List<PdfHashOutputDto> PdfDocs { get; set; } = new();
 
     [JsonPropertyName("xmlDocs")]
-    public List<object>? XmlDocs { get; set; }
+    public List<XmlHashOutputDto>? XmlDocs { get; set; }
 
     [JsonPropertyName("wordDocs")]
-    public List<object>? WordDocs { get; set; }
+    public List<WordHashOutputDto>? WordDocs { get; set; }
 
     [JsonPropertyName("excelDocs")]
-    public List<object>? ExcelDocs { get; set; }
+    public List<ExcelHashOutputDto>? ExcelDocs { get; set; }
 }
 
 internal sealed class PdfHashOutputDto
@@ -164,4 +203,61 @@ internal sealed class PdfHashOutputDto
 
     [JsonPropertyName("signatureId")]
     public string? SignatureId { get; set; }
+}
+
+// MISA §4.15 — XML response entry. Uses `document` (raw text), not `documentBytes`.
+internal sealed class XmlHashOutputDto
+{
+    [JsonPropertyName("documentId")]
+    public string DocumentId { get; set; } = string.Empty;
+
+    [JsonPropertyName("document")]
+    public string Document { get; set; } = string.Empty;
+
+    [JsonPropertyName("signatureId")]
+    public string SignatureId { get; set; } = string.Empty;
+
+    [JsonPropertyName("digest")]
+    public string Digest { get; set; } = string.Empty;
+
+    [JsonPropertyName("sh")]
+    public string Sh { get; set; } = string.Empty;
+}
+
+// MISA §4.15 — Word response entry. Uses `documentBytes` and carries `mainDom`.
+internal sealed class WordHashOutputDto
+{
+    [JsonPropertyName("documentId")]
+    public string DocumentId { get; set; } = string.Empty;
+
+    [JsonPropertyName("documentBytes")]
+    public string DocumentBytes { get; set; } = string.Empty;
+
+    [JsonPropertyName("signatureId")]
+    public string SignatureId { get; set; } = string.Empty;
+
+    [JsonPropertyName("digest")]
+    public string Digest { get; set; } = string.Empty;
+
+    [JsonPropertyName("mainDom")]
+    public string MainDom { get; set; } = string.Empty;
+}
+
+// MISA §4.15 — Excel response entry. Same field set as Word.
+internal sealed class ExcelHashOutputDto
+{
+    [JsonPropertyName("documentId")]
+    public string DocumentId { get; set; } = string.Empty;
+
+    [JsonPropertyName("documentBytes")]
+    public string DocumentBytes { get; set; } = string.Empty;
+
+    [JsonPropertyName("signatureId")]
+    public string SignatureId { get; set; } = string.Empty;
+
+    [JsonPropertyName("digest")]
+    public string Digest { get; set; } = string.Empty;
+
+    [JsonPropertyName("mainDom")]
+    public string MainDom { get; set; } = string.Empty;
 }

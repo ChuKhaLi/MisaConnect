@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Application.Results;
 using MisaConnect.EInvoice.Application.UseCases;
@@ -7,8 +9,6 @@ using MisaConnect.EInvoice.Domain.Pdf;
 using MisaConnect.EInvoice.Domain.Templates;
 using MisaConnect.EInvoice.Infrastructure.Configuration;
 using MisaConnect.EInvoice.Infrastructure.Logging;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace MisaConnect.EInvoice.UnitTests.Lookup;

@@ -72,10 +72,18 @@ internal static class ServiceCollectionExtensions
         });
         services.AddScoped<ListActiveCertificates>();
         services.AddScoped<HashPdfDocument>();
+        services.AddScoped<HashXmlDocument>();
+        services.AddScoped<HashWordDocument>();
+        services.AddScoped<HashExcelDocument>();
         services.AddScoped<SubmitSignHash>();
         services.AddScoped<PollSignStatus>();
         services.AddScoped<AttachSignature>();
+        services.AddScoped<AttachSignatureToXml>();
+        services.AddScoped<AttachSignatureToWordExcel>();
         services.AddScoped<SignPdfRequestValidator>();
+        services.AddScoped<SignXmlRequestValidator>();
+        services.AddScoped<SignWordRequestValidator>();
+        services.AddScoped<SignExcelRequestValidator>();
         services.AddScoped<OtpSubmissionValidator>();
         services.AddScoped<ExchangeOtp>(sp => new ExchangeOtp(
             wire: sp.GetRequiredService<IMisaESignWireClient>(),
@@ -103,6 +111,66 @@ internal static class ServiceCollectionExtensions
                 attachSignature: sp.GetRequiredService<AttachSignature>(),
                 clock: sp.GetRequiredService<ISystemClock>(),
                 validator: sp.GetRequiredService<SignPdfRequestValidator>(),
+                intervalAccessor: () => options.Value.Polling.Interval,
+                totalTimeoutAccessor: () => options.Value.Polling.TotalTimeout,
+                otpProvider: sp.GetService<IOtpProvider>(),
+                exchangeOtp: sp.GetService<ExchangeOtp>(),
+                otpSubmissionValidator: sp.GetService<OtpSubmissionValidator>(),
+                correlation: sp.GetService<ICorrelationIdAccessor>());
+        });
+        services.AddScoped<SignXml>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<MisaESignOptions>>();
+            return new SignXml(
+                ensureToken: sp.GetRequiredService<EnsureAccessToken>(),
+                listCerts: sp.GetRequiredService<ListActiveCertificates>(),
+                certSelector: sp.GetRequiredService<ICertificateSelector>(),
+                hashXml: sp.GetRequiredService<HashXmlDocument>(),
+                submitSignHash: sp.GetRequiredService<SubmitSignHash>(),
+                pollStatus: sp.GetRequiredService<PollSignStatus>(),
+                attachSignature: sp.GetRequiredService<AttachSignatureToXml>(),
+                clock: sp.GetRequiredService<ISystemClock>(),
+                validator: sp.GetRequiredService<SignXmlRequestValidator>(),
+                intervalAccessor: () => options.Value.Polling.Interval,
+                totalTimeoutAccessor: () => options.Value.Polling.TotalTimeout,
+                otpProvider: sp.GetService<IOtpProvider>(),
+                exchangeOtp: sp.GetService<ExchangeOtp>(),
+                otpSubmissionValidator: sp.GetService<OtpSubmissionValidator>(),
+                correlation: sp.GetService<ICorrelationIdAccessor>());
+        });
+        services.AddScoped<SignWord>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<MisaESignOptions>>();
+            return new SignWord(
+                ensureToken: sp.GetRequiredService<EnsureAccessToken>(),
+                listCerts: sp.GetRequiredService<ListActiveCertificates>(),
+                certSelector: sp.GetRequiredService<ICertificateSelector>(),
+                hashWord: sp.GetRequiredService<HashWordDocument>(),
+                submitSignHash: sp.GetRequiredService<SubmitSignHash>(),
+                pollStatus: sp.GetRequiredService<PollSignStatus>(),
+                attachSignature: sp.GetRequiredService<AttachSignatureToWordExcel>(),
+                clock: sp.GetRequiredService<ISystemClock>(),
+                validator: sp.GetRequiredService<SignWordRequestValidator>(),
+                intervalAccessor: () => options.Value.Polling.Interval,
+                totalTimeoutAccessor: () => options.Value.Polling.TotalTimeout,
+                otpProvider: sp.GetService<IOtpProvider>(),
+                exchangeOtp: sp.GetService<ExchangeOtp>(),
+                otpSubmissionValidator: sp.GetService<OtpSubmissionValidator>(),
+                correlation: sp.GetService<ICorrelationIdAccessor>());
+        });
+        services.AddScoped<SignExcel>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<MisaESignOptions>>();
+            return new SignExcel(
+                ensureToken: sp.GetRequiredService<EnsureAccessToken>(),
+                listCerts: sp.GetRequiredService<ListActiveCertificates>(),
+                certSelector: sp.GetRequiredService<ICertificateSelector>(),
+                hashExcel: sp.GetRequiredService<HashExcelDocument>(),
+                submitSignHash: sp.GetRequiredService<SubmitSignHash>(),
+                pollStatus: sp.GetRequiredService<PollSignStatus>(),
+                attachSignature: sp.GetRequiredService<AttachSignatureToWordExcel>(),
+                clock: sp.GetRequiredService<ISystemClock>(),
+                validator: sp.GetRequiredService<SignExcelRequestValidator>(),
                 intervalAccessor: () => options.Value.Polling.Interval,
                 totalTimeoutAccessor: () => options.Value.Polling.TotalTimeout,
                 otpProvider: sp.GetService<IOtpProvider>(),

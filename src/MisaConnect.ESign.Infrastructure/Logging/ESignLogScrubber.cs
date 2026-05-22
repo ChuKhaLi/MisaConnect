@@ -21,7 +21,7 @@ public static class ESignLogScrubber
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex SensitiveJsonField = new(
-        "\"(accessToken|remoteSigningAccessToken|refreshToken|authorizationRM|authorization|password|code|certificate|certiticateChain|certificateChain|fileToSign|documentBytes|documentHash|sh|digest|signature|fontData|signatureImage|logoImage|email|emailName|phoneNumber|firstName|lastName)\"\\s*:\\s*\"[^\"]*\"",
+        "\"(accessToken|remoteSigningAccessToken|refreshToken|authorizationRM|authorization|password|code|certificate|certiticateChain|certificateChain|fileToSign|documentBytes|documentHash|sh|digest|signature|signatureId|mainDom|document|fontData|signatureImage|logoImage|email|emailName|phoneNumber|firstName|lastName)\"\\s*:\\s*\"[^\"]*\"",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex DeviceJsonField = new(

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Domain.Certificates;
+using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Domain.Signing;
 
@@ -39,7 +40,16 @@ internal sealed class ESignCallLogger : IMisaESignWireClient
     public Task<PdfHashOutput> HashPdfAsync(string accessToken, Certificate cert, byte[] pdfBytes, string documentId, SignatureInfo signatureInfo, CancellationToken ct) =>
         Wrap("documents/hash", "POST", () => _inner.HashPdfAsync(accessToken, cert, pdfBytes, documentId, signatureInfo, ct));
 
-    public Task<SignTransaction> SubmitSignHashAsync(string accessToken, Certificate cert, string userId, string dataToBeDisplayed, PdfHashOutput hash, string documentName, CancellationToken ct) =>
+    public Task<XmlHashOutput> HashXmlAsync(string accessToken, Certificate cert, string xmlContent, string documentId, XmlSignatureContext signatureContext, CancellationToken ct) =>
+        Wrap("documents/hash", "POST", () => _inner.HashXmlAsync(accessToken, cert, xmlContent, documentId, signatureContext, ct));
+
+    public Task<WordExcelHashOutput> HashWordAsync(string accessToken, Certificate cert, byte[] wordBytes, string documentId, SignatureInfo signatureInfo, CancellationToken ct) =>
+        Wrap("documents/hash", "POST", () => _inner.HashWordAsync(accessToken, cert, wordBytes, documentId, signatureInfo, ct));
+
+    public Task<WordExcelHashOutput> HashExcelAsync(string accessToken, Certificate cert, byte[] excelBytes, string documentId, SignatureInfo signatureInfo, CancellationToken ct) =>
+        Wrap("documents/hash", "POST", () => _inner.HashExcelAsync(accessToken, cert, excelBytes, documentId, signatureInfo, ct));
+
+    public Task<SignTransaction> SubmitSignHashAsync(string accessToken, Certificate cert, string userId, string dataToBeDisplayed, SignHashInput hash, string documentName, CancellationToken ct) =>
         Wrap("Signing/hash", "POST", () => _inner.SubmitSignHashAsync(accessToken, cert, userId, dataToBeDisplayed, hash, documentName, ct));
 
     public Task<SignStatusSnapshot> GetSignStatusAsync(string accessToken, string transactionId, CancellationToken ct) =>
@@ -47,6 +57,12 @@ internal sealed class ESignCallLogger : IMisaESignWireClient
 
     public Task<byte[]> AttachSignatureAsync(string accessToken, Certificate cert, PdfHashOutput hash, string signatureData, CancellationToken ct) =>
         Wrap("documents/attachment", "POST", () => _inner.AttachSignatureAsync(accessToken, cert, hash, signatureData, ct));
+
+    public Task<byte[]> AttachSignatureToXmlAsync(string accessToken, Certificate cert, XmlHashOutput hash, string signatureData, CancellationToken ct) =>
+        Wrap("documents/attachment", "POST", () => _inner.AttachSignatureToXmlAsync(accessToken, cert, hash, signatureData, ct));
+
+    public Task<byte[]> AttachSignatureToWordExcelAsync(string accessToken, Certificate cert, WordExcelHashOutput hash, string signatureData, DocumentFormat format, CancellationToken ct) =>
+        Wrap("documents/attachment", "POST", () => _inner.AttachSignatureToWordExcelAsync(accessToken, cert, hash, signatureData, format, ct));
 
     private async Task<T> Wrap<T>(string endpoint, string method, Func<Task<T>> action)
     {

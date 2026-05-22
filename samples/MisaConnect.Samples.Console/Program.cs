@@ -1,10 +1,10 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Application.UseCases;
 using MisaConnect.EInvoice.Domain.Invoices;
 using MisaConnect.EInvoice.Infrastructure.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 var config = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json", optional: true)

@@ -1,7 +1,7 @@
+using Microsoft.Extensions.Logging;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Application.Results;
 using MisaConnect.EInvoice.Domain.Errors;
-using Microsoft.Extensions.Logging;
 
 namespace MisaConnect.EInvoice.Application.UseCases;
 

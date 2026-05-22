@@ -1,7 +1,7 @@
+using Microsoft.Extensions.Options;
 using MisaConnect.EInvoice.Client;
 using MisaConnect.EInvoice.Infrastructure.Configuration;
 using MisaConnect.EInvoice.IntegrationTests.Sandbox;
-using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace MisaConnect.EInvoice.IntegrationTests.Client;

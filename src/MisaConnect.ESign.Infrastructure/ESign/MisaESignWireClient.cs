@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Domain.Authentication;
+using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Domain.Signing;
 using MisaConnect.ESign.Infrastructure.Configuration;
@@ -275,7 +277,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
 
         if (!resp.IsSuccessStatusCode)
         {
-            await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsHash, ct).ConfigureAwait(false);
+            await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsHash, ct, requestedFormat: DocumentFormat.Pdf).ConfigureAwait(false);
         }
 
         var dto = Deserialize<HashResponseDto>(json);
@@ -285,7 +287,8 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
                 ESignErrorCategory.MisaUnknown,
                 "EmptyResponse",
                 $"MISA {ESignHttpRoutes.DocumentsHash} returned no pdfDocs.",
-                _correlation.Current);
+                _correlation.Current,
+                format: DocumentFormat.Pdf);
         }
         var first = dto.PdfDocs[0];
         return new PdfHashOutput(
@@ -297,12 +300,176 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             Digest: first.Digest);
     }
 
+    public async Task<XmlHashOutput> HashXmlAsync(
+        string accessToken,
+        DomainCert cert,
+        string xmlContent,
+        string documentId,
+        XmlSignatureContext signatureContext,
+        CancellationToken ct)
+    {
+        var body = new HashRequestDto
+        {
+            Certificate = cert.CertificateValue,
+            CertificateChain = cert.CertificateChain.AsList().ToList(),
+            XmlDocs = new List<XmlHashDocRequestDto>
+            {
+                new()
+                {
+                    DocumentId = documentId,
+                    FileToSign = xmlContent,
+                    SignatureInfo = XmlSignatureContextMapper.ToWireSignatureInfo(signatureContext),
+                },
+            },
+        };
+
+        var req = NewRequest(HttpMethod.Post, ESignHttpRoutes.DocumentsHash);
+        ApplyAuth(req, accessToken);
+        req.Content = JsonContent.Create(body, options: ESignJsonOptions.Wire);
+
+        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+        var json = await ReadStringAsync(resp, ct).ConfigureAwait(false);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsHash, ct, requestedFormat: DocumentFormat.Xml).ConfigureAwait(false);
+        }
+
+        var dto = Deserialize<HashResponseDto>(json);
+        if (dto?.XmlDocs is not { Count: > 0 })
+        {
+            throw new ESignGeneralException(
+                ESignErrorCategory.MisaUnknown,
+                "EmptyResponse",
+                $"MISA {ESignHttpRoutes.DocumentsHash} returned no xmlDocs.",
+                _correlation.Current,
+                format: DocumentFormat.Xml);
+        }
+        var first = dto.XmlDocs[0];
+        return new XmlHashOutput(
+            DocumentId: first.DocumentId,
+            Document: first.Document,
+            SignatureId: first.SignatureId,
+            Digest: first.Digest,
+            Sh: first.Sh);
+    }
+
+    public async Task<WordExcelHashOutput> HashWordAsync(
+        string accessToken,
+        DomainCert cert,
+        byte[] wordBytes,
+        string documentId,
+        SignatureInfo signatureInfo,
+        CancellationToken ct) =>
+        await HashWordOrExcelAsync(accessToken, cert, wordBytes, documentId, signatureInfo, DocumentFormat.Word, ct).ConfigureAwait(false);
+
+    public async Task<WordExcelHashOutput> HashExcelAsync(
+        string accessToken,
+        DomainCert cert,
+        byte[] excelBytes,
+        string documentId,
+        SignatureInfo signatureInfo,
+        CancellationToken ct) =>
+        await HashWordOrExcelAsync(accessToken, cert, excelBytes, documentId, signatureInfo, DocumentFormat.Excel, ct).ConfigureAwait(false);
+
+    private async Task<WordExcelHashOutput> HashWordOrExcelAsync(
+        string accessToken,
+        DomainCert cert,
+        byte[] payload,
+        string documentId,
+        SignatureInfo signatureInfo,
+        DocumentFormat format,
+        CancellationToken ct)
+    {
+        var body = new HashRequestDto
+        {
+            Certificate = cert.CertificateValue,
+            CertificateChain = cert.CertificateChain.AsList().ToList(),
+        };
+        if (format == DocumentFormat.Word)
+        {
+            body.WordDocs = new List<WordHashDocRequestDto>
+            {
+                new()
+                {
+                    DocumentId = documentId,
+                    FileToSign = Convert.ToBase64String(payload),
+                    SignatureInfo = ToWireSignatureInfo(signatureInfo),
+                },
+            };
+        }
+        else
+        {
+            body.ExcelDocs = new List<ExcelHashDocRequestDto>
+            {
+                new()
+                {
+                    DocumentId = documentId,
+                    FileToSign = Convert.ToBase64String(payload),
+                    SignatureInfo = ToWireSignatureInfo(signatureInfo),
+                },
+            };
+        }
+
+        var req = NewRequest(HttpMethod.Post, ESignHttpRoutes.DocumentsHash);
+        ApplyAuth(req, accessToken);
+        req.Content = JsonContent.Create(body, options: ESignJsonOptions.Wire);
+
+        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+        var json = await ReadStringAsync(resp, ct).ConfigureAwait(false);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsHash, ct, requestedFormat: format).ConfigureAwait(false);
+        }
+
+        var dto = Deserialize<HashResponseDto>(json);
+        if (format == DocumentFormat.Word)
+        {
+            if (dto?.WordDocs is not { Count: > 0 })
+            {
+                throw new ESignGeneralException(
+                    ESignErrorCategory.MisaUnknown,
+                    "EmptyResponse",
+                    $"MISA {ESignHttpRoutes.DocumentsHash} returned no wordDocs.",
+                    _correlation.Current,
+                    format: DocumentFormat.Word);
+            }
+            var first = dto.WordDocs[0];
+            return new WordExcelHashOutput(
+                DocumentId: first.DocumentId,
+                DocumentBytes: first.DocumentBytes,
+                SignatureId: first.SignatureId,
+                Digest: first.Digest,
+                MainDom: first.MainDom);
+        }
+        else
+        {
+            if (dto?.ExcelDocs is not { Count: > 0 })
+            {
+                throw new ESignGeneralException(
+                    ESignErrorCategory.MisaUnknown,
+                    "EmptyResponse",
+                    $"MISA {ESignHttpRoutes.DocumentsHash} returned no excelDocs.",
+                    _correlation.Current,
+                    format: DocumentFormat.Excel);
+            }
+            var first = dto.ExcelDocs[0];
+            return new WordExcelHashOutput(
+                DocumentId: first.DocumentId,
+                DocumentBytes: first.DocumentBytes,
+                SignatureId: first.SignatureId,
+                Digest: first.Digest,
+                MainDom: first.MainDom);
+        }
+    }
+
     public async Task<SignTransaction> SubmitSignHashAsync(
         string accessToken,
         DomainCert cert,
         string userId,
         string dataToBeDisplayed,
-        PdfHashOutput hash,
+        SignHashInput hash,
         string documentName,
         CancellationToken ct)
     {
@@ -407,7 +574,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
 
         if (!resp.IsSuccessStatusCode)
         {
-            await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsAttachment, ct).ConfigureAwait(false);
+            await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsAttachment, ct, requestedFormat: DocumentFormat.Pdf).ConfigureAwait(false);
         }
 
         var dto = Deserialize<AttachmentResponseDto>(json);
@@ -418,7 +585,137 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
                 ESignErrorCategory.MisaUnknown,
                 "EmptyResponse",
                 $"MISA {ESignHttpRoutes.DocumentsAttachment} returned no signed document.",
-                _correlation.Current);
+                _correlation.Current,
+                format: DocumentFormat.Pdf);
+        }
+        return Convert.FromBase64String(doc);
+    }
+
+    public async Task<byte[]> AttachSignatureToXmlAsync(
+        string accessToken,
+        DomainCert cert,
+        XmlHashOutput hash,
+        string signatureData,
+        CancellationToken ct)
+    {
+        var body = new AttachmentRequestDto
+        {
+            Certificate = cert.CertificateValue,
+            CertificateChain = cert.CertificateChain.AsList().ToList(),
+            XmlDocs = new List<XmlAttachmentDocRequestDto>
+            {
+                new()
+                {
+                    Signature = signatureData,
+                    DocumentId = hash.DocumentId,
+                    DocumentBytes = hash.Document,
+                    Digest = hash.Digest,
+                    SignatureName = string.Empty,
+                    Sh = hash.Sh,
+                    SignatureId = hash.SignatureId,
+                    DocumentHash = string.Empty,
+                },
+            },
+        };
+
+        var req = NewRequest(HttpMethod.Post, ESignHttpRoutes.DocumentsAttachment);
+        ApplyAuth(req, accessToken);
+        req.Content = JsonContent.Create(body, options: ESignJsonOptions.Wire);
+
+        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+        var json = await ReadStringAsync(resp, ct).ConfigureAwait(false);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsAttachment, ct, requestedFormat: DocumentFormat.Xml).ConfigureAwait(false);
+        }
+
+        var dto = Deserialize<AttachmentResponseDto>(json);
+        var doc = dto?.XmlDocs is { Count: > 0 } ? dto.XmlDocs[0].Document : null;
+        if (string.IsNullOrEmpty(doc))
+        {
+            throw new ESignGeneralException(
+                ESignErrorCategory.AttachmentRejected,
+                "MissingSignedDocument",
+                $"MISA {ESignHttpRoutes.DocumentsAttachment} returned no signed xml document.",
+                _correlation.Current,
+                format: DocumentFormat.Xml);
+        }
+        return Encoding.UTF8.GetBytes(doc);
+    }
+
+    public async Task<byte[]> AttachSignatureToWordExcelAsync(
+        string accessToken,
+        DomainCert cert,
+        WordExcelHashOutput hash,
+        string signatureData,
+        DocumentFormat format,
+        CancellationToken ct)
+    {
+        if (format != DocumentFormat.Word && format != DocumentFormat.Excel)
+        {
+            throw new ArgumentException(
+                $"AttachSignatureToWordExcelAsync requires format Word or Excel, got {format}.",
+                nameof(format));
+        }
+
+        var entry = new WordExcelAttachmentDocRequestDto
+        {
+            Signature = signatureData,
+            DocumentId = hash.DocumentId,
+            DocumentBytes = hash.DocumentBytes,
+            Digest = hash.Digest,
+            MainDom = hash.MainDom,
+            SignatureName = string.Empty,
+            Sh = string.Empty,
+            SignatureId = hash.SignatureId,
+            DocumentHash = string.Empty,
+        };
+
+        var body = new AttachmentRequestDto
+        {
+            Certificate = cert.CertificateValue,
+            CertificateChain = cert.CertificateChain.AsList().ToList(),
+        };
+        if (format == DocumentFormat.Word)
+        {
+            body.WordDocs = new List<WordExcelAttachmentDocRequestDto> { entry };
+        }
+        else
+        {
+            body.ExcelDocs = new List<WordExcelAttachmentDocRequestDto> { entry };
+        }
+
+        var req = NewRequest(HttpMethod.Post, ESignHttpRoutes.DocumentsAttachment);
+        ApplyAuth(req, accessToken);
+        req.Content = JsonContent.Create(body, options: ESignJsonOptions.Wire);
+
+        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+        var json = await ReadStringAsync(resp, ct).ConfigureAwait(false);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsAttachment, ct, requestedFormat: format).ConfigureAwait(false);
+        }
+
+        var dto = Deserialize<AttachmentResponseDto>(json);
+        string? doc;
+        if (format == DocumentFormat.Word)
+        {
+            doc = dto?.WordDocs is { Count: > 0 } ? dto.WordDocs[0].Document : null;
+        }
+        else
+        {
+            doc = dto?.ExcelDocs is { Count: > 0 } ? dto.ExcelDocs[0].Document : null;
+        }
+        if (string.IsNullOrEmpty(doc))
+        {
+            throw new ESignGeneralException(
+                ESignErrorCategory.AttachmentRejected,
+                "MissingSignedDocument",
+                $"MISA {ESignHttpRoutes.DocumentsAttachment} returned no signed {format} document.",
+                _correlation.Current,
+                format: format);
         }
         return Convert.FromBase64String(doc);
     }
@@ -459,7 +756,13 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         }
     }
 
-    private async Task ThrowMappedAsync(HttpResponseMessage resp, string body, string endpoint, CancellationToken ct, string? userName = null)
+    private async Task ThrowMappedAsync(
+        HttpResponseMessage resp,
+        string body,
+        string endpoint,
+        CancellationToken ct,
+        string? userName = null,
+        DocumentFormat requestedFormat = DocumentFormat.Pdf)
     {
         await Task.CompletedTask;
         _ = ct;
@@ -482,7 +785,8 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             transactionId: null,
             attemptCount: null,
             lastStatusCode: resp.StatusCode,
-            userName: userName);
+            userName: userName,
+            requestedFormat: requestedFormat);
     }
 
     private async Task<ESignException> BuildAuthFailureAsync(HttpResponseMessage resp, string body, string endpoint, CancellationToken ct)

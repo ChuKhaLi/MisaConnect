@@ -1,10 +1,10 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Microsoft.Extensions.Options;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Application.UseCases;
 using MisaConnect.EInvoice.Domain.Errors;
 using MisaConnect.EInvoice.Infrastructure.Configuration;
-using Microsoft.Extensions.Options;
 
 namespace MisaConnect.EInvoice.Infrastructure.MeInvoice.Auth;
 

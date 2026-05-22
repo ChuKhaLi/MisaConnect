@@ -85,7 +85,9 @@ dotnet add package MisaConnect.ESign --version 2.0.0-preview.2
 | 2FA / OTP — explicit completion of a captured challenge | `IMisaESignClient.SignInWithOtpAsync` | 🟡 v2.0-preview.2 |
 | 2FA / OTP — request re-delivery | `IMisaESignClient.ResendOtpAsync` | 🟡 v2.0-preview.2 |
 | 2FA / OTP — transparent (DI-registered `IOtpProvider`) | `Application.Abstractions.IOtpProvider` | 🟡 v2.0-preview.2 |
-| Non-PDF document types (XML, Word, Excel) | — | 🛑 slice 3 |
+| Sign XML (XAdES) end-to-end | `IMisaESignClient.SignXmlAsync` | 🟡 v2.0-preview.3 |
+| Sign Word (OOXML `.docx`) end-to-end | `IMisaESignClient.SignWordAsync` | 🟡 v2.0-preview.3 |
+| Sign Excel (OOXML `.xlsx`) end-to-end | `IMisaESignClient.SignExcelAsync` | 🟡 v2.0-preview.3 |
 | Webhook receiver (vs polling) | — | 🛑 slice 4 |
 
 Bind options under the `Misa:ESign` configuration section, then call `services.AddMisaConnectESign(IConfiguration)`. See [specs/001-misa-esign-pdf-sign-flow/quickstart.md](specs/001-misa-esign-pdf-sign-flow/quickstart.md) for the full walkthrough.

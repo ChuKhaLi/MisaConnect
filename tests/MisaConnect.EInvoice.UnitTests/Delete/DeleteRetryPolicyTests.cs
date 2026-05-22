@@ -1,4 +1,6 @@
 using System.Net;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Application.Errors;
 using MisaConnect.EInvoice.Application.Results;
@@ -9,8 +11,6 @@ using MisaConnect.EInvoice.Infrastructure.Caching;
 using MisaConnect.EInvoice.Infrastructure.Configuration;
 using MisaConnect.EInvoice.Infrastructure.MeInvoice;
 using MisaConnect.EInvoice.Infrastructure.MeInvoice.Retry;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace MisaConnect.EInvoice.UnitTests.Delete;

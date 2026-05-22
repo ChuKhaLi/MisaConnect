@@ -1,8 +1,8 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Infrastructure.Configuration;
 using MisaConnect.EInvoice.Infrastructure.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace MisaConnect.EInvoice.Client.DependencyInjection;
 

@@ -1,9 +1,9 @@
 using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using MisaConnect.EInvoice.Client;
 using MisaConnect.EInvoice.Client.DependencyInjection;
 using MisaConnect.EInvoice.Infrastructure.Configuration;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace MisaConnect.EInvoice.IntegrationTests.Client;

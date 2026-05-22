@@ -6,4 +6,7 @@ public sealed record PdfHashOutput(
     string DocumentHash,
     string Sh,
     string SignatureName,
-    string Digest);
+    string Digest)
+{
+    public SignHashInput ToSignHashInput() => new(DocumentId, Digest);
+}

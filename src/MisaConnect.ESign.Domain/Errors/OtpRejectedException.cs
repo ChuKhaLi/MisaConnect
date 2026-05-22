@@ -1,3 +1,5 @@
+using MisaConnect.ESign.Domain.Documents;
+
 namespace MisaConnect.ESign.Domain.Errors;
 
 public sealed class OtpRejectedException : AuthenticationFailedException
@@ -6,8 +8,9 @@ public sealed class OtpRejectedException : AuthenticationFailedException
         string? rawCode,
         string detail,
         string correlationId,
-        Exception? inner = null)
-        : base(rawCode ?? "OtpRejected", detail, correlationId, requires2FA: false, username: string.Empty, inner)
+        Exception? inner = null,
+        DocumentFormat format = DocumentFormat.Unknown)
+        : base(rawCode ?? "OtpRejected", detail, correlationId, requires2FA: false, username: string.Empty, inner, format)
     {
     }
 }

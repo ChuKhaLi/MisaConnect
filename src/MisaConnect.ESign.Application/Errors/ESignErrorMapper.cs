@@ -1,4 +1,5 @@
 using System.Net;
+using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Domain.Signing;
 
@@ -6,10 +7,12 @@ namespace MisaConnect.ESign.Application.Errors;
 
 /// <summary>
 /// Translates a MISA <see cref="ResponseError"/> envelope (or its absence) into
-/// a typed <see cref="ESignException"/> subclass per the slice-1 error mapping
-/// contract. The mapper is endpoint-aware so the same MISA-side code lands on
-/// the right typed exception (e.g. "InvalidCertificate" on hash vs. on
-/// attachment).
+/// a typed <see cref="ESignException"/> subclass per the slice-1 / slice-3 error
+/// mapping contract. The mapper is endpoint-aware so the same MISA-side code
+/// lands on the right typed exception (e.g. "InvalidCertificate" on hash vs.
+/// on attachment); slice 3 adds the <paramref name="requestedFormat"/>
+/// parameter so every typed exception also carries the document format the
+/// consumer requested.
 /// </summary>
 public static class ESignErrorMapper
 {
@@ -30,14 +33,15 @@ public static class ESignErrorMapper
         string? transactionId = null,
         int? attemptCount = null,
         HttpStatusCode? lastStatusCode = null,
-        string? userName = null)
+        string? userName = null,
+        DocumentFormat requestedFormat = DocumentFormat.Pdf)
     {
         var rawCode = envelope?.ErrorCode;
         var detail = BuildDetail(endpoint, rawCode, envelope, includeRawErrorMessage);
 
         if (statusCode == (int)HttpStatusCode.Unauthorized && !IsAuthEndpoint(endpoint))
         {
-            return new AuthenticationFailedException(rawCode, detail, correlationId, requires2FA: false);
+            return new AuthenticationFailedException(rawCode, detail, correlationId, requires2FA: false, format: requestedFormat);
         }
 
         if (IsTransportFailure(statusCode))
@@ -46,19 +50,20 @@ public static class ESignErrorMapper
                 lastStatusCode: lastStatusCode ?? (HttpStatusCode)statusCode,
                 attemptCount: attemptCount ?? 1,
                 detail: detail,
-                correlationId: correlationId);
+                correlationId: correlationId,
+                format: requestedFormat);
         }
 
         return endpoint switch
         {
-            EndpointLogin => MapLogin(rawCode, detail, correlationId, userName ?? string.Empty),
-            EndpointRefresh => new AuthenticationFailedException(rawCode, detail, correlationId, requires2FA: false),
-            EndpointCertificates => new ESignGeneralException(ESignErrorCategory.CertificateLookupFailed, rawCode ?? "EmptyErrorCode", detail, correlationId),
-            EndpointHash => MapHash(rawCode, envelope, detail, correlationId),
-            EndpointSignHash => MapSignHash(rawCode, envelope, detail, correlationId),
-            EndpointSignStatus => new ESignGeneralException(ESignErrorCategory.StatusLookupFailed, rawCode ?? "EmptyErrorCode", detail, correlationId),
-            EndpointAttachment => MapAttachment(rawCode, envelope, detail, correlationId),
-            _ => new ESignGeneralException(ESignErrorCategory.MisaUnknown, rawCode ?? "EmptyErrorCode", detail, correlationId),
+            EndpointLogin => MapLogin(rawCode, detail, correlationId, userName ?? string.Empty, requestedFormat),
+            EndpointRefresh => new AuthenticationFailedException(rawCode, detail, correlationId, requires2FA: false, format: requestedFormat),
+            EndpointCertificates => new ESignGeneralException(ESignErrorCategory.CertificateLookupFailed, rawCode ?? "EmptyErrorCode", detail, correlationId, format: requestedFormat),
+            EndpointHash => MapHash(rawCode, envelope, detail, correlationId, requestedFormat),
+            EndpointSignHash => MapSignHash(rawCode, envelope, detail, correlationId, requestedFormat),
+            EndpointSignStatus => new ESignGeneralException(ESignErrorCategory.StatusLookupFailed, rawCode ?? "EmptyErrorCode", detail, correlationId, format: requestedFormat),
+            EndpointAttachment => MapAttachment(rawCode, envelope, detail, correlationId, requestedFormat),
+            _ => new ESignGeneralException(ESignErrorCategory.MisaUnknown, rawCode ?? "EmptyErrorCode", detail, correlationId, format: requestedFormat),
         };
     }
 
@@ -68,7 +73,7 @@ public static class ESignErrorMapper
     private static bool IsTransportFailure(int statusCode) =>
         statusCode == 429 || statusCode >= 500;
 
-    private static AuthenticationFailedException MapLogin(string? rawCode, string detail, string correlationId, string userName)
+    private static AuthenticationFailedException MapLogin(string? rawCode, string detail, string correlationId, string userName, DocumentFormat requestedFormat)
     {
         var requires2FA = string.Equals(rawCode, "122", StringComparison.OrdinalIgnoreCase);
         return new AuthenticationFailedException(
@@ -76,26 +81,76 @@ public static class ESignErrorMapper
             detail,
             correlationId,
             requires2FA,
-            username: requires2FA ? userName : string.Empty);
+            username: requires2FA ? userName : string.Empty,
+            format: requestedFormat);
     }
 
-    private static ESignException MapHash(string? rawCode, ResponseError? envelope, string detail, string correlationId)
+    private static ESignException MapHash(string? rawCode, ResponseError? envelope, string detail, string correlationId, DocumentFormat requestedFormat)
     {
-        var synthesized = SynthesizeHashCode(rawCode, envelope);
-        return new ESignGeneralException(ESignErrorCategory.HashRejected, synthesized, detail, correlationId);
+        var synthesized = SynthesizeHashCodeForFormat(rawCode, envelope, requestedFormat);
+        return new ESignGeneralException(ESignErrorCategory.HashRejected, synthesized, detail, correlationId, format: requestedFormat);
     }
 
-    private static ESignException MapSignHash(string? rawCode, ResponseError? envelope, string detail, string correlationId)
+    private static ESignException MapSignHash(string? rawCode, ResponseError? envelope, string detail, string correlationId, DocumentFormat requestedFormat)
     {
         var requiresSetup = ContainsAny(envelope?.DevMsg, "not connected", "not set up", "remote signing account") ||
                             ContainsAny(envelope?.UserMsg, "chưa kết nối", "chưa thiết lập");
-        return new SignRejectedException(rawCode, detail, correlationId, requiresUserCertSetup: requiresSetup);
+        return new SignRejectedException(rawCode, detail, correlationId, requiresUserCertSetup: requiresSetup, format: requestedFormat);
     }
 
-    private static ESignException MapAttachment(string? rawCode, ResponseError? envelope, string detail, string correlationId)
+    private static ESignException MapAttachment(string? rawCode, ResponseError? envelope, string detail, string correlationId, DocumentFormat requestedFormat)
     {
-        var synthesized = SynthesizeAttachmentCode(rawCode, envelope);
-        return new ESignGeneralException(ESignErrorCategory.AttachmentRejected, synthesized, detail, correlationId);
+        var synthesized = SynthesizeAttachmentCodeForFormat(rawCode, envelope, requestedFormat);
+        return new ESignGeneralException(ESignErrorCategory.AttachmentRejected, synthesized, detail, correlationId, format: requestedFormat);
+    }
+
+    private static string SynthesizeHashCodeForFormat(string? rawCode, ResponseError? envelope, DocumentFormat requestedFormat)
+    {
+        var probe = CombinedProbe(rawCode, envelope);
+        if (probe is null) return "EmptyErrorCode";
+
+        if (requestedFormat == DocumentFormat.Xml &&
+            Contains(probe, "xml") &&
+            (Contains(probe, "malformed") || Contains(probe, "invalid") || Contains(probe, "không hợp lệ")))
+        {
+            return "InvalidXmlInput";
+        }
+        if (Contains(probe, "unsupported") || Contains(probe, "variant") || Contains(probe, "format not supported"))
+        {
+            return "UnsupportedDocumentVariant";
+        }
+        return SynthesizeHashCode(rawCode, envelope);
+    }
+
+    private static string SynthesizeAttachmentCodeForFormat(string? rawCode, ResponseError? envelope, DocumentFormat requestedFormat)
+    {
+        var probe = CombinedProbe(rawCode, envelope);
+        if (probe is null) return "EmptyErrorCode";
+
+        if ((requestedFormat == DocumentFormat.Word || requestedFormat == DocumentFormat.Excel) &&
+            (Contains(probe, "mainDom") || Contains(probe, "main dom") || Contains(probe, "missing main")))
+        {
+            return "MissingMainDom";
+        }
+        if ((requestedFormat == DocumentFormat.Xml || requestedFormat == DocumentFormat.Word || requestedFormat == DocumentFormat.Excel) &&
+            (Contains(probe, "signatureId") || Contains(probe, "signature id") || Contains(probe, "missing signature")))
+        {
+            return "MissingSignatureId";
+        }
+        if (Contains(probe, "unsupported") || Contains(probe, "variant") || Contains(probe, "format not supported"))
+        {
+            return "UnsupportedDocumentVariant";
+        }
+        return SynthesizeAttachmentCode(rawCode, envelope);
+    }
+
+    private static string? CombinedProbe(string? rawCode, ResponseError? envelope)
+    {
+        var parts = new List<string>(3);
+        if (!string.IsNullOrEmpty(rawCode)) parts.Add(rawCode);
+        if (!string.IsNullOrEmpty(envelope?.DevMsg)) parts.Add(envelope!.DevMsg!);
+        if (!string.IsNullOrEmpty(envelope?.UserMsg)) parts.Add(envelope!.UserMsg!);
+        return parts.Count == 0 ? null : string.Join(" ", parts);
     }
 
     private static string SynthesizeHashCode(string? rawCode, ResponseError? envelope)
@@ -148,7 +203,8 @@ public static class ESignErrorMapper
         SignStatus status,
         string? rawCode,
         string? errorDescription,
-        string correlationId)
+        string correlationId,
+        DocumentFormat requestedFormat = DocumentFormat.Pdf)
     {
         var detail = status switch
         {
@@ -160,6 +216,6 @@ public static class ESignErrorMapper
         {
             detail += $" {errorDescription}";
         }
-        return new SignTerminalStateException(status, transactionId, rawCode, detail, correlationId);
+        return new SignTerminalStateException(status, transactionId, rawCode, detail, correlationId, format: requestedFormat);
     }
 }

@@ -13,20 +13,29 @@ internal sealed class MisaESignClient : IMisaESignClient
     private string? _pendingUserName;
     private readonly object _pendingLock = new();
 
-    private readonly SignPdf _orchestrator;
+    private readonly SignPdf _signPdf;
+    private readonly SignXml _signXml;
+    private readonly SignWord _signWord;
+    private readonly SignExcel _signExcel;
     private readonly ExchangeOtp _exchangeOtp;
     private readonly ResendOtp _resendOtp;
     private readonly OtpSubmissionValidator _otpSubmissionValidator;
     private readonly IOtpProvider? _otpProvider;
 
     public MisaESignClient(
-        SignPdf orchestrator,
+        SignPdf signPdf,
+        SignXml signXml,
+        SignWord signWord,
+        SignExcel signExcel,
         ExchangeOtp exchangeOtp,
         ResendOtp resendOtp,
         OtpSubmissionValidator otpSubmissionValidator,
         IOtpProvider? otpProvider = null)
     {
-        _orchestrator = orchestrator;
+        _signPdf = signPdf;
+        _signXml = signXml;
+        _signWord = signWord;
+        _signExcel = signExcel;
         _exchangeOtp = exchangeOtp;
         _resendOtp = resendOtp;
         _otpSubmissionValidator = otpSubmissionValidator;
@@ -39,10 +48,73 @@ internal sealed class MisaESignClient : IMisaESignClient
         var workRequest = SignPdfRequestMapper.ToWorkRequest(request);
         try
         {
-            var result = await _orchestrator.ExecuteAsync(workRequest, ct).ConfigureAwait(false);
+            var result = await _signPdf.ExecuteAsync(workRequest, ct).ConfigureAwait(false);
             lock (_pendingLock) { _pendingUserName = null; }
             return new SignPdfResultDto(
                 SignedPdf: result.SignedPdf.Bytes,
+                TransactionId: result.TransactionId,
+                CertificateKeyAlias: result.CertificateKeyAlias,
+                CompletedAtUtc: result.CompletedAtUtc);
+        }
+        catch (AuthenticationFailedException ex) when (ex.Requires2FA && _otpProvider is null)
+        {
+            lock (_pendingLock) { _pendingUserName = ex.Username; }
+            throw;
+        }
+    }
+
+    public async Task<SignXmlResultDto> SignXmlAsync(SignXmlRequestDto request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var workRequest = SignXmlRequestMapper.ToWorkRequest(request);
+        try
+        {
+            var result = await _signXml.ExecuteAsync(workRequest, ct).ConfigureAwait(false);
+            lock (_pendingLock) { _pendingUserName = null; }
+            return new SignXmlResultDto(
+                SignedXml: result.SignedXml.Bytes,
+                TransactionId: result.TransactionId,
+                CertificateKeyAlias: result.CertificateKeyAlias,
+                CompletedAtUtc: result.CompletedAtUtc);
+        }
+        catch (AuthenticationFailedException ex) when (ex.Requires2FA && _otpProvider is null)
+        {
+            lock (_pendingLock) { _pendingUserName = ex.Username; }
+            throw;
+        }
+    }
+
+    public async Task<SignWordResultDto> SignWordAsync(SignWordRequestDto request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var workRequest = SignWordRequestMapper.ToWorkRequest(request);
+        try
+        {
+            var result = await _signWord.ExecuteAsync(workRequest, ct).ConfigureAwait(false);
+            lock (_pendingLock) { _pendingUserName = null; }
+            return new SignWordResultDto(
+                SignedWord: result.SignedWord.Bytes,
+                TransactionId: result.TransactionId,
+                CertificateKeyAlias: result.CertificateKeyAlias,
+                CompletedAtUtc: result.CompletedAtUtc);
+        }
+        catch (AuthenticationFailedException ex) when (ex.Requires2FA && _otpProvider is null)
+        {
+            lock (_pendingLock) { _pendingUserName = ex.Username; }
+            throw;
+        }
+    }
+
+    public async Task<SignExcelResultDto> SignExcelAsync(SignExcelRequestDto request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var workRequest = SignExcelRequestMapper.ToWorkRequest(request);
+        try
+        {
+            var result = await _signExcel.ExecuteAsync(workRequest, ct).ConfigureAwait(false);
+            lock (_pendingLock) { _pendingUserName = null; }
+            return new SignExcelResultDto(
+                SignedExcel: result.SignedExcel.Bytes,
                 TransactionId: result.TransactionId,
                 CertificateKeyAlias: result.CertificateKeyAlias,
                 CompletedAtUtc: result.CompletedAtUtc);

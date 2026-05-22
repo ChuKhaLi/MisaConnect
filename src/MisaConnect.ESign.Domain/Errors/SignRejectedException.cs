@@ -1,3 +1,5 @@
+using MisaConnect.ESign.Domain.Documents;
+
 namespace MisaConnect.ESign.Domain.Errors;
 
 public sealed class SignRejectedException : ESignException
@@ -7,8 +9,9 @@ public sealed class SignRejectedException : ESignException
         string detail,
         string correlationId,
         bool requiresUserCertSetup = false,
-        Exception? inner = null)
-        : base(ESignErrorCategory.SignRejected, rawCode, detail, correlationId, inner)
+        Exception? inner = null,
+        DocumentFormat format = DocumentFormat.Unknown)
+        : base(ESignErrorCategory.SignRejected, rawCode, detail, correlationId, inner, format)
     {
         RequiresUserCertSetup = requiresUserCertSetup;
     }

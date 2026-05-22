@@ -38,7 +38,7 @@ public class MisaESignClientUsernameContextTests
         var exchange = new ExchangeOtp(wire, cache, selector, (k, f, ct) => f(ct));
         var resend = new ResendOtp(wire, () => "en-US");
         var otpValidator = new OtpSubmissionValidator(correlation);
-        return new MisaESignClient(signPdf, exchange, resend, otpValidator);
+        return new MisaESignClient(signPdf, signXml: null!, signWord: null!, signExcel: null!, exchange, resend, otpValidator);
     }
 
     [Fact]

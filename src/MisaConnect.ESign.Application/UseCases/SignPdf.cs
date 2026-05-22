@@ -90,7 +90,7 @@ public sealed class SignPdf
 
         var token = await _ensureToken.ExecuteAsync(ct).ConfigureAwait(false);
 
-        var activeCerts = await _listCerts.ExecuteAsync(token.Value, ct).ConfigureAwait(false);
+        var activeCerts = await _listCerts.ExecuteAsync(token.Value, ct, DocumentFormat.Pdf).ConfigureAwait(false);
         var cert = await _certSelector.SelectAsync(activeCerts, ct).ConfigureAwait(false);
 
         var hash = await _hashPdf.ExecuteAsync(
@@ -106,7 +106,7 @@ public sealed class SignPdf
             cert: cert,
             userId: token.UserId,
             dataToBeDisplayed: request.DataToBeDisplayed,
-            hash: hash,
+            hash: hash.ToSignHashInput(),
             documentName: request.DocumentName,
             ct: ct).ConfigureAwait(false);
 
@@ -115,7 +115,8 @@ public sealed class SignPdf
             transactionId: transaction.TransactionId,
             interval: _intervalAccessor(),
             totalTimeout: _totalTimeoutAccessor(),
-            ct: ct).ConfigureAwait(false);
+            ct: ct,
+            format: DocumentFormat.Pdf).ConfigureAwait(false);
 
         var signedBytes = await _attachSignature.ExecuteAsync(
             accessToken: token.Value,

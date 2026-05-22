@@ -1,3 +1,5 @@
+using MisaConnect.ESign.Domain.Documents;
+
 namespace MisaConnect.ESign.Domain.Errors;
 
 public class AuthenticationFailedException : ESignException
@@ -8,8 +10,9 @@ public class AuthenticationFailedException : ESignException
         string correlationId,
         bool requires2FA = false,
         string username = "",
-        Exception? inner = null)
-        : base(ESignErrorCategory.Authentication, rawCode, detail, correlationId, inner)
+        Exception? inner = null,
+        DocumentFormat format = DocumentFormat.Unknown)
+        : base(ESignErrorCategory.Authentication, rawCode, detail, correlationId, inner, format)
     {
         Requires2FA = requires2FA;
         Username = username ?? string.Empty;

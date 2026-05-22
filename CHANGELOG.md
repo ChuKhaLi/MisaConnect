@@ -5,6 +5,19 @@ All notable changes to MisaConnect will be documented here. This project follows
 ## [Unreleased]
 
 ### Added
+- `MisaConnect.ESign` slice 3 — Multi-format document signing (XML, Word, Excel). Shipping as `2.0.0-preview.3`.
+  - `IMisaESignClient.SignXmlAsync(SignXmlRequestDto, CancellationToken)` — end-to-end XML (XAdES) signing. Accepts either a `string Xml` (primary; matches MISA's "text content" semantics on `FileToSign` per §4.1.2) or `byte[] XmlUtf8Bytes` (secondary; UTF-8-decoded by the SDK). Construct via `SignXmlRequest.FromString(...)` / `FromUtf8Bytes(...)` factories.
+  - `IMisaESignClient.SignWordAsync(SignWordRequestDto, CancellationToken)` — end-to-end Word (OOXML `.docx`) signing using MISA's `wordDocs` per-format array on `/documents/hash` and `/documents/attachment` per §4.1.1 / §4.6 / §4.15.
+  - `IMisaESignClient.SignExcelAsync(SignExcelRequestDto, CancellationToken)` — end-to-end Excel (OOXML `.xlsx`) signing using MISA's `excelDocs` per-format array.
+  - `DocumentFormat` byte-backed closed enum (`Unknown = 0, Pdf = 1, Xml = 2, Word = 3, Excel = 4`) in `Domain.Documents`. Surfaced as the `Format` property on every typed exception and on every result DTO so consumers can branch on `(ExceptionType, Format)` without string-matching MISA's `devMsg`.
+  - `XmlSignatureContext` slim record (`SignatureName`, `HashAlgorithm`, `SignatureDescription`) in `Domain.Signing` — exposes only XAdES-meaningful fields. Visual-positioning fields are intentionally absent so the type system rejects consumer mistakes at compile time.
+  - Public client DTOs: `SignXmlRequestDto`, `SignWordRequestDto`, `SignExcelRequestDto`, `SignXmlResultDto`, `SignWordResultDto`, `SignExcelResultDto`, `XmlSignatureContextDto`, `SignatureDescriptionDto`.
+  - `SignPdfResultDto` gains a `Format = DocumentFormat.Pdf` property (additive; existing call sites unaffected).
+  - Every existing typed exception (`ESignException` base + every concrete subclass) gains an optional `format` constructor parameter at the end and a `Format` property. Slice-1 PDF call sites pass `DocumentFormat.Pdf`; slice-2 paths reached during a facade call inherit the called facade's format.
+  - Five new methods on `IMisaESignWireClient` (additive): `HashXmlAsync`, `HashWordAsync`, `HashExcelAsync`, `AttachSignatureToXmlAsync`, `AttachSignatureToWordExcelAsync`.
+  - Two new Application records: `XmlHashOutput`, `WordExcelHashOutput`. New `SignHashInput(string DocumentId, string Digest)` record — `SubmitSignHash.ExecuteAsync(...)` now takes this in place of the slice-1 `PdfHashOutput hash` parameter (each per-format hash output exposes a `ToSignHashInput()` projection). Wire shape on `/Signing/hash` stays byte-identical (FR-065).
+  - `ESignErrorMapper.Map(...)` gains a `DocumentFormat requestedFormat = DocumentFormat.Pdf` parameter and new per-format synthesized codes (`InvalidXmlInput`, `MissingMainDom`, `MissingSignatureId`, `UnsupportedDocumentVariant`).
+  - `ESignLogScrubber` redacts the new sensitive fields on `/documents/*` payloads: `mainDom`, `signatureId`, `document`.
 - `MisaConnect.ESign` slice 2 — Two-factor authentication (OTP) flow. Shipping as `2.0.0-preview.2`.
   - `IMisaESignClient.SignInWithOtpAsync(otpCode, otpType, remember, ct)` — completes an in-progress 2FA challenge captured from a preceding `SignPdfAsync`.
   - `IMisaESignClient.ResendOtpAsync(language?, ct)` — requests OTP re-delivery; returns a typed `OtpResendResultDto` (does not throw on documented MISA rejections).

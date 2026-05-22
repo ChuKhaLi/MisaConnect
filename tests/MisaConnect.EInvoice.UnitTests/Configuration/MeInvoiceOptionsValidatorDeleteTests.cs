@@ -1,5 +1,5 @@
-using MisaConnect.EInvoice.Infrastructure.Configuration;
 using Microsoft.Extensions.Configuration;
+using MisaConnect.EInvoice.Infrastructure.Configuration;
 using Xunit;
 
 namespace MisaConnect.EInvoice.UnitTests.Configuration;

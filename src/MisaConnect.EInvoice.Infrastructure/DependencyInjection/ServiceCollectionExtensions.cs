@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Application.Errors;
 using MisaConnect.EInvoice.Application.Templates;
@@ -9,9 +12,6 @@ using MisaConnect.EInvoice.Infrastructure.Logging;
 using MisaConnect.EInvoice.Infrastructure.MeInvoice;
 using MisaConnect.EInvoice.Infrastructure.MeInvoice.Auth;
 using MisaConnect.EInvoice.Infrastructure.MeInvoice.Retry;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace MisaConnect.EInvoice.Infrastructure.DependencyInjection;
 

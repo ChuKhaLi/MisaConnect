@@ -1,3 +1,5 @@
+using MisaConnect.ESign.Domain.Documents;
+
 namespace MisaConnect.ESign.Domain.Errors;
 
 public sealed class SignTimeoutException : ESignException
@@ -7,8 +9,9 @@ public sealed class SignTimeoutException : ESignException
         TimeSpan elapsedTime,
         string detail,
         string correlationId,
-        Exception? inner = null)
-        : base(ESignErrorCategory.SignTimeout, "SignTimeout", detail, correlationId, inner)
+        Exception? inner = null,
+        DocumentFormat format = DocumentFormat.Unknown)
+        : base(ESignErrorCategory.SignTimeout, "SignTimeout", detail, correlationId, inner, format)
     {
         TransactionId = transactionId;
         ElapsedTime = elapsedTime;

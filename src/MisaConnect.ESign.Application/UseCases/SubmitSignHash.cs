@@ -18,7 +18,7 @@ public sealed class SubmitSignHash
         Certificate cert,
         string userId,
         string dataToBeDisplayed,
-        PdfHashOutput hash,
+        SignHashInput hash,
         string documentName,
         CancellationToken ct) =>
         _wire.SubmitSignHashAsync(accessToken, cert, userId, dataToBeDisplayed, hash, documentName, ct);

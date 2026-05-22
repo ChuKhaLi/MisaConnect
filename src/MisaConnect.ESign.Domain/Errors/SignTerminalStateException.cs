@@ -1,3 +1,4 @@
+using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Signing;
 
 namespace MisaConnect.ESign.Domain.Errors;
@@ -10,8 +11,9 @@ public sealed class SignTerminalStateException : ESignException
         string? rawCode,
         string detail,
         string correlationId,
-        Exception? inner = null)
-        : base(CategoryFromStatus(terminalStatus), rawCode, detail, correlationId, inner)
+        Exception? inner = null,
+        DocumentFormat format = DocumentFormat.Unknown)
+        : base(CategoryFromStatus(terminalStatus), rawCode, detail, correlationId, inner, format)
     {
         TerminalStatus = terminalStatus;
         TransactionId = transactionId;

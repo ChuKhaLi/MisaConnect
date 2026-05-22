@@ -1,4 +1,5 @@
 using MisaConnect.ESign.Application.Abstractions;
+using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Domain.Signing;
 
@@ -28,7 +29,8 @@ public sealed class PollSignStatus
         string transactionId,
         TimeSpan interval,
         TimeSpan totalTimeout,
-        CancellationToken ct)
+        CancellationToken ct,
+        DocumentFormat format = DocumentFormat.Pdf)
     {
         var start = _clock.UtcNow;
         var deadline = start + totalTimeout;
@@ -50,7 +52,8 @@ public sealed class PollSignStatus
                         transactionId: transactionId,
                         rawCode: snapshot.ErrorCode,
                         detail: BuildTerminalDetail(snapshot),
-                        correlationId: _correlation.Current);
+                        correlationId: _correlation.Current,
+                        format: format);
 
                 case SignStatus.UNKNOWN:
                     throw new SignTerminalStateException(
@@ -58,7 +61,8 @@ public sealed class PollSignStatus
                         transactionId: transactionId,
                         rawCode: snapshot.ErrorCode ?? "UnknownStatus",
                         detail: BuildTerminalDetail(snapshot),
-                        correlationId: _correlation.Current);
+                        correlationId: _correlation.Current,
+                        format: format);
 
                 case SignStatus.PENDING:
                 default:
@@ -72,7 +76,8 @@ public sealed class PollSignStatus
                     transactionId: transactionId,
                     elapsedTime: now - start,
                     detail: $"Polling exceeded total timeout of {totalTimeout} on transactionId={transactionId}.",
-                    correlationId: _correlation.Current);
+                    correlationId: _correlation.Current,
+                    format: format);
             }
 
             var remainingToDeadline = deadline - now;

@@ -1,5 +1,6 @@
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Domain.Certificates;
+using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
 
 namespace MisaConnect.ESign.Application.UseCases;
@@ -15,7 +16,10 @@ public sealed class ListActiveCertificates
         _correlation = correlation;
     }
 
-    public async Task<IReadOnlyList<Certificate>> ExecuteAsync(string accessToken, CancellationToken ct)
+    public async Task<IReadOnlyList<Certificate>> ExecuteAsync(
+        string accessToken,
+        CancellationToken ct,
+        DocumentFormat format = DocumentFormat.Pdf)
     {
         var all = await _wire.ListCertificatesByUserIdAsync(accessToken, ct).ConfigureAwait(false);
         var active = new List<Certificate>(all.Count);
@@ -30,7 +34,8 @@ public sealed class ListActiveCertificates
         {
             throw new NoActiveCertificateException(
                 "No certificate with keyStatus = ACTIVE is available for the authenticated user.",
-                _correlation.Current);
+                _correlation.Current,
+                format: format);
         }
         return active;
     }

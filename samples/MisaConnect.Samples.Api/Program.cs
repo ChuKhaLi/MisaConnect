@@ -1,12 +1,12 @@
 using System.Text.Json;
-using MisaConnect.Samples.Api.Endpoints;
-using MisaConnect.Samples.Api.Middleware;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Application.Operations;
 using MisaConnect.EInvoice.Infrastructure.Configuration;
 using MisaConnect.EInvoice.Infrastructure.DependencyInjection;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
+using MisaConnect.Samples.Api.Endpoints;
+using MisaConnect.Samples.Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 

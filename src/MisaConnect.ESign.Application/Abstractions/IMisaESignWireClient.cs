@@ -1,5 +1,6 @@
 using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Domain.Certificates;
+using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Signing;
 
 namespace MisaConnect.ESign.Application.Abstractions;
@@ -29,7 +30,7 @@ public interface IMisaESignWireClient
         Certificate cert,
         string userId,
         string dataToBeDisplayed,
-        PdfHashOutput hash,
+        SignHashInput hash,
         string documentName,
         CancellationToken ct);
 
@@ -40,5 +41,48 @@ public interface IMisaESignWireClient
         Certificate cert,
         PdfHashOutput hash,
         string signatureData,
+        CancellationToken ct);
+
+    // Slice 3 — per-format hash methods (§4.1.1 / §4.1.2 / §4.15)
+
+    Task<XmlHashOutput> HashXmlAsync(
+        string accessToken,
+        Certificate cert,
+        string xmlContent,
+        string documentId,
+        XmlSignatureContext signatureContext,
+        CancellationToken ct);
+
+    Task<WordExcelHashOutput> HashWordAsync(
+        string accessToken,
+        Certificate cert,
+        byte[] wordBytes,
+        string documentId,
+        SignatureInfo signatureInfo,
+        CancellationToken ct);
+
+    Task<WordExcelHashOutput> HashExcelAsync(
+        string accessToken,
+        Certificate cert,
+        byte[] excelBytes,
+        string documentId,
+        SignatureInfo signatureInfo,
+        CancellationToken ct);
+
+    // Slice 3 — per-format attachment methods (§4.6 Doc_Attackment)
+
+    Task<byte[]> AttachSignatureToXmlAsync(
+        string accessToken,
+        Certificate cert,
+        XmlHashOutput hash,
+        string signatureData,
+        CancellationToken ct);
+
+    Task<byte[]> AttachSignatureToWordExcelAsync(
+        string accessToken,
+        Certificate cert,
+        WordExcelHashOutput hash,
+        string signatureData,
+        DocumentFormat format,
         CancellationToken ct);
 }

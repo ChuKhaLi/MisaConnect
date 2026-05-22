@@ -1,3 +1,5 @@
+using MisaConnect.ESign.Domain.Documents;
+
 namespace MisaConnect.ESign.Domain.Errors;
 
 public sealed class ExhaustedOtpAttemptsException : AuthenticationFailedException
@@ -6,8 +8,9 @@ public sealed class ExhaustedOtpAttemptsException : AuthenticationFailedExceptio
         string? rawCode,
         string detail,
         string correlationId,
-        Exception? inner = null)
-        : base(rawCode ?? "ExhaustedOtpAttempts", detail, correlationId, requires2FA: false, username: string.Empty, inner)
+        Exception? inner = null,
+        DocumentFormat format = DocumentFormat.Unknown)
+        : base(rawCode ?? "ExhaustedOtpAttempts", detail, correlationId, requires2FA: false, username: string.Empty, inner, format)
     {
     }
 }

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Application.Errors;
 using MisaConnect.EInvoice.Application.Results;
@@ -12,7 +13,6 @@ using MisaConnect.EInvoice.Infrastructure.Configuration;
 using MisaConnect.EInvoice.Infrastructure.MeInvoice.Auth;
 using MisaConnect.EInvoice.Infrastructure.MeInvoice.Mapping;
 using MisaConnect.EInvoice.Infrastructure.MeInvoice.Wire;
-using Microsoft.Extensions.Options;
 
 namespace MisaConnect.EInvoice.Infrastructure.MeInvoice;
 

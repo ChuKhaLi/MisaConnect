@@ -79,4 +79,44 @@ public class ESignLogScrubberTests
         Assert.DoesNotContain("device-1234567890", scrubbed);
         Assert.DoesNotContain("My-Phone", scrubbed);
     }
+
+    [Fact]
+    public void MainDom_field_redacted_on_word_excel_responses()
+    {
+        var scrubbed = ESignLogScrubber.Scrub("{\"mainDom\":\"MAIN-DOM-SECRET\"}");
+        Assert.DoesNotContain("MAIN-DOM-SECRET", scrubbed);
+    }
+
+    [Fact]
+    public void SignatureId_field_redacted_on_per_format_responses()
+    {
+        var scrubbed = ESignLogScrubber.Scrub("{\"signatureId\":\"SIG-ID-SECRET\"}");
+        Assert.DoesNotContain("SIG-ID-SECRET", scrubbed);
+    }
+
+    [Fact]
+    public void Document_field_redacted_on_attachment_responses()
+    {
+        var scrubbed = ESignLogScrubber.Scrub("{\"document\":\"SIGNED-XML-CONTENT\"}");
+        Assert.DoesNotContain("SIGNED-XML-CONTENT", scrubbed);
+    }
+
+    [Fact]
+    public void Xml_word_excel_file_to_sign_redacted_on_hash_requests()
+    {
+        var hashReq = "{\"xmlDocs\":[{\"DocumentId\":\"doc-1\",\"FileToSign\":\"<root>secret-payload</root>\"}]}";
+        var scrubbed = ESignLogScrubber.Scrub(hashReq);
+        Assert.DoesNotContain("secret-payload", scrubbed);
+    }
+
+    [Fact]
+    public void Per_format_digest_sh_documentBytes_documentHash_redacted()
+    {
+        var body = "{\"digest\":\"DIGEST-SECRET\",\"sh\":\"SH-SECRET\",\"documentBytes\":\"BYTES-SECRET\",\"documentHash\":\"HASH-SECRET\"}";
+        var scrubbed = ESignLogScrubber.Scrub(body);
+        Assert.DoesNotContain("DIGEST-SECRET", scrubbed);
+        Assert.DoesNotContain("SH-SECRET", scrubbed);
+        Assert.DoesNotContain("BYTES-SECRET", scrubbed);
+        Assert.DoesNotContain("HASH-SECRET", scrubbed);
+    }
 }

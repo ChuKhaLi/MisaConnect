@@ -1,5 +1,5 @@
-using MisaConnect.EInvoice.Application.Abstractions;
 using Microsoft.Extensions.Primitives;
+using MisaConnect.EInvoice.Application.Abstractions;
 
 namespace MisaConnect.Samples.Api.Middleware;
 

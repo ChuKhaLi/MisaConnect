@@ -1,9 +1,9 @@
-using MisaConnect.EInvoice.Application.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
+using MisaConnect.EInvoice.Application.Abstractions;
 
 namespace MisaConnect.EInvoice.IntegrationTests.Api;
 

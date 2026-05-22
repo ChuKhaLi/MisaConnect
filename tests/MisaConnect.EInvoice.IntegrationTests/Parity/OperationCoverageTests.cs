@@ -1,10 +1,10 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using MisaConnect.EInvoice.Application.Operations;
 using MisaConnect.EInvoice.Application.UseCases;
 using MisaConnect.EInvoice.Client;
 using MisaConnect.EInvoice.IntegrationTests.Api;
-using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace MisaConnect.EInvoice.IntegrationTests.Parity;

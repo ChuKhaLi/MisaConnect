@@ -3,7 +3,9 @@ using MisaConnect.ESign.Application.Errors;
 using MisaConnect.ESign.Application.UseCases;
 using MisaConnect.ESign.Application.Validation;
 using MisaConnect.ESign.Domain.Authentication;
+using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
+using MisaConnect.ESign.Domain.Signing;
 using MisaConnect.ESign.Infrastructure.Configuration;
 using Xunit;
 
@@ -88,6 +90,28 @@ public class MisaConnectESignLayerAuditTests
         Assert.Equal("MisaConnect.ESign.Application", typeof(ResendOtp).Assembly.GetName().Name);
         Assert.Equal("MisaConnect.ESign.Application", typeof(OtpErrorMapper).Assembly.GetName().Name);
         Assert.Equal("MisaConnect.ESign.Application", typeof(OtpSubmissionValidator).Assembly.GetName().Name);
+    }
+
+    [Fact]
+    public void Slice3_per_format_types_live_at_expected_layers()
+    {
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(DocumentFormat).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(XmlSignatureContext).Assembly.GetName().Name);
+
+        Assert.Equal("MisaConnect.ESign.Application", typeof(XmlHashOutput).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(WordExcelHashOutput).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(SignHashInput).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(HashXmlDocument).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(HashWordDocument).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(HashExcelDocument).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(AttachSignatureToXml).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(AttachSignatureToWordExcel).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(SignXml).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(SignWord).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(SignExcel).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(SignXmlRequestValidator).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(SignWordRequestValidator).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(SignExcelRequestValidator).Assembly.GetName().Name);
     }
 
     private static bool IsSystemAssembly(string name) =>

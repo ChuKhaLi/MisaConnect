@@ -1,3 +1,5 @@
+using MisaConnect.ESign.Domain.Documents;
+
 namespace MisaConnect.ESign.Domain.Errors;
 
 public abstract class ESignException : Exception
@@ -7,7 +9,8 @@ public abstract class ESignException : Exception
         string? rawCode,
         string detail,
         string correlationId,
-        Exception? inner = null)
+        Exception? inner = null,
+        DocumentFormat format = DocumentFormat.Unknown)
         : base(detail, inner)
     {
         if (string.IsNullOrWhiteSpace(correlationId))
@@ -19,12 +22,14 @@ public abstract class ESignException : Exception
         RawCode = rawCode;
         Detail = detail;
         CorrelationId = correlationId;
+        Format = format;
     }
 
     public ESignErrorCategory Category { get; }
     public string? RawCode { get; }
     public string Detail { get; }
     public string CorrelationId { get; }
+    public DocumentFormat Format { get; }
 }
 
 public sealed class ESignGeneralException : ESignException
@@ -34,8 +39,9 @@ public sealed class ESignGeneralException : ESignException
         string? rawCode,
         string detail,
         string correlationId,
-        Exception? inner = null)
-        : base(category, rawCode, detail, correlationId, inner)
+        Exception? inner = null,
+        DocumentFormat format = DocumentFormat.Unknown)
+        : base(category, rawCode, detail, correlationId, inner, format)
     {
     }
 }
