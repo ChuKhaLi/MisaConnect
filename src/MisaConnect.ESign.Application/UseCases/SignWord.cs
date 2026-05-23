@@ -1,9 +1,14 @@
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Application.Validation;
+using MisaConnect.ESign.Domain.Authentication;
+using MisaConnect.ESign.Domain.Certificates;
 using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
+using MisaConnect.ESign.Domain.Signing;
 
 namespace MisaConnect.ESign.Application.UseCases;
+
+internal sealed record BeginSignWordCoreResult(AccessToken Token, Certificate Cert, WordExcelHashOutput Hash, SignTransaction Transaction);
 
 public sealed class SignWord
 {
@@ -84,7 +89,7 @@ public sealed class SignWord
         }
     }
 
-    private async Task<SignWordWorkResult> ExecuteSignAsync(SignWordWorkRequest request, CancellationToken ct)
+    internal async Task<BeginSignWordCoreResult> BeginSignWordCoreAsync(SignWordWorkRequest request, CancellationToken ct)
     {
         _validator.Validate(request);
 
@@ -110,26 +115,33 @@ public sealed class SignWord
             documentName: request.DocumentName,
             ct: ct).ConfigureAwait(false);
 
+        return new BeginSignWordCoreResult(token, cert, hash, transaction);
+    }
+
+    private async Task<SignWordWorkResult> ExecuteSignAsync(SignWordWorkRequest request, CancellationToken ct)
+    {
+        var core = await BeginSignWordCoreAsync(request, ct).ConfigureAwait(false);
+
         var snapshot = await _pollStatus.ExecuteAsync(
-            accessToken: token.Value,
-            transactionId: transaction.TransactionId,
+            accessToken: core.Token.Value,
+            transactionId: core.Transaction.TransactionId,
             interval: _intervalAccessor(),
             totalTimeout: _totalTimeoutAccessor(),
             ct: ct,
             format: DocumentFormat.Word).ConfigureAwait(false);
 
         var signedBytes = await _attachSignature.ExecuteAsync(
-            accessToken: token.Value,
-            cert: cert,
-            hash: hash,
+            accessToken: core.Token.Value,
+            cert: core.Cert,
+            hash: core.Hash,
             signatureData: snapshot.FirstSignatureData ?? string.Empty,
             format: DocumentFormat.Word,
             ct: ct).ConfigureAwait(false);
 
         return new SignWordWorkResult(
             SignedWord: new SignedDocument(signedBytes),
-            TransactionId: transaction.TransactionId,
-            CertificateKeyAlias: cert.KeyAlias,
+            TransactionId: core.Transaction.TransactionId,
+            CertificateKeyAlias: core.Cert.KeyAlias,
             CompletedAtUtc: _clock.UtcNow);
     }
 }

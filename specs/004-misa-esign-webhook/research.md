@@ -235,6 +235,8 @@ Wait — this is over-engineered for a case that's vanishingly rare. Alternative
 
 **Open**: Run this check during `/speckit-tasks` generation; record the finding inline in the task that creates the `WebhookEnvelopeValidator`.
 
+**Resolution (2026-05-23, T005 implementation pass)**: Postman collection downloaded and grepped. No webhook endpoint, no `x-misa-signature`/`hmac` header, no success-ACK `errorCode` sentinel documented. The collection covers Auth, Cert, `/Signing/hash`, `/Signing/status`, and `/documents/attachment` only. The two `signature`-bearing references in the collection are JavaScript test-scripts extracting `dataJson.signatures[0].signature` from the `/Signing/status` response — same shape the webhook envelope re-uses per §3.8 / §4.9. **Assumption 11 stands**; no `IWebhookSignatureVerifier` port is needed. Assumption 6 (`MisaWebhookAckCodes.Success = "0"`) cannot be contradicted from this source — kept as-is. R-3 + R-7 closed.
+
 ---
 
 ## R-8. JSON deserialization of `extraData` — preserve as `JsonElement`, `JsonObject`, or `Dictionary<string, object?>`?

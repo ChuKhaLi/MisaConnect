@@ -1,11 +1,14 @@
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Application.Errors;
+using MisaConnect.ESign.Application.Sessions;
 using MisaConnect.ESign.Application.UseCases;
 using MisaConnect.ESign.Application.Validation;
+using MisaConnect.ESign.Application.Webhook;
 using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Domain.Signing;
+using MisaConnect.ESign.Domain.Webhook;
 using MisaConnect.ESign.Infrastructure.Configuration;
 using Xunit;
 
@@ -112,6 +115,51 @@ public class MisaConnectESignLayerAuditTests
         Assert.Equal("MisaConnect.ESign.Application", typeof(SignXmlRequestValidator).Assembly.GetName().Name);
         Assert.Equal("MisaConnect.ESign.Application", typeof(SignWordRequestValidator).Assembly.GetName().Name);
         Assert.Equal("MisaConnect.ESign.Application", typeof(SignExcelRequestValidator).Assembly.GetName().Name);
+    }
+
+    [Fact]
+    public void Slice4_webhook_types_live_at_expected_layers()
+    {
+        // Domain.Webhook.* are pure value/enum types
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(WebhookEnvelope).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(WebhookSignature).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(WebhookStatus).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(WebhookAck).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(WebhookOutcome).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(BeginResult).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(WebhookValidationCategory).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(WebhookValidationException).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Domain", typeof(MalformedEnvelopeException).Assembly.GetName().Name);
+
+        // Application.Sessions.* live in Application (not Domain) because they wrap Application-layer hash output types
+        Assert.Equal("MisaConnect.ESign.Application", typeof(SigningSession).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(PerFormatHashPayload).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(SigningSessionCachedSuccess).Assembly.GetName().Name);
+
+        // Application.Webhook ports + use cases
+        Assert.Equal("MisaConnect.ESign.Application", typeof(IWebhookDeliveryHook).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(WebhookHandleResult).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(ISigningSessionStore).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(IFinalizeLockOwner).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(WebhookEnvelopeValidator).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(BeginSignPdf).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(BeginSignXml).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(BeginSignWord).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(BeginSignExcel).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(HandleWebhook).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Application", typeof(FinalizeFromWebhook).Assembly.GetName().Name);
+
+        // Infrastructure.Sessions.InMemorySigningSessionStore + Infrastructure.ESign.Webhook.* stay internal
+        var infraAssembly = typeof(MisaESignOptions).Assembly;
+        Assert.DoesNotContain(infraAssembly.GetExportedTypes(),
+            t => t.FullName == "MisaConnect.ESign.Infrastructure.Sessions.InMemorySigningSessionStore");
+        Assert.DoesNotContain(infraAssembly.GetExportedTypes(),
+            t => (t.FullName ?? "").StartsWith("MisaConnect.ESign.Infrastructure.ESign.Webhook.", StringComparison.Ordinal));
+
+        // Webhook configuration types ARE public (DI-touching)
+        Assert.Equal("MisaConnect.ESign.Infrastructure", typeof(MisaESignWebhookOptions).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Infrastructure", typeof(MisaESignWebhookSessionOptions).Assembly.GetName().Name);
+        Assert.Equal("MisaConnect.ESign.Infrastructure", typeof(WebhookMode).Assembly.GetName().Name);
     }
 
     private static bool IsSystemAssembly(string name) =>

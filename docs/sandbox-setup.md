@@ -76,6 +76,20 @@ export MISACONNECT_ESIGN_SANDBOX_USER_2FA_ENABLED=1
 
 When either of the two-factor env vars is absent the 2FA sandbox test skips cleanly with `ESign sandbox not configured. Missing: ...`. The test never throws on missing credentials — failures only surface when MISA itself rejects the configured account.
 
+### Slice-4 webhook sandbox
+
+For the slice-4 webhook end-to-end test (`[SandboxFact(SandboxRequirement.Webhook)]`), additionally set:
+
+```bash
+# Publicly reachable URL that MISA has been configured to POST webhook deliveries to.
+# For local development, ngrok or similar tunneling tools expose localhost to MISA's network.
+export MISACONNECT_ESIGN_SANDBOX_WEBHOOK_URL=https://your-tunnel.ngrok.io/esign/webhook
+# Optional — how long the sandbox test waits for MISA to POST back. Default 00:05:00 (5 min).
+export MISACONNECT_ESIGN_SANDBOX_WEBHOOK_TIMEOUT=00:05:00
+```
+
+The webhook URL must be registered with MISA out-of-band (the SDK does not register webhook destinations on the consumer's behalf). Local-developer workflow: start the sample API behind ngrok, set `MISACONNECT_ESIGN_SANDBOX_WEBHOOK_URL` to the ngrok-public URL, and register that URL with MISA's webhook configuration. The sandbox test then drives `BeginSignPdfAsync` and waits for MISA to push the completion envelope back to the running sample API endpoint, which routes through `IMisaESignClient.HandleWebhookAsync` and surfaces the signed bytes to the test's delivery hook.
+
 ## 4. Production cutover
 
 Flip:

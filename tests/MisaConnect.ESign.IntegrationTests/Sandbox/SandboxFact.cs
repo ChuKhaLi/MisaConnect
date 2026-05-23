@@ -6,6 +6,7 @@ public enum SandboxRequirement
 {
     Default = 0,
     TwoFactorAuth = 1,
+    Webhook = 2,
 }
 
 /// <summary>
@@ -38,6 +39,11 @@ public sealed class SandboxFactAttribute : FactAttribute
                 missing.Add("MISACONNECT_ESIGN_SANDBOX_OTP_PROVIDER");
             if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MISACONNECT_ESIGN_SANDBOX_USER_2FA_ENABLED")))
                 missing.Add("MISACONNECT_ESIGN_SANDBOX_USER_2FA_ENABLED");
+        }
+        if (requires == SandboxRequirement.Webhook)
+        {
+            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("MISACONNECT_ESIGN_SANDBOX_WEBHOOK_URL")))
+                missing.Add("MISACONNECT_ESIGN_SANDBOX_WEBHOOK_URL");
         }
         if (missing.Count > 0)
         {

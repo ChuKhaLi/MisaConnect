@@ -4,7 +4,7 @@ using MisaConnect.ESign.Infrastructure.Configuration;
 
 namespace MisaConnect.Samples.Api.Middleware;
 
-internal static class ESignWebhookStartupValidator
+public static class ESignWebhookStartupValidator
 {
     public static void EmitWarnIfPubliclyReachable(IServiceProvider services)
     {

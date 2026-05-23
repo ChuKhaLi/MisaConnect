@@ -387,6 +387,58 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         await _app.DisposeAsync();
     }
 
+    /// <summary>
+    /// Slice 4 helper: builds a MISA-shaped webhook envelope JSON body for
+    /// driving the sample API's webhook endpoint in integration tests
+    /// (§3.8 / §4.9). Auto-generates a messageId if not provided.
+    /// </summary>
+    public static string BuildSyntheticWebhookBody(
+        string transactionId,
+        string clientId,
+        string documentId = "doc-1",
+        string signatureBytes = "SIGNATURE-BYTES",
+        string status = "SUCCESS",
+        string? messageId = null,
+        string? errorCode = null)
+    {
+        messageId ??= Guid.NewGuid().ToString("N");
+        var sigArray = status == "SUCCESS"
+            ? "[{\"documentId\":\"" + JsonEscape(documentId) + "\",\"signature\":\"" + JsonEscape(signatureBytes) + "\"}]"
+            : "[]";
+        var errorField = errorCode is null ? "null" : "\"" + JsonEscape(errorCode) + "\"";
+        return "{" +
+            "\"messageId\":\"" + JsonEscape(messageId) + "\"," +
+            "\"clientId\":\"" + JsonEscape(clientId) + "\"," +
+            "\"extraData\":null," +
+            "\"status\":\"" + status + "\"," +
+            "\"errorCode\":" + errorField + "," +
+            "\"transactionId\":\"" + JsonEscape(transactionId) + "\"," +
+            "\"signatures\":" + sigArray +
+            "}";
+    }
+
+    /// <summary>
+    /// POSTs a synthetic webhook envelope to <paramref name="webhookUrl"/>
+    /// using the provided <see cref="HttpClient"/>. Returns the raw HTTP
+    /// response so the caller can assert on status code + body shape.
+    /// </summary>
+    public static async Task<HttpResponseMessage> PostSyntheticWebhookAsync(
+        HttpClient http,
+        string webhookUrl,
+        string transactionId,
+        string clientId,
+        string documentId = "doc-1",
+        string signatureBytes = "SIGNATURE-BYTES",
+        string status = "SUCCESS",
+        string? messageId = null,
+        string? errorCode = null,
+        CancellationToken ct = default)
+    {
+        var json = BuildSyntheticWebhookBody(transactionId, clientId, documentId, signatureBytes, status, messageId, errorCode);
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        return await http.PostAsync(webhookUrl, content, ct).ConfigureAwait(false);
+    }
+
     public sealed class Counters
     {
         public int Login;

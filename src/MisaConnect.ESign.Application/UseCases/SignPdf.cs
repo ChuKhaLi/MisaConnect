@@ -1,9 +1,21 @@
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Application.Validation;
+using MisaConnect.ESign.Domain.Authentication;
+using MisaConnect.ESign.Domain.Certificates;
 using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
+using MisaConnect.ESign.Domain.Signing;
 
 namespace MisaConnect.ESign.Application.UseCases;
+
+/// <summary>
+/// Intermediate result of the pre-/Signing/status half of a sign orchestration.
+/// Slice 4 extracts this so the webhook-mode <c>BeginSignPdf</c> use case can
+/// share the same plumbing with the polling-mode <c>SignPdf</c>. FR-089 byte-
+/// identical regression is preserved because <see cref="SignPdf"/> still
+/// composes this helper + poll + attach.
+/// </summary>
+internal sealed record BeginSignPdfCoreResult(AccessToken Token, Certificate Cert, PdfHashOutput Hash, SignTransaction Transaction);
 
 public sealed class SignPdf
 {
@@ -84,7 +96,7 @@ public sealed class SignPdf
         }
     }
 
-    private async Task<SignPdfWorkResult> ExecuteSignAsync(SignPdfWorkRequest request, CancellationToken ct)
+    internal async Task<BeginSignPdfCoreResult> BeginSignPdfCoreAsync(SignPdfWorkRequest request, CancellationToken ct)
     {
         _validator.Validate(request);
 
@@ -110,25 +122,32 @@ public sealed class SignPdf
             documentName: request.DocumentName,
             ct: ct).ConfigureAwait(false);
 
+        return new BeginSignPdfCoreResult(token, cert, hash, transaction);
+    }
+
+    private async Task<SignPdfWorkResult> ExecuteSignAsync(SignPdfWorkRequest request, CancellationToken ct)
+    {
+        var core = await BeginSignPdfCoreAsync(request, ct).ConfigureAwait(false);
+
         var snapshot = await _pollStatus.ExecuteAsync(
-            accessToken: token.Value,
-            transactionId: transaction.TransactionId,
+            accessToken: core.Token.Value,
+            transactionId: core.Transaction.TransactionId,
             interval: _intervalAccessor(),
             totalTimeout: _totalTimeoutAccessor(),
             ct: ct,
             format: DocumentFormat.Pdf).ConfigureAwait(false);
 
         var signedBytes = await _attachSignature.ExecuteAsync(
-            accessToken: token.Value,
-            cert: cert,
-            hash: hash,
+            accessToken: core.Token.Value,
+            cert: core.Cert,
+            hash: core.Hash,
             signatureData: snapshot.FirstSignatureData ?? string.Empty,
             ct: ct).ConfigureAwait(false);
 
         return new SignPdfWorkResult(
             SignedPdf: new SignedDocument(signedBytes),
-            TransactionId: transaction.TransactionId,
-            CertificateKeyAlias: cert.KeyAlias,
+            TransactionId: core.Transaction.TransactionId,
+            CertificateKeyAlias: core.Cert.KeyAlias,
             CompletedAtUtc: _clock.UtcNow);
     }
 }
