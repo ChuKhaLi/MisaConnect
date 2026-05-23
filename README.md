@@ -1,97 +1,39 @@
-# MisaConnect
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ChuKhaLi/MisaConnect/main/icon.png" alt="MisaConnect" width="128" height="128" />
+</p>
 
-Community .NET SDK for MISA cloud APIs. Currently covers **MISA MeInvoice** (eInvoice) and **MISA eSign**, released in v2.0.
+<h1 align="center">MisaConnect</h1>
 
-> Status: v1.0.0 released on NuGet. Targets .NET 8. See the [CHANGELOG](CHANGELOG.md).
+[![MisaConnect.EInvoice](https://img.shields.io/nuget/v/MisaConnect.EInvoice.svg?label=MisaConnect.EInvoice)](https://www.nuget.org/packages/MisaConnect.EInvoice)
+[![Downloads](https://img.shields.io/nuget/dt/MisaConnect.EInvoice.svg?label=downloads)](https://www.nuget.org/packages/MisaConnect.EInvoice)
+[![MisaConnect.ESign](https://img.shields.io/nuget/v/MisaConnect.ESign.svg?label=MisaConnect.ESign)](https://www.nuget.org/packages/MisaConnect.ESign)
+[![Downloads](https://img.shields.io/nuget/dt/MisaConnect.ESign.svg?label=downloads)](https://www.nuget.org/packages/MisaConnect.ESign)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Community .NET SDK for MISA cloud APIs. Two independent NuGet packages ship from this repo, each a port-and-adapter facade over a separate MISA product:
+
+| Package | Covers | Docs |
+| --- | --- | --- |
+| **[`MisaConnect.EInvoice`](https://www.nuget.org/packages/MisaConnect.EInvoice)** | MISA MeInvoice — token acquisition, template lookup, invoice preview / save / PDF / delete, lookup, replacement & adjustment invoices. | [docs/einvoice/](docs/einvoice/) |
+| **[`MisaConnect.ESign`](https://www.nuget.org/packages/MisaConnect.ESign)** | MISA eSign RemoteSigning — PDF / XML / Word / Excel signing, 2FA / OTP (explicit + transparent), webhook-mode (non-blocking) signing. | [docs/esign/](docs/esign/) |
+
+Both packages target **.NET 8** and share the same layered architecture, options-pattern configuration, swappable ports, and wire-format fidelity with MISA's published APIs.
 
 ## Install
 
 ```
-dotnet add package MisaConnect.EInvoice
+dotnet add package MisaConnect.EInvoice    # invoice operations
+dotnet add package MisaConnect.ESign       # digital-signature operations
 ```
+
+The two packages are entirely independent — install whichever you need (or both).
 
 ## Quickstart
 
-```csharp
-using MisaConnect.EInvoice.Application.UseCases;
-using MisaConnect.EInvoice.Infrastructure.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+See the per-package READMEs and getting-started guides for runnable examples:
 
-var config = new ConfigurationBuilder()
-    .AddJsonFile("appsettings.json")
-    .AddUserSecrets<Program>()
-    .Build();
-
-var services = new ServiceCollection();
-services.AddLogging();
-services.AddMisaConnectEInvoice(config);
-
-await using var scope = services.BuildServiceProvider().CreateAsyncScope();
-
-var listTemplates = scope.ServiceProvider.GetRequiredService<ListActiveTemplates>();
-var templates = await listTemplates.ExecuteAsync(invoiceWithCode: true, CancellationToken.None);
-foreach (var t in templates) Console.WriteLine($"{t.InvSeries} - {t.TemplateName}");
-```
-
-Bind credentials under the `Misa:EInvoice` configuration section (env vars, user-secrets, or appsettings):
-
-```json
-{
-  "Misa": {
-    "EInvoice": {
-      "Environment": "Sandbox",
-      "BaseUrl": "https://testapi.meinvoice.vn/api/integration",
-      "TaxCode": "0000000000",
-      "UserName": "your-misa-user",
-      "Password": "your-misa-password",
-      "AppId": "your-misa-app-id"
-    }
-  }
-}
-```
-
-See [docs/sandbox-setup.md](docs/sandbox-setup.md) for sandbox credential setup and [docs/getting-started.md](docs/getting-started.md) for the full walkthrough.
-
-## Supported operations
-
-| Operation | Use case | Status |
-| --- | --- | --- |
-| Acquire access token | `EnsureAccessToken` | ✅ v1.0 |
-| List active templates | `ListActiveTemplates` | ✅ v1.0 |
-| Preview invoice (PDF) | `PreviewInvoice` | ✅ v1.0 |
-| Save draft invoices | `SaveDraftInvoices` | ✅ v1.0 |
-| Get draft PDF by RefId | `GetDraftPdfByRefId` | ✅ v1.0 |
-| Delete draft invoice | `DeleteDraftInvoice` | ✅ v1.0 |
-| Lookup by RefId (cascade) | `LookupByRefIds` | ✅ v1.0 |
-| Lookup paginated (standard) | `LookupStandard` | ✅ v1.0 |
-| Lookup paginated (calculating) | `LookupCalculating` | ✅ v1.0 |
-| Issue replacement | `IssueReplacementInvoice` | ✅ v1.0 |
-| Issue adjustment | `IssueAdjustmentInvoice` | ✅ v1.0 |
-| Issue invoice (cấp số / sign) | — | 🛑 not yet |
-| MISA eSign integration | — | ✅ v2.0 (separate `MisaConnect.ESign` package — see below) |
-
-## MisaConnect.ESign (v2.0)
-
-The `MisaConnect.ESign` product family covers end-to-end PDF / XML / Word / Excel signing, two-factor (OTP) authentication, and webhook-mode (non-blocking) signing via the MISA eSign RemoteSigning API. Released in v2.0; installable separately:
-
-```
-dotnet add package MisaConnect.ESign --version 2.0.0
-```
-
-| Operation | Facade method | Status |
-| --- | --- | --- |
-| Sign PDF end-to-end (login → list certs → hash → sign → poll → attach) | `IMisaESignClient.SignPdfAsync` | ✅ v2.0 |
-| 2FA / OTP — explicit completion of a captured challenge | `IMisaESignClient.SignInWithOtpAsync` | ✅ v2.0 |
-| 2FA / OTP — request re-delivery | `IMisaESignClient.ResendOtpAsync` | ✅ v2.0 |
-| 2FA / OTP — transparent (DI-registered `IOtpProvider`) | `Application.Abstractions.IOtpProvider` | ✅ v2.0 |
-| Sign XML (XAdES) end-to-end (string + bytes overloads) | `IMisaESignClient.SignXmlAsync` | ✅ v2.0 |
-| Sign Word (OOXML `.docx`) end-to-end | `IMisaESignClient.SignWordAsync` | ✅ v2.0 |
-| Sign Excel (OOXML `.xlsx`) end-to-end | `IMisaESignClient.SignExcelAsync` | ✅ v2.0 |
-| Begin webhook-mode sign (no polling) | `IMisaESignClient.BeginSign{Pdf,Xml,Word,Excel}Async` | ✅ v2.0 |
-| Handle inbound MISA webhook envelope | `IMisaESignClient.HandleWebhookAsync` | ✅ v2.0 |
-
-Bind options under the `Misa:ESign` configuration section, then call `services.AddMisaConnectESign(IConfiguration)`. See [specs/001-misa-esign-pdf-sign-flow/quickstart.md](specs/001-misa-esign-pdf-sign-flow/quickstart.md) for the full walkthrough, and [specs/004-misa-esign-webhook/quickstart.md](specs/004-misa-esign-webhook/quickstart.md) for webhook-mode setup (mode config, `IWebhookDeliveryHook` registration, sample-API transport-layer auth).
+- **EInvoice** — [package README](src/MisaConnect.EInvoice.Client/README.md) · [getting started](docs/einvoice/getting-started.md)
+- **ESign** — [package README](src/MisaConnect.ESign.Client/README.md) · [getting started](docs/esign/getting-started.md)
 
 ## Project layout
 
@@ -101,28 +43,38 @@ src/
   MisaConnect.EInvoice.Application/    use cases + port interfaces
   MisaConnect.EInvoice.Infrastructure/ MISA HTTP client + DI
   MisaConnect.EInvoice.Client/         consumer-facing facade (the NuGet package)
+  MisaConnect.ESign.Domain/            entities, value objects, errors
+  MisaConnect.ESign.Application/       use cases + port interfaces
+  MisaConnect.ESign.Infrastructure/    MISA HTTP client + DI
+  MisaConnect.ESign.Client/            consumer-facing facade (the NuGet package)
 samples/
-  MisaConnect.Samples.Console/         minimal DI wiring + ListTemplates demo
-  MisaConnect.Samples.Api/             ASP.NET Core minimal-API reference host
+  MisaConnect.Samples.Console/         minimal DI wiring + ListTemplates demo (EInvoice)
+  MisaConnect.Samples.Api/             ASP.NET Core minimal-API reference host (both families)
 tests/
-  MisaConnect.EInvoice.UnitTests/      315 unit tests
-  MisaConnect.EInvoice.IntegrationTests/ sandbox + fake-server tests
-  MisaConnect.EInvoice.TestSupport/    shared fixtures
+  MisaConnect.EInvoice.UnitTests/      EInvoice unit tests, no network
+  MisaConnect.EInvoice.IntegrationTests/ EInvoice sandbox + fake-server tests
+  MisaConnect.ESign.UnitTests/         ESign unit tests, no network
+  MisaConnect.ESign.IntegrationTests/  ESign sandbox + EsignFake tests
 docs/
+  architecture.md                      layered design shared by both families
+  einvoice/                            EInvoice guides (getting-started, configuration, sandbox)
+  esign/                               ESign guides (getting-started, configuration, sandbox)
   misa-api-reference/                  copies of MISA public reference docs
 ```
 
+See [docs/architecture.md](docs/architecture.md) for the layered (Domain → Application → Infrastructure → Client) design and [.specify/memory/constitution.md](.specify/memory/constitution.md) for the binding project principles.
+
 ## Documentation
 
-- [Getting started](docs/getting-started.md)
-- [Architecture](docs/architecture.md)
-- [Configuration](docs/configuration.md)
-- [Sandbox setup](docs/sandbox-setup.md)
-- [MISA API reference](docs/misa-api-reference/)
+- [Architecture](docs/architecture.md) — shared design across both families
+- [MisaConnect.EInvoice guides](docs/einvoice/) — getting started, configuration, sandbox setup
+- [MisaConnect.ESign guides](docs/esign/) — getting started, configuration, sandbox setup
+- [MISA API reference](docs/misa-api-reference/) — copies of MISA's official CURL/schema docs
+- [CHANGELOG](CHANGELOG.md) — per-release notes, both families
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Slice-driven development via Spec Kit under `specs/`.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Slice-driven development via [Spec Kit](https://github.com/github/spec-kit) under `specs/`.
 
 ## License
 

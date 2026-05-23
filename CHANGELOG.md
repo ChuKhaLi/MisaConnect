@@ -4,6 +4,21 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-05-23
+
+Documentation patch. No source code or public API changes.
+
+### Changed
+
+- Per-package NuGet READMEs: each `.nupkg` now ships its own focused README (`src/MisaConnect.EInvoice.Client/README.md` and `src/MisaConnect.ESign.Client/README.md`) instead of the shared root README, so the NuGet.org listing pages no longer cross-reference the sibling package.
+- Root `README.md` rewritten as a GitHub landing page with shields.io NuGet version + download badges for both packages and the embedded `icon.png` rendered as a centered logo.
+- `docs/architecture.md` updated: ESign documented as shipped in v2.0.0 (previously listed as "planned for v2.0"); added the ESign port-and-adapter table; wire-format-fidelity section now references both families' Wire/Mapping namespaces.
+- Documentation reorganized into product subfolders: `docs/einvoice/{getting-started,configuration,sandbox-setup}.md` and `docs/esign/{getting-started,configuration,sandbox-setup}.md`. The new ESign guides cover `Misa:ESign` configuration (including the slice-4 `Webhook` block) and the `MISACONNECT_ESIGN_SANDBOX_*` env-var family.
+
+### Removed
+
+- `docs/misa-esign-spec-plan.md` — pre-release planning snapshot superseded by `specs/001`–`005` and the `[2.0.0]` CHANGELOG entry above.
+
 ## [2.0.0] - 2026-05-23
 
 Public API is the union of slices 1–4 of the `MisaConnect.ESign` product family, previewed through `2.0.0-preview.1`..`preview.4`. This is the first stable release of `MisaConnect.ESign`.
