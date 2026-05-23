@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version to publish (e.g. 2.0.0). Used when running manually."
+        required: true
+        type: string
 
 jobs:
   pack-and-publish:
@@ -22,11 +28,15 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Derive version from tag
+      - name: Derive version
         id: ver
         run: |
-          REF="${GITHUB_REF#refs/tags/v}"
-          echo "version=$REF" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Restore
         run: dotnet restore MisaConnect.slnx
