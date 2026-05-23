@@ -1,6 +1,6 @@
 # MisaConnect Constitution
 
-Ratified: 2026-05-13 · Version: 1.0.0
+Ratified: 2026-05-13 · Last amended: 2026-05-23 · Version: 1.1.0
 
 MisaConnect is a community .NET SDK for MISA cloud APIs. These principles govern how this codebase evolves. Each is a hard rule — exceptions require an entry in `CHANGELOG.md` and the slice plan that introduced the exception.
 
@@ -10,7 +10,7 @@ Domain has zero external dependencies. Application depends only on Domain and `M
 
 ## Principle II — Public surface is small and stable
 
-Only types in `MisaConnect.EInvoice.Client` and `MisaConnect.EInvoice.Domain` are public API. Application and Infrastructure types are `internal` unless explicitly part of the consumer-extension contract (port interfaces, DI options, `AddMisaConnectEInvoice`). Every public-surface change requires a `CHANGELOG.md` entry and a semver-appropriate version bump.
+Each product-family package exposes its public surface from exactly two layers: `MisaConnect.<Product>.Client` and `MisaConnect.<Product>.Domain`, where `<Product>` is one of `EInvoice` or `ESign`. Application and Infrastructure types are `internal` unless explicitly part of the consumer-extension contract (port interfaces, DI options, the family's `AddMisaConnect<Product>` extension method). Every public-surface change requires a `CHANGELOG.md` entry and a semver-appropriate version bump on the affected family's package. New product families MUST follow this two-layer public surface pattern.
 
 ## Principle III — Port-and-adapter for extensibility
 
@@ -30,7 +30,7 @@ Unit tests are mandatory and must run under 30 seconds without network. Integrat
 
 ## Principle VII — Semver discipline
 
-Breaking public-surface changes only in major versions. Minor versions add operations or non-breaking extensions. Patch versions are bug fixes only. The `MisaConnect.EInvoice` package version drives the contract; pre-release identifiers (`-preview.N`) may be used for unstable iterations.
+Breaking public-surface changes only in major versions. Minor versions add operations or non-breaking extensions. Patch versions are bug fixes only. Each product-family NuGet package (`MisaConnect.EInvoice`, `MisaConnect.ESign`, and any future family) is versioned independently — a major bump on one family does not require a bump on another. Pre-release identifiers (`-preview.N`, `-rc.N`) may be used for unstable iterations within a family.
 
 ## Principle VIII — Logs never leak secrets or PII
 
@@ -39,7 +39,17 @@ No tokens, no buyer names/addresses, no line-item content, no raw MISA error mes
 ## Governance
 
 - Constitution changes require a PR with rationale and a sync impact report.
-- Changes to Principles I–IV require a major version bump on `MisaConnect.EInvoice`.
-- Changes to Principles V–VIII may be MINOR if backward-compatible.
+- Changes to Principles I–IV require a major version bump on every affected product-family package.
+- Changes to Principles V–VIII may be MINOR if backward-compatible. Editorial changes (additive enumeration of existing product families, typo fixes, formatting) MAY be MINOR even when touching Principles I–IV, provided no semantic restriction is added or removed and the sync-impact note explains why.
 
 This document is the source of truth. CLAUDE.md, CONTRIBUTING.md, and slice templates derive from it.
+
+---
+
+## Sync-impact note — 2026-05-23 (constitution v1.1.0)
+
+The first stable release of `MisaConnect.ESign 2.0.0` (Spec Kit slice 005-release-esign-2-0) made the EInvoice-only wording of Principles II and VII inconsistent with shipping reality. This amendment widens both principles to enumerate the two product families (`MisaConnect.EInvoice`, `MisaConnect.ESign`) and to govern each family's versioning independently.
+
+The amendment is **additive**: no semantic restriction has been added or removed. Every existing `MisaConnect.EInvoice 1.1.0` artifact and every preview-tagged `MisaConnect.ESign` artifact already complies with the new wording. Per the new governance clause, this constitution change is therefore MINOR (1.0.0 → 1.1.0) rather than MAJOR; the Complexity Tracking section of [specs/005-release-esign-2-0/plan.md](../../specs/005-release-esign-2-0/plan.md) records the rationale.
+
+Dependent documents reviewed for cascade: CLAUDE.md (no change required — it references "MisaConnect" generically), CONTRIBUTING.md (added a one-line release convention note under `## Releasing`), `.specify/templates/*` (no template literally references EInvoice as the sole product surface).

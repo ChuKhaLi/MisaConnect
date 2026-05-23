@@ -34,11 +34,17 @@ jobs:
       - name: Build
         run: dotnet build MisaConnect.slnx --no-restore --configuration Release -p:Version=${{ steps.ver.outputs.version }}
 
-      - name: Unit tests
+      - name: Unit tests (EInvoice)
         run: dotnet test tests/MisaConnect.EInvoice.UnitTests/MisaConnect.EInvoice.UnitTests.csproj --no-build --configuration Release
 
-      - name: Pack
+      - name: Unit tests (ESign)
+        run: dotnet test tests/MisaConnect.ESign.UnitTests/MisaConnect.ESign.UnitTests.csproj --no-build --configuration Release
+
+      - name: Pack (EInvoice)
         run: dotnet pack src/MisaConnect.EInvoice.Client/MisaConnect.EInvoice.Client.csproj --configuration Release -p:Version=${{ steps.ver.outputs.version }} -o artifacts
+
+      - name: Pack (ESign)
+        run: dotnet pack src/MisaConnect.ESign.Client/MisaConnect.ESign.Client.csproj --configuration Release -p:Version=${{ steps.ver.outputs.version }} -o artifacts
 
       - name: NuGet login (OIDC -> temp API key)
         id: nuget_login
@@ -56,7 +62,7 @@ jobs:
           VERSION="${{ steps.ver.outputs.version }}"
           awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > RELEASE_NOTES.md
           gh release create "v$VERSION" \
-            --title "MisaConnect.EInvoice $VERSION" \
+            --title "MisaConnect.ESign $VERSION" \
             --notes-file RELEASE_NOTES.md \
             artifacts/*.nupkg artifacts/*.snupkg
 

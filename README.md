@@ -1,6 +1,6 @@
 # MisaConnect
 
-Community .NET SDK for MISA cloud APIs. Currently covers **MISA MeInvoice** (eInvoice). MISA eSign is planned for v2.0.
+Community .NET SDK for MISA cloud APIs. Currently covers **MISA MeInvoice** (eInvoice) and **MISA eSign**, released in v2.0.
 
 > Status: v1.0.0 released on NuGet. Targets .NET 8. See the [CHANGELOG](CHANGELOG.md).
 
@@ -69,27 +69,27 @@ See [docs/sandbox-setup.md](docs/sandbox-setup.md) for sandbox credential setup 
 | Issue replacement | `IssueReplacementInvoice` | ✅ v1.0 |
 | Issue adjustment | `IssueAdjustmentInvoice` | ✅ v1.0 |
 | Issue invoice (cấp số / sign) | — | 🛑 not yet |
-| MISA eSign integration | — | 🟡 v2.0-preview.1 (slice 1) |
+| MISA eSign integration | — | ✅ v2.0 (separate `MisaConnect.ESign` package — see below) |
 
-## MisaConnect.ESign (v2.0 preview)
+## MisaConnect.ESign (v2.0)
 
-Slices 1–4 of the `MisaConnect.ESign` product family cover end-to-end PDF / XML / Word / Excel signing, two-factor (OTP) authentication, and webhook-mode (non-blocking) signing via the MISA eSign RemoteSigning API. Installable separately:
+The `MisaConnect.ESign` product family covers end-to-end PDF / XML / Word / Excel signing, two-factor (OTP) authentication, and webhook-mode (non-blocking) signing via the MISA eSign RemoteSigning API. Released in v2.0; installable separately:
 
 ```
-dotnet add package MisaConnect.ESign --version 2.0.0-preview.4
+dotnet add package MisaConnect.ESign --version 2.0.0
 ```
 
 | Operation | Facade method | Status |
 | --- | --- | --- |
-| Sign PDF end-to-end (login → list certs → hash → sign → poll → attach) | `IMisaESignClient.SignPdfAsync` | 🟡 v2.0-preview.1 |
-| 2FA / OTP — explicit completion of a captured challenge | `IMisaESignClient.SignInWithOtpAsync` | 🟡 v2.0-preview.2 |
-| 2FA / OTP — request re-delivery | `IMisaESignClient.ResendOtpAsync` | 🟡 v2.0-preview.2 |
-| 2FA / OTP — transparent (DI-registered `IOtpProvider`) | `Application.Abstractions.IOtpProvider` | 🟡 v2.0-preview.2 |
-| Sign XML (XAdES) end-to-end | `IMisaESignClient.SignXmlAsync` | 🟡 v2.0-preview.3 |
-| Sign Word (OOXML `.docx`) end-to-end | `IMisaESignClient.SignWordAsync` | 🟡 v2.0-preview.3 |
-| Sign Excel (OOXML `.xlsx`) end-to-end | `IMisaESignClient.SignExcelAsync` | 🟡 v2.0-preview.3 |
-| Begin webhook-mode sign (no polling) | `IMisaESignClient.BeginSign{Pdf,Xml,Word,Excel}Async` | 🟡 v2.0-preview.4 |
-| Handle inbound MISA webhook envelope | `IMisaESignClient.HandleWebhookAsync` | 🟡 v2.0-preview.4 |
+| Sign PDF end-to-end (login → list certs → hash → sign → poll → attach) | `IMisaESignClient.SignPdfAsync` | ✅ v2.0 |
+| 2FA / OTP — explicit completion of a captured challenge | `IMisaESignClient.SignInWithOtpAsync` | ✅ v2.0 |
+| 2FA / OTP — request re-delivery | `IMisaESignClient.ResendOtpAsync` | ✅ v2.0 |
+| 2FA / OTP — transparent (DI-registered `IOtpProvider`) | `Application.Abstractions.IOtpProvider` | ✅ v2.0 |
+| Sign XML (XAdES) end-to-end (string + bytes overloads) | `IMisaESignClient.SignXmlAsync` | ✅ v2.0 |
+| Sign Word (OOXML `.docx`) end-to-end | `IMisaESignClient.SignWordAsync` | ✅ v2.0 |
+| Sign Excel (OOXML `.xlsx`) end-to-end | `IMisaESignClient.SignExcelAsync` | ✅ v2.0 |
+| Begin webhook-mode sign (no polling) | `IMisaESignClient.BeginSign{Pdf,Xml,Word,Excel}Async` | ✅ v2.0 |
+| Handle inbound MISA webhook envelope | `IMisaESignClient.HandleWebhookAsync` | ✅ v2.0 |
 
 Bind options under the `Misa:ESign` configuration section, then call `services.AddMisaConnectESign(IConfiguration)`. See [specs/001-misa-esign-pdf-sign-flow/quickstart.md](specs/001-misa-esign-pdf-sign-flow/quickstart.md) for the full walkthrough, and [specs/004-misa-esign-webhook/quickstart.md](specs/004-misa-esign-webhook/quickstart.md) for webhook-mode setup (mode config, `IWebhookDeliveryHook` registration, sample-API transport-layer auth).
 

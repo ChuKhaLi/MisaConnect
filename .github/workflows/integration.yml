@@ -36,7 +36,7 @@ jobs:
       - name: Build
         run: dotnet build MisaConnect.slnx --no-restore --configuration ${{ inputs.configuration || 'Release' }}
 
-      - name: Integration tests
+      - name: Integration tests (EInvoice)
         env:
           Misa__EInvoice__Environment: Sandbox
           Misa__EInvoice__BaseUrl: https://testapi.meinvoice.vn/api/integration
@@ -48,7 +48,16 @@ jobs:
           MISACONNECT_SANDBOX_USERNAME: ${{ secrets.MISA_USERNAME }}
           MISACONNECT_SANDBOX_PASSWORD: ${{ secrets.MISA_PASSWORD }}
           MISACONNECT_SANDBOX_APPID: ${{ secrets.MISA_APP_ID }}
-        run: dotnet test tests/MisaConnect.EInvoice.IntegrationTests/MisaConnect.EInvoice.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFileName=integration-tests.trx" --results-directory artifacts/test-results
+        run: dotnet test tests/MisaConnect.EInvoice.IntegrationTests/MisaConnect.EInvoice.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFileName=einvoice-integration-tests.trx" --results-directory artifacts/test-results
+
+      - name: Integration tests (ESign)
+        env:
+          MISACONNECT_ESIGN_SANDBOX_BASE_URL: ${{ secrets.MISA_ESIGN_BASE_URL }}
+          MISACONNECT_ESIGN_SANDBOX_CLIENT_ID: ${{ secrets.MISA_ESIGN_CLIENT_ID }}
+          MISACONNECT_ESIGN_SANDBOX_CLIENT_KEY: ${{ secrets.MISA_ESIGN_CLIENT_KEY }}
+          MISACONNECT_ESIGN_SANDBOX_USERNAME: ${{ secrets.MISA_ESIGN_USERNAME }}
+          MISACONNECT_ESIGN_SANDBOX_PASSWORD: ${{ secrets.MISA_ESIGN_PASSWORD }}
+        run: dotnet test tests/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFileName=esign-integration-tests.trx" --results-directory artifacts/test-results
 
       - name: Upload test results
         if: always()

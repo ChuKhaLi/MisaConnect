@@ -4,7 +4,7 @@
     <RootNamespace>MisaConnect.ESign.Client</RootNamespace>
     <AssemblyName>MisaConnect.ESign.Client</AssemblyName>
     <PackageId>MisaConnect.ESign</PackageId>
-    <Version>2.0.0-preview.2</Version>
+    <Version>2.0.0</Version>
     <Description>Community .NET SDK for MISA eSign RemoteSigning. Provides a port-and-adapter facade for the MISA eSign HTTP API: PDF signing end-to-end (login, certificate listing, server-side hashing, sign submission, status polling, signature attachment).</Description>
     <PackageTags>misa;esign;remotesigning;vietnam;pdf;signature;sdk</PackageTags>
     <IsPackable>true</IsPackable>
