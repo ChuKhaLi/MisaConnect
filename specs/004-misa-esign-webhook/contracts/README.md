@@ -1,0 +1,12 @@
+# Slice 4 contracts — `MisaConnect.ESign` webhook receiver
+
+This directory pins the four contracts that slice 4 of `MisaConnect.ESign` extends. Each is an additive delta on top of the corresponding slice-1 + slice-2 + slice-3 contracts.
+
+| File | Scope |
+|---|---|
+| [public-surface.md](./public-surface.md) | Public API additions: the four `BeginSign{Pdf,Xml,Word,Excel}Async` facades on `IMisaESignClient`, the new `HandleWebhookAsync` facade, the new `ISigningSessionStore` Application-layer port, the new `IWebhookDeliveryHook` consumer-implementable interface, the new `Domain.Sessions.*` and `Domain.Webhook.*` types, the new `Domain.Errors.WebhookValidationException` family, the new `MisaESignOptions.Webhook` configuration sub-section, and the new per-format `BeginSign{Format}RequestDto` / `BeginSign{Format}ResultDto` Client DTOs. |
+| [wire-envelopes.md](./wire-envelopes.md) | Two new MISA wire shapes — E12 (inbound webhook envelope per MISA §3.8 / §4.9) and E13 (ACK envelope per MISA §4.9). The existing E6.x `/documents/hash`, E7.x `/Signing/hash`, E8.x `/Signing/status`, and E9.x `/documents/attachment` envelopes from slices 1+3 remain authoritative and are reused unchanged on the webhook-mode finalize path. |
+| [error-mapping.md](./error-mapping.md) | The slice-4 mapping table A.11 — webhook validation failures (Malformed, ClientIdMismatch, UnknownTransaction, IncompleteSuccessEnvelope, DocumentIdMismatch) → typed exception subclass → outbound ACK `errorCode` per FR-082 + Assumption 6. Plus the finalize-failure ACK mapping per FR-081 (returned-not-cached). |
+| [sample-api.md](./sample-api.md) | The sample API's transport-layer auth contract per FR-099 / FR-100 / FR-101 — the configurable shared-secret URL segment routing, the optional CIDR allowlist semantics + IP-class log reduction, the startup-WARN emission rules, and the 200-on-every-well-formed-POST convention per FR-085. |
+
+All four are **incremental** — they list only the slice-4 additions. The slice-1 contracts under [specs/001-misa-esign-pdf-sign-flow/contracts/](../../001-misa-esign-pdf-sign-flow/contracts/), the slice-2 contracts under [specs/002-misa-esign-2fa-otp/contracts/](../../002-misa-esign-2fa-otp/contracts/), and the slice-3 contracts under [specs/003-misa-esign-multi-format/contracts/](../../003-misa-esign-multi-format/contracts/) remain authoritative for everything they already covered.

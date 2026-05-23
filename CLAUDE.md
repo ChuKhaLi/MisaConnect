@@ -52,5 +52,5 @@ Never log secrets, tokens, or buyer PII (names, addresses, line-item content). R
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-[specs/003-misa-esign-multi-format/plan.md](specs/003-misa-esign-multi-format/plan.md).
+[specs/004-misa-esign-webhook/plan.md](specs/004-misa-esign-webhook/plan.md).
 <!-- SPECKIT END -->
