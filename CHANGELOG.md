@@ -4,6 +4,20 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-05-23
+
+Documentation patch. No source code or public API changes.
+
+### Fixed
+
+- Per-package NuGet READMEs: replaced the leading `<p align="center"><img></p>` + `<h1 align="center">` HTML block with CommonMark. NuGet.org's Markdig renderer strips raw HTML, so the logo and title were previously appearing as literal `<p align="center">…</p>` text on both package detail pages. The image and heading now render correctly.
+
+### Added
+
+- GitHub Pages documentation site at <https://chukhali.github.io/MisaConnect/>, built from `docs/` via Jekyll + Just-the-Docs (`remote_theme`). Sidebar navigation covers EInvoice, ESign, and Architecture; the existing per-product guides (`getting-started`, `configuration`, `sandbox-setup`) are reused — only Jekyll front matter was added.
+- Each per-package NuGet README now links to its docs section on the new Pages site.
+- Root `README.md` gains a Docs badge and a direct link to the hosted docs.
+
 ## [2.0.1] - 2026-05-23
 
 Documentation patch. No source code or public API changes.
