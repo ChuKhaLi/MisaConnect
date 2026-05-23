@@ -1,3 +1,10 @@
+---
+title: Sandbox setup
+layout: default
+parent: EInvoice
+nav_order: 3
+---
+
 # Sandbox setup
 
 To run integration tests or `samples/MisaConnect.Samples.Console` against MISA's sandbox, you need sandbox credentials from MISA.

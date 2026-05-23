@@ -1,3 +1,9 @@
+---
+title: Architecture
+layout: default
+nav_order: 4
+---
+
 # Architecture
 
 MisaConnect follows a strict layered (ports-and-adapters) architecture. Each layer depends only on layers below it. Both product families — `MisaConnect.EInvoice` and `MisaConnect.ESign` — apply the same pattern; the diagram below shows EInvoice as the reference, with the equivalent `MisaConnect.ESign.{Client,Infrastructure,Application,Domain}` stack mirroring each row one-for-one.

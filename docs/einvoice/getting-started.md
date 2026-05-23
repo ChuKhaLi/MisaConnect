@@ -1,3 +1,10 @@
+---
+title: Getting started
+layout: default
+parent: EInvoice
+nav_order: 1
+---
+
 # Getting started
 
 This guide walks through installing `MisaConnect.EInvoice`, wiring DI, and calling your first MISA API.

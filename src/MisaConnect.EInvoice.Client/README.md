@@ -1,8 +1,8 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ChuKhaLi/MisaConnect/main/icon.png" alt="MisaConnect" width="128" height="128" />
-</p>
+![MisaConnect](https://raw.githubusercontent.com/ChuKhaLi/MisaConnect/main/icon.png)
 
-<h1 align="center">MisaConnect.EInvoice</h1>
+# MisaConnect.EInvoice
+
+📖 **Docs:** <https://chukhali.github.io/MisaConnect/einvoice/>
 
 [![NuGet](https://img.shields.io/nuget/v/MisaConnect.EInvoice.svg?label=NuGet)](https://www.nuget.org/packages/MisaConnect.EInvoice)
 [![Downloads](https://img.shields.io/nuget/dt/MisaConnect.EInvoice.svg)](https://www.nuget.org/packages/MisaConnect.EInvoice)

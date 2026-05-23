@@ -1,3 +1,10 @@
+---
+title: Configuration
+layout: default
+parent: ESign
+nav_order: 2
+---
+
 # Configuration reference
 
 `MisaConnect.ESign` binds the `Misa:ESign` section to `MisaESignOptions`. All keys are case-sensitive in this table (the binder is, in practice, case-insensitive — but match the table for consistency with logs and validator messages).

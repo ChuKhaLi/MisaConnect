@@ -1,3 +1,10 @@
+---
+title: Getting started
+layout: default
+parent: ESign
+nav_order: 1
+---
+
 # Getting started
 
 This guide walks through installing `MisaConnect.ESign`, wiring DI, and signing your first PDF via the MISA eSign RemoteSigning API.

@@ -4,6 +4,7 @@
 
 <h1 align="center">MisaConnect</h1>
 
+[![Docs](https://img.shields.io/badge/docs-chukhali.github.io%2FMisaConnect-blue)](https://chukhali.github.io/MisaConnect/)
 [![MisaConnect.EInvoice](https://img.shields.io/nuget/v/MisaConnect.EInvoice.svg?label=MisaConnect.EInvoice)](https://www.nuget.org/packages/MisaConnect.EInvoice)
 [![Downloads](https://img.shields.io/nuget/dt/MisaConnect.EInvoice.svg?label=downloads)](https://www.nuget.org/packages/MisaConnect.EInvoice)
 [![MisaConnect.ESign](https://img.shields.io/nuget/v/MisaConnect.ESign.svg?label=MisaConnect.ESign)](https://www.nuget.org/packages/MisaConnect.ESign)
@@ -18,6 +19,8 @@ Community .NET SDK for MISA cloud APIs. Two independent NuGet packages ship from
 | **[`MisaConnect.ESign`](https://www.nuget.org/packages/MisaConnect.ESign)** | MISA eSign RemoteSigning — PDF / XML / Word / Excel signing, 2FA / OTP (explicit + transparent), webhook-mode (non-blocking) signing. | [docs/esign/](docs/esign/) |
 
 Both packages target **.NET 8** and share the same layered architecture, options-pattern configuration, swappable ports, and wire-format fidelity with MISA's published APIs.
+
+> 📖 **Full docs:** <https://chukhali.github.io/MisaConnect/>
 
 ## Install
 

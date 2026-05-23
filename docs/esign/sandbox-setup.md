@@ -1,3 +1,10 @@
+---
+title: Sandbox setup
+layout: default
+parent: ESign
+nav_order: 3
+---
+
 # Sandbox setup
 
 To run integration tests or `samples/MisaConnect.Samples.Api` against the MISA eSign sandbox, you need sandbox credentials from MISA.

@@ -1,3 +1,10 @@
+---
+title: Configuration
+layout: default
+parent: EInvoice
+nav_order: 2
+---
+
 # Configuration reference
 
 `MisaConnect.EInvoice` binds the `Misa:EInvoice` section to `MisaEInvoiceOptions`. All keys are case-sensitive (the binder is, in practice, case-insensitive — but match the table for consistency with logs and validator messages).
