@@ -16,4 +16,6 @@ public enum ESignErrorCategory
     StatusLookupFailed = 11,
     Transport = 12,
     Validation = 13,
+    WebhookValidation = 14,
+    WebhookFinalize = 15,
 }

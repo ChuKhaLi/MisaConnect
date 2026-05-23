@@ -1,19 +1,23 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
-using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Application.Operations;
 using MisaConnect.EInvoice.Infrastructure.Configuration;
 using MisaConnect.EInvoice.Infrastructure.DependencyInjection;
+using MisaConnect.ESign.Client.DependencyInjection;
 using MisaConnect.Samples.Api.Endpoints;
 using MisaConnect.Samples.Api.Middleware;
+using EInvoiceCorrelationAccessor = MisaConnect.EInvoice.Application.Abstractions.ICorrelationIdAccessor;
+using ESignCorrelationAccessor = MisaConnect.ESign.Application.Abstractions.ICorrelationIdAccessor;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
 builder.Services.AddMisaConnectEInvoice(builder.Configuration);
+builder.Services.AddMisaConnectESign(builder.Configuration);
 builder.Services.AddScoped<HttpContextCorrelationIdAccessor>();
-builder.Services.AddScoped<ICorrelationIdAccessor>(sp => sp.GetRequiredService<HttpContextCorrelationIdAccessor>());
+builder.Services.AddScoped<EInvoiceCorrelationAccessor>(sp => sp.GetRequiredService<HttpContextCorrelationIdAccessor>());
+builder.Services.AddScoped<ESignCorrelationAccessor>(sp => sp.GetRequiredService<HttpContextCorrelationIdAccessor>());
 
 var app = builder.Build();
 
@@ -43,6 +47,9 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 
 app.MapTemplateEndpoints();
 app.MapInvoiceEndpoints();
+app.MapESignWebhookEndpoint(builder.Configuration);
+
+ESignWebhookStartupValidator.EmitWarnIfPubliclyReachable(app.Services);
 
 app.Run();
 

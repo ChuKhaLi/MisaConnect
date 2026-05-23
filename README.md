@@ -73,10 +73,10 @@ See [docs/sandbox-setup.md](docs/sandbox-setup.md) for sandbox credential setup 
 
 ## MisaConnect.ESign (v2.0 preview)
 
-Slices 1–2 of the `MisaConnect.ESign` product family cover end-to-end PDF signing and two-factor (OTP) authentication via the MISA eSign RemoteSigning API. Installable separately:
+Slices 1–4 of the `MisaConnect.ESign` product family cover end-to-end PDF / XML / Word / Excel signing, two-factor (OTP) authentication, and webhook-mode (non-blocking) signing via the MISA eSign RemoteSigning API. Installable separately:
 
 ```
-dotnet add package MisaConnect.ESign --version 2.0.0-preview.2
+dotnet add package MisaConnect.ESign --version 2.0.0-preview.4
 ```
 
 | Operation | Facade method | Status |
@@ -88,9 +88,10 @@ dotnet add package MisaConnect.ESign --version 2.0.0-preview.2
 | Sign XML (XAdES) end-to-end | `IMisaESignClient.SignXmlAsync` | 🟡 v2.0-preview.3 |
 | Sign Word (OOXML `.docx`) end-to-end | `IMisaESignClient.SignWordAsync` | 🟡 v2.0-preview.3 |
 | Sign Excel (OOXML `.xlsx`) end-to-end | `IMisaESignClient.SignExcelAsync` | 🟡 v2.0-preview.3 |
-| Webhook receiver (vs polling) | — | 🛑 slice 4 |
+| Begin webhook-mode sign (no polling) | `IMisaESignClient.BeginSign{Pdf,Xml,Word,Excel}Async` | 🟡 v2.0-preview.4 |
+| Handle inbound MISA webhook envelope | `IMisaESignClient.HandleWebhookAsync` | 🟡 v2.0-preview.4 |
 
-Bind options under the `Misa:ESign` configuration section, then call `services.AddMisaConnectESign(IConfiguration)`. See [specs/001-misa-esign-pdf-sign-flow/quickstart.md](specs/001-misa-esign-pdf-sign-flow/quickstart.md) for the full walkthrough.
+Bind options under the `Misa:ESign` configuration section, then call `services.AddMisaConnectESign(IConfiguration)`. See [specs/001-misa-esign-pdf-sign-flow/quickstart.md](specs/001-misa-esign-pdf-sign-flow/quickstart.md) for the full walkthrough, and [specs/004-misa-esign-webhook/quickstart.md](specs/004-misa-esign-webhook/quickstart.md) for webhook-mode setup (mode config, `IWebhookDeliveryHook` registration, sample-API transport-layer auth).
 
 ## Project layout
 

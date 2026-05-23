@@ -1,4 +1,5 @@
 using MisaConnect.ESign.Client.Dtos;
+using MisaConnect.ESign.Client.Dtos.Webhook;
 using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Domain.Errors;
 
@@ -66,4 +67,34 @@ public interface IMisaESignClient
     /// <exception cref="InvalidOperationException">No pending 2FA challenge captured for the current execution context.</exception>
     /// <exception cref="ESignTransportException">Transport-retry budget exhausted.</exception>
     Task<OtpResendResultDto> ResendOtpAsync(string? language = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Initiate a webhook-mode PDF sign. Reuses the slice-1 pipeline up to
+    /// <c>/Signing/hash</c>, records a signing session, and returns the
+    /// MISA-issued transaction id. No <c>/Signing/status</c> polling occurs —
+    /// MISA will POST the completion envelope to the consumer's webhook
+    /// endpoint and <see cref="HandleWebhookAsync"/> finalizes the document.
+    /// Throws <see cref="InvalidOperationException"/> when
+    /// <c>Misa:ESign:Webhook:Mode</c> is <c>Polling</c> (FR-093).
+    /// </summary>
+    Task<BeginResultDto> BeginSignPdfAsync(SignPdfRequestDto request, CancellationToken ct = default);
+
+    /// <summary>Webhook-mode initiation for XML. See <see cref="BeginSignPdfAsync"/>.</summary>
+    Task<BeginResultDto> BeginSignXmlAsync(SignXmlRequestDto request, CancellationToken ct = default);
+
+    /// <summary>Webhook-mode initiation for Word (.docx). See <see cref="BeginSignPdfAsync"/>.</summary>
+    Task<BeginResultDto> BeginSignWordAsync(SignWordRequestDto request, CancellationToken ct = default);
+
+    /// <summary>Webhook-mode initiation for Excel (.xlsx). See <see cref="BeginSignPdfAsync"/>.</summary>
+    Task<BeginResultDto> BeginSignExcelAsync(SignExcelRequestDto request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reconcile an inbound MISA webhook envelope against a recorded session,
+    /// run the typed four-step validation pipeline (FR-082), finalize via
+    /// <c>/documents/attachment</c> on the success path, and return the ACK to
+    /// send back to MISA. Idempotent on the success path (FR-080); duplicate
+    /// success deliveries short-circuit to the cached ACK without re-invoking
+    /// the delivery hook. Failures are NOT cached (FR-081).
+    /// </summary>
+    Task<WebhookHandleResultDto> HandleWebhookAsync(WebhookEnvelopeDto envelope, CancellationToken ct = default);
 }

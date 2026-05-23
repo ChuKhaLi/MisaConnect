@@ -2,8 +2,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MisaConnect.ESign.Application.Abstractions;
+using MisaConnect.ESign.Client.Webhook;
 using MisaConnect.ESign.Infrastructure.Configuration;
 using MisaConnect.ESign.Infrastructure.DependencyInjection;
+using ApplicationWebhookHook = MisaConnect.ESign.Application.Webhook.IWebhookDeliveryHook;
 
 namespace MisaConnect.ESign.Client.DependencyInjection;
 
@@ -38,5 +40,8 @@ public static class ServiceCollectionExtensions
     {
         services.TryAddScoped<ICorrelationIdAccessor, LibraryCorrelationIdAccessor>();
         services.TryAddScoped<IMisaESignClient, MisaESignClient>();
+        services.TryAddSingleton<IWebhookDeliveryHook, NullClientWebhookDeliveryHook>();
+        services.AddSingleton<ApplicationWebhookHook>(sp =>
+            new WebhookDeliveryHookAdapter(sp.GetRequiredService<IWebhookDeliveryHook>()));
     }
 }

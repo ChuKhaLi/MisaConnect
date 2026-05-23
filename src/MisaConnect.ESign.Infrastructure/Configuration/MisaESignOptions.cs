@@ -16,6 +16,7 @@ public sealed class MisaESignOptions
     public MisaESignTransportRetryOptions TransportRetry { get; set; } = new();
     public MisaESignErrorOptions Errors { get; set; } = new();
     public MisaESignOtpOptions Otp { get; set; } = new();
+    public MisaESignWebhookOptions Webhook { get; set; } = new();
 }
 
 public sealed class MisaESignOtpOptions

@@ -21,7 +21,11 @@ public static class ESignLogScrubber
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex SensitiveJsonField = new(
-        "\"(accessToken|remoteSigningAccessToken|refreshToken|authorizationRM|authorization|password|code|certificate|certiticateChain|certificateChain|fileToSign|documentBytes|documentHash|sh|digest|signature|signatureId|mainDom|document|fontData|signatureImage|logoImage|email|emailName|phoneNumber|firstName|lastName)\"\\s*:\\s*\"[^\"]*\"",
+        "\"(accessToken|remoteSigningAccessToken|refreshToken|authorizationRM|authorization|password|code|certificate|certiticateChain|certificateChain|fileToSign|documentBytes|documentHash|sh|digest|signature|signatureId|mainDom|document|fontData|signatureImage|logoImage|email|emailName|phoneNumber|firstName|lastName|extraData|secret)\"\\s*:\\s*\"[^\"]*\"",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex ExtraDataObjectField = new(
+        "\"extraData\"\\s*:\\s*\\{[^}]*\\}",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex DeviceJsonField = new(
@@ -35,7 +39,8 @@ public static class ESignLogScrubber
     public static string Scrub(string input)
     {
         if (string.IsNullOrEmpty(input)) return input;
-        var result = AuthHeaderPattern.Replace(input, m => $"{m.Groups[1].Value}: {Mask}");
+        var result = ExtraDataObjectField.Replace(input, "\"extraData\":\"***\"");
+        result = AuthHeaderPattern.Replace(result, m => $"{m.Groups[1].Value}: {Mask}");
         result = BearerPattern.Replace(result, $"Bearer {Mask}");
         result = SensitiveJsonField.Replace(result, m =>
         {

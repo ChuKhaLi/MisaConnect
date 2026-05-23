@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Options;
 
 namespace MisaConnect.ESign.Infrastructure.Configuration;
@@ -65,6 +66,27 @@ public sealed class MisaESignOptionsValidator : IValidateOptions<MisaESignOption
         if (string.IsNullOrWhiteSpace(options.Otp.DefaultResendLanguage))
         {
             errors.Add("Misa:ESign:Otp:DefaultResendLanguage must be non-empty.");
+        }
+
+        if (options.Webhook.Session.Ttl <= TimeSpan.Zero)
+        {
+            errors.Add("Misa:ESign:Webhook:Session:Ttl must be > 0.");
+        }
+
+        if (!string.IsNullOrEmpty(options.Webhook.Secret) && options.Webhook.Secret.Length < 32)
+        {
+            errors.Add("Misa:ESign:Webhook:Secret must be at least 32 characters when set.");
+        }
+
+        if (options.Webhook.AllowedIps is { Length: > 0 })
+        {
+            foreach (var cidr in options.Webhook.AllowedIps)
+            {
+                if (string.IsNullOrWhiteSpace(cidr) || !IPNetwork.TryParse(cidr, out _))
+                {
+                    errors.Add($"Misa:ESign:Webhook:AllowedIps entry '{cidr}' is not a valid CIDR range.");
+                }
+            }
         }
 
         return errors.Count == 0

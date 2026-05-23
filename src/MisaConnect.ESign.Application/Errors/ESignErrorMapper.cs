@@ -2,6 +2,7 @@ using System.Net;
 using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Domain.Signing;
+using MisaConnect.ESign.Domain.Webhook;
 
 namespace MisaConnect.ESign.Application.Errors;
 
@@ -196,6 +197,31 @@ public static class ESignErrorMapper
         if (!string.IsNullOrWhiteSpace(envelope.UserMsg)) parts.Add($"userMsg={envelope.UserMsg}");
         if (!string.IsNullOrWhiteSpace(envelope.DevMsg)) parts.Add($"devMsg={envelope.DevMsg}");
         return string.Join(" | ", parts);
+    }
+
+    /// <summary>
+    /// Per [contracts/error-mapping.md A.11], maps a typed webhook-validation
+    /// failure to the namespaced ACK <c>errorCode</c> the sample API returns to
+    /// MISA. Wire-side success uses <c>"0"</c>; failures use the
+    /// <c>"webhook.&lt;category&gt;"</c> codes.
+    /// </summary>
+    public static WebhookAck MapWebhookValidationToAck(WebhookValidationException ex)
+    {
+        return ex.WebhookCategory switch
+        {
+            WebhookValidationCategory.MalformedEnvelope => WebhookAck.Failure(
+                "webhook.malformed", "Inbound envelope failed shape validation.", "Webhook payload was malformed."),
+            WebhookValidationCategory.ClientIdMismatch => WebhookAck.Failure(
+                "webhook.client_id_mismatch", "clientId did not match configured value.", "Webhook clientId mismatch."),
+            WebhookValidationCategory.UnknownTransaction => WebhookAck.Failure(
+                "webhook.unknown_transaction", "No session recorded for that transactionId.", "Webhook transaction not recognized."),
+            WebhookValidationCategory.IncompleteSuccessEnvelope => WebhookAck.Failure(
+                "webhook.incomplete_success", "status=SUCCESS but signatures[] was empty or invalid.", "Webhook payload was incomplete."),
+            WebhookValidationCategory.DocumentIdMismatch => WebhookAck.Failure(
+                "webhook.document_id_mismatch", "signatures[].documentId did not match session.", "Webhook document mismatch."),
+            _ => WebhookAck.Failure(
+                "webhook.malformed", "Unspecified webhook validation failure.", "Webhook payload was invalid."),
+        };
     }
 
     public static ESignException MapStatusTerminal(
