@@ -78,6 +78,12 @@ Bind credentials under the `Misa:ESign` configuration section (env vars, user-se
 
 For production, switch `Environment` to `Production` and `BaseUrl` to `https://esignapp.misa.vn/`. The options validator refuses to start if the environment and base-URL host disagree.
 
+`BaseUrl` should be the **host root**. The SDK normalizes it to its origin (scheme + host), so any path you include — e.g. a trailing `/webdev/` — is tolerated and ignored for routing: ESRM endpoints always resolve at the host root, and the auth app under `/webdev/`. The login/two-factor location follows `Environment` (Sandbox ⇒ under `/webdev/`, Production ⇒ host root). Override it with the optional `AuthUnderWebdev` (`true`/`false`) only if a specific tenant differs from its environment default:
+
+```json
+"Misa": { "ESign": { "AuthUnderWebdev": true } }
+```
+
 ## Supported operations
 
 | Operation | Facade method |

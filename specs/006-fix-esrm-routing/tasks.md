@@ -29,8 +29,8 @@ description: "Task list for slice 006 — fix ESRM routing & silent-failure hard
 
 **Purpose**: Establish a green baseline and confirm test layout before any change.
 
-- [ ] T001 Build the solution and run the ESign suites to confirm a green baseline: `dotnet build MisaConnect.slnx`, `dotnet test tests/MisaConnect.ESign.UnitTests`, `dotnet test tests/MisaConnect.ESign.IntegrationTests` (sandbox facts skip without creds).
-- [ ] T002 Confirm test-project folder conventions and existing fixture entry points in `tests/MisaConnect.ESign.UnitTests/` and `tests/MisaConnect.ESign.IntegrationTests/EndToEnd/TestServiceProvider.cs` + `EsignFake/FakeMisaESignServer.cs`; note the namespaces/paths the new test files in later phases will use.
+- [x] T001 Build the solution and run the ESign suites to confirm a green baseline: `dotnet build MisaConnect.slnx`, `dotnet test tests/MisaConnect.ESign.UnitTests`, `dotnet test tests/MisaConnect.ESign.IntegrationTests` (sandbox facts skip without creds).
+- [x] T002 Confirm test-project folder conventions and existing fixture entry points in `tests/MisaConnect.ESign.UnitTests/` and `tests/MisaConnect.ESign.IntegrationTests/EndToEnd/TestServiceProvider.cs` + `EsignFake/FakeMisaESignServer.cs`; note the namespaces/paths the new test files in later phases will use.
 
 ---
 
@@ -40,10 +40,10 @@ description: "Task list for slice 006 — fix ESRM routing & silent-failure hard
 
 **⚠️ CRITICAL**: No user-story work begins until this phase is complete.
 
-- [ ] T003 [P] Add `public bool? AuthUnderWebdev { get; set; }` to `src/MisaConnect.ESign.Infrastructure/Configuration/MisaESignOptions.cs` with XML doc per [contracts/public-surface.md](./contracts/public-surface.md). No consumer of it yet (no behavior change).
-- [ ] T004 Create `src/MisaConnect.ESign.Infrastructure/ESign/ESignRouteResolver.cs` (Infrastructure-internal): expose (a) an origin-derivation helper `Origin(string baseUrl)` → `scheme://host/` and (b) `ResolveRequestPath(string canonicalRoute)` returning the request path. Initial implementation returns the canonical route unchanged (identity) for all routes — behavior-preserving. Include the `EffectiveAuthUnderWebdev` computation (`AuthUnderWebdev ?? Environment == Sandbox`) but DO NOT yet apply it (US3 wires it in).
-- [ ] T005 Inject `ESignRouteResolver` (and existing `IOptions<MisaESignOptions>`) into `src/MisaConnect.ESign.Infrastructure/ESign/MisaESignWireClient.cs`; route request-path construction in `NewRequest`/call sites through `ResolveRequestPath(canonicalRoute)`, while continuing to pass the **canonical** `ESignHttpRoutes.*` constant as the `endpoint` argument to the error mappers (keeps `ESignErrorMapper`/`OtpErrorMapper` exact-match dispatch intact). Register the resolver in `src/MisaConnect.ESign.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`. Behavior unchanged (resolver is identity, BaseAddress still = BaseUrl).
-- [ ] T006 In `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs`, stop discarding the `AuthorizationRM` header — capture the last-seen bearer per endpoint so tests can assert it (no SDK behavior change). Keep existing route maps for now.
+- [x] T003 [P] Add `public bool? AuthUnderWebdev { get; set; }` to `src/MisaConnect.ESign.Infrastructure/Configuration/MisaESignOptions.cs` with XML doc per [contracts/public-surface.md](./contracts/public-surface.md). No consumer of it yet (no behavior change).
+- [x] T004 Create `src/MisaConnect.ESign.Infrastructure/ESign/ESignRouteResolver.cs` (Infrastructure-internal): expose (a) an origin-derivation helper `Origin(string baseUrl)` → `scheme://host/` and (b) `ResolveRequestPath(string canonicalRoute)` returning the request path. Initial implementation returns the canonical route unchanged (identity) for all routes — behavior-preserving. Include the `EffectiveAuthUnderWebdev` computation (`AuthUnderWebdev ?? Environment == Sandbox`) but DO NOT yet apply it (US3 wires it in).
+- [x] T005 Inject `ESignRouteResolver` (and existing `IOptions<MisaESignOptions>`) into `src/MisaConnect.ESign.Infrastructure/ESign/MisaESignWireClient.cs`; route request-path construction in `NewRequest`/call sites through `ResolveRequestPath(canonicalRoute)`, while continuing to pass the **canonical** `ESignHttpRoutes.*` constant as the `endpoint` argument to the error mappers (keeps `ESignErrorMapper`/`OtpErrorMapper` exact-match dispatch intact). Register the resolver in `src/MisaConnect.ESign.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`. Behavior unchanged (resolver is identity, BaseAddress still = BaseUrl).
+- [x] T006 In `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs`, stop discarding the `AuthorizationRM` header — capture the last-seen bearer per endpoint so tests can assert it (no SDK behavior change). Keep existing route maps for now.
 
 **Checkpoint**: Solution builds, all existing tests still pass (`dotnet test` green), seam in place.
 
@@ -57,16 +57,16 @@ description: "Task list for slice 006 — fix ESRM routing & silent-failure hard
 
 ### Tests for User Story 1 (write first — MUST fail) ⚠️
 
-- [ ] T007 [P] [US1] Unit test `tests/MisaConnect.ESign.UnitTests/ESign/Routing/BaseAddressNormalizationTests.cs`: assert resolved **absolute** URLs for ESRM (cert-list, hash, signing, status, attachment) and refresh/resend against `BaseUrl = https://host/webdev/` AND `https://host/` are byte-identical and land at host root (ESRM) / single `/webdev/` (refresh/resend). Contracts C1, C2.
-- [ ] T008 [P] [US1] Integration test in `tests/MisaConnect.ESign.IntegrationTests/EndToEnd/` (new file, e.g. `EsrmRootRoutingTests.cs`): configure the SDK with a `/webdev/`-suffixed base against the fake; assert cert-list returns the seeded ACTIVE certificate (not zero) and the ESRM request path observed by the fake has no `/webdev/` segment.
-- [ ] T009 [P] [US1] Integration test asserting the `AuthorizationRM` bearer the fake received on an ESRM call equals the login response's `remoteSigningAccessToken` (Defect B guard / Contract C5).
-- [ ] T010 [P] [US1] Integration test for the `401` refresh-and-retry path against the corrected ESRM routes (Contract C6) — extend/relocate the existing 401 test to run with a `/webdev/` base.
+- [x] T007 [P] [US1] Unit test `tests/MisaConnect.ESign.UnitTests/ESign/Routing/BaseAddressNormalizationTests.cs`: assert resolved **absolute** URLs for ESRM (cert-list, hash, signing, status, attachment) and refresh/resend against `BaseUrl = https://host/webdev/` AND `https://host/` are byte-identical and land at host root (ESRM) / single `/webdev/` (refresh/resend). Contracts C1, C2.
+- [x] T008 [P] [US1] Integration test in `tests/MisaConnect.ESign.IntegrationTests/EndToEnd/` (new file, e.g. `EsrmRootRoutingTests.cs`): configure the SDK with a `/webdev/`-suffixed base against the fake; assert cert-list returns the seeded ACTIVE certificate (not zero) and the ESRM request path observed by the fake has no `/webdev/` segment.
+- [x] T009 [P] [US1] Integration test asserting the `AuthorizationRM` bearer the fake received on an ESRM call equals the login response's `remoteSigningAccessToken` (Defect B guard / Contract C5).
+- [x] T010 [P] [US1] Integration test for the `401` refresh-and-retry path against the corrected ESRM routes (Contract C6) — extend/relocate the existing 401 test to run with a `/webdev/` base.
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] In `src/MisaConnect.ESign.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`, change the HttpClient registration so `http.BaseAddress = ESignRouteResolver.Origin(opts.BaseUrl)` (scheme+host, trailing slash), replacing the current `EndsWith('/')` logic. (Makes T007/T008 ESRM + refresh/resend pass.)
-- [ ] T012 [US1] In `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs`, ensure ESRM endpoints are served **only at the host root** and remove any `/webdev/`-prefixed ESRM mapping, so a mis-routed ESRM call cannot accidentally succeed. (Locks T008.)
-- [ ] T013 [US1] Run US1 tests; confirm red→green and no regression in the existing suite.
+- [x] T011 [US1] In `src/MisaConnect.ESign.Infrastructure/DependencyInjection/ServiceCollectionExtensions.cs`, change the HttpClient registration so `http.BaseAddress = ESignRouteResolver.Origin(opts.BaseUrl)` (scheme+host, trailing slash), replacing the current `EndsWith('/')` logic. (Makes T007/T008 ESRM + refresh/resend pass.)
+- [x] T012 [US1] In `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs`, ensure ESRM endpoints are served **only at the host root** and remove any `/webdev/`-prefixed ESRM mapping, so a mis-routed ESRM call cannot accidentally succeed. (Locks T008.)
+- [x] T013 [US1] Run US1 tests; confirm red→green and no regression in the existing suite.
 
 **Checkpoint**: ESRM + refresh/resend correct and path-tolerant against the fake. (Login still resolves at root here — completed in US3 for real-sandbox correctness.)
 
@@ -80,14 +80,14 @@ description: "Task list for slice 006 — fix ESRM routing & silent-failure hard
 
 ### Tests for User Story 2 (write first — MUST fail) ⚠️
 
-- [ ] T014 [P] [US2] Unit test `tests/MisaConnect.ESign.UnitTests/ESign/ContentTypeGuardTests.cs` (or integration if HttpClient plumbing is needed): `200 text/html` body on the cert-list path → `ESignGeneralException` whose message contains the endpoint and content type and a body snippet, and contains NO bearer/credential. Contract C4 + FR-007.
-- [ ] T015 [P] [US2] Test: `200 application/json` body `[]` → `NoActiveCertificateException` (legitimate empty); and a valid JSON array parses normally. Contract C4 / FR-008.
+- [x] T014 [P] [US2] Unit test `tests/MisaConnect.ESign.UnitTests/ESign/ContentTypeGuardTests.cs` (or integration if HttpClient plumbing is needed): `200 text/html` body on the cert-list path → `ESignGeneralException` whose message contains the endpoint and content type and a body snippet, and contains NO bearer/credential. Contract C4 + FR-007.
+- [x] T015 [P] [US2] Test: `200 application/json` body `[]` → `NoActiveCertificateException` (legitimate empty); and a valid JSON array parses normally. Contract C4 / FR-008.
 
 ### Implementation for User Story 2
 
-- [ ] T016 [US2] In `src/MisaConnect.ESign.Infrastructure/ESign/MisaESignWireClient.cs`, add a content-type/JSON guard at the ESRM JSON-response boundary (after the existing `IsSuccessStatusCode` check, before deserialize): if media type is not JSON (`application/json`/`*+json`) or a non-empty body fails to parse, throw `ESignGeneralException` (category `MisaUnknown`, code e.g. `UnexpectedContentType`) with endpoint + content type + truncated (~256 char) body snippet. Do NOT alter the shared `Deserialize<T>` swallow behavior. Apply to the cert-list path (and the other ESRM JSON reads where low-risk).
-- [ ] T017 [US2] In `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs`, add a way to make an ESRM endpoint return `200 text/html` (e.g. a toggle/seam) so T014 exercises the real HTTP path.
-- [ ] T018 [US2] Run US2 tests; confirm red→green and no regression.
+- [x] T016 [US2] In `src/MisaConnect.ESign.Infrastructure/ESign/MisaESignWireClient.cs`, add a content-type/JSON guard at the ESRM JSON-response boundary (after the existing `IsSuccessStatusCode` check, before deserialize): if media type is not JSON (`application/json`/`*+json`) or a non-empty body fails to parse, throw `ESignGeneralException` (category `MisaUnknown`, code e.g. `UnexpectedContentType`) with endpoint + content type + truncated (~256 char) body snippet. Do NOT alter the shared `Deserialize<T>` swallow behavior. Apply to the cert-list path (and the other ESRM JSON reads where low-risk).
+- [x] T017 [US2] In `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs`, add a way to make an ESRM endpoint return `200 text/html` (e.g. a toggle/seam) so T014 exercises the real HTTP path.
+- [x] T018 [US2] Run US2 tests; confirm red→green and no regression.
 
 **Checkpoint**: A routing/gateway anomaly surfaces as a clear exception, never a silent empty result.
 
@@ -101,15 +101,15 @@ description: "Task list for slice 006 — fix ESRM routing & silent-failure hard
 
 ### Tests for User Story 3 (write first — MUST fail) ⚠️
 
-- [ ] T019 [P] [US3] Unit test `tests/MisaConnect.ESign.UnitTests/ESign/Routing/AuthLocationTests.cs`: across the C3 matrix (Production/Sandbox × override null/true/false), assert login + two-factor resolved paths, and assert ESRM/refresh/resend paths are invariant. Contract C3.
-- [ ] T020 [P] [US3] Unit test for `EffectiveAuthUnderWebdev` derivation: `null` ⇒ `Environment == Sandbox`; `true`/`false` force the value. data-model §1.
-- [ ] T021 [P] [US3] Integration test: with `Environment = Sandbox` (default), login is served under `/webdev/` by the fake and login succeeds; with `Environment = Production`, login is served at root.
+- [x] T019 [P] [US3] Unit test `tests/MisaConnect.ESign.UnitTests/ESign/Routing/AuthLocationTests.cs`: across the C3 matrix (Production/Sandbox × override null/true/false), assert login + two-factor resolved paths, and assert ESRM/refresh/resend paths are invariant. Contract C3.
+- [x] T020 [P] [US3] Unit test for `EffectiveAuthUnderWebdev` derivation: `null` ⇒ `Environment == Sandbox`; `true`/`false` force the value. data-model §1.
+- [x] T021 [P] [US3] Integration test: with `Environment = Sandbox` (default), login is served under `/webdev/` by the fake and login succeeds; with `Environment = Production`, login is served at root.
 
 ### Implementation for User Story 3
 
-- [ ] T022 [US3] In `src/MisaConnect.ESign.Infrastructure/ESign/ESignRouteResolver.cs`, apply `EffectiveAuthUnderWebdev` so `ResolveRequestPath` prepends `webdev/` to the login and two-factor canonical routes when effective; identity for all other routes. (Endpoint ids passed to error mappers remain canonical.)
-- [ ] T023 [US3] In `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs` (and `EndToEnd/TestServiceProvider.cs` if needed), serve login/two-factor under `/webdev/` for the Sandbox topology (and at root for a Production-configured test), matching the real sandbox. Update any existing login/two-factor E2E tests that assumed root-only.
-- [ ] T024 [US3] Run US3 tests + the full ESign suite; confirm red→green and that US1/US2 still pass.
+- [x] T022 [US3] In `src/MisaConnect.ESign.Infrastructure/ESign/ESignRouteResolver.cs`, apply `EffectiveAuthUnderWebdev` so `ResolveRequestPath` prepends `webdev/` to the login and two-factor canonical routes when effective; identity for all other routes. (Endpoint ids passed to error mappers remain canonical.)
+- [x] T023 [US3] In `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs` (and `EndToEnd/TestServiceProvider.cs` if needed), serve login/two-factor under `/webdev/` for the Sandbox topology (and at root for a Production-configured test), matching the real sandbox. Update any existing login/two-factor E2E tests that assumed root-only.
+- [x] T024 [US3] Run US3 tests + the full ESign suite; confirm red→green and that US1/US2 still pass.
 
 **Checkpoint**: All three stories pass; SDK is correct against both topologies (fake-verified).
 
@@ -117,11 +117,11 @@ description: "Task list for slice 006 — fix ESRM routing & silent-failure hard
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T025 [P] Add a `CHANGELOG.md` `[Unreleased]` entry under `MisaConnect.ESign` (routing fix + `AuthUnderWebdev`; Defect D hardening; note Defect B was a non-issue).
-- [ ] T026 [P] Update README config/supported-ops docs (repo root `README.md` and `src/MisaConnect.ESign.Client/README.md`): `BaseUrl` = host root (path tolerated), document `AuthUnderWebdev` + the Production/Sandbox default.
-- [ ] T027 Bump the `MisaConnect.ESign` package version to `2.1.0` (version property in the Client csproj / version props).
-- [ ] T028 Run `dotnet format MisaConnect.slnx` and the full ESign unit + integration suites; confirm green with `TreatWarningsAsErrors=true`.
-- [ ] T029 Validate [quickstart.md](./quickstart.md) end to end; record the **production login-path pre-release check** (research D7) as a release-gate item (do not tag 2.1.0 until confirmed, or ship guidance to set `AuthUnderWebdev=true` for Production if prod serves login under `/webdev/`).
+- [x] T025 [P] Add a `CHANGELOG.md` `[Unreleased]` entry under `MisaConnect.ESign` (routing fix + `AuthUnderWebdev`; Defect D hardening; note Defect B was a non-issue).
+- [x] T026 [P] Update README config/supported-ops docs (repo root `README.md` and `src/MisaConnect.ESign.Client/README.md`): `BaseUrl` = host root (path tolerated), document `AuthUnderWebdev` + the Production/Sandbox default.
+- [x] T027 Bump the `MisaConnect.ESign` package version to `2.1.0` (version property in the Client csproj / version props).
+- [x] T028 Run `dotnet format MisaConnect.slnx` and the full ESign unit + integration suites; confirm green with `TreatWarningsAsErrors=true`.
+- [x] T029 Validate [quickstart.md](./quickstart.md) end to end; record the **production login-path pre-release check** (research D7) as a release-gate item (do not tag 2.1.0 until confirmed, or ship guidance to set `AuthUnderWebdev=true` for Production if prod serves login under `/webdev/`).
 
 ---
 
@@ -159,3 +159,11 @@ description: "Task list for slice 006 — fix ESRM routing & silent-failure hard
 - Defect B requires **no** implementation — only the T009 assertion that locks the already-correct bearer.
 - The error-mapper endpoint constants are intentionally **untouched**; the resolver separates request path from endpoint identity (research D2), so error categorization is unaffected.
 - No secrets in the new exception/logs (FR-007): body snippet only, never request headers.
+
+## Implementation notes (completed 2026-06-13)
+
+- All 29 tasks implemented under TDD; ESign suites green: **268 unit + 67 integration** (5 sandbox facts skip without creds). Build clean (0 warnings, `TreatWarningsAsErrors`); `dotnet format` verified no changes.
+- **`ESignRouteResolver` is a static internal helper** (pure functions: `Origin`, `EffectiveAuthUnderWebdev`, `ResolveRequestPath`), not a DI-registered service — simpler and trivially unit-testable. The wire client calls it from `NewRequest` using `_options.Value`; no DI registration was needed (T004/T005 refined accordingly).
+- Error-mapper endpoint constants were left **untouched** (research D2): request-path resolution is separate from the canonical endpoint identifier, so error categorization is unaffected — verified by the full existing suite staying green.
+- **Pre-existing, out-of-scope:** `MisaConnect.EInvoice.IntegrationTests` (e.g. `AmendmentHttpStatusTests`) fail in this environment because the sample API's `ESignWebhookStartupValidator.EmitWarnIfPubliclyReachable` throws at `WebApplicationFactory` startup. Confirmed identical failure with slice 006 stashed (clean baseline) — **not caused by this slice**. Not addressed here.
+- T029 release gate: do not tag `2.1.0` until the **production login path** is confirmed (root vs `/webdev/`); `AuthUnderWebdev=true` is the field-level mitigation. Recorded in [research.md](./research.md) D7, [quickstart.md](./quickstart.md), and the CHANGELOG note.

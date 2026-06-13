@@ -13,8 +13,9 @@ nav_order: 2
 
 | Key | Type | Required | Description |
 | --- | --- | --- | --- |
-| `Environment` | enum | yes | `Sandbox` or `Production`. Drives the host-validation check on `BaseUrl`. |
-| `BaseUrl` | string | yes | Absolute `https://` URL. Sandbox: issued with your credentials. Production: `https://esignapp.misa.vn/`. |
+| `Environment` | enum | yes | `Sandbox` or `Production`. Drives the host-validation check on `BaseUrl` and the default `login`/`two-factor` location (Sandbox ⇒ under `/webdev/`, Production ⇒ host root). |
+| `BaseUrl` | string | yes | Absolute `https://` URL — the **host root**. Sandbox: issued with your credentials. Production: `https://esignapp.misa.vn/`. Normalized to its origin, so any path you include (e.g. a trailing `/webdev/`) is tolerated and ignored for routing. |
+| `AuthUnderWebdev` | bool? | no | Overrides where `login`/`two-factor` are served. `null` (default) derives from `Environment`; `true` forces `/webdev/`, `false` forces the host root. Does not affect refresh/resend (always `/webdev/`) or ESRM (always host root). |
 | `ClientId` | string | yes | MISA client ID. |
 | `ClientKey` | string | yes | MISA client key. |
 | `UserName` | string | yes | MISA user. |

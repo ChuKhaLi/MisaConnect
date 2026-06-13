@@ -310,7 +310,11 @@ internal static class ServiceCollectionExtensions
             .AddHttpClient<MisaESignWireClient>((sp, http) =>
             {
                 var opts = sp.GetRequiredService<IOptions<MisaESignOptions>>().Value;
-                http.BaseAddress = new Uri(opts.BaseUrl.EndsWith('/') ? opts.BaseUrl : opts.BaseUrl + "/");
+                // ESRM lives at the host root and the auth app under /webdev/; a
+                // single base path cannot serve both. Use the ORIGIN of BaseUrl so
+                // any configured path (e.g. /webdev/) is discarded; ESignRouteResolver
+                // re-derives each endpoint's path. Path-tolerant: no consumer change.
+                http.BaseAddress = ESignRouteResolver.Origin(opts.BaseUrl);
             })
             .AddHttpMessageHandler<TransientFailureRetryHandler>()
             .AddHttpMessageHandler<RemoteSigningAuthHandler>()

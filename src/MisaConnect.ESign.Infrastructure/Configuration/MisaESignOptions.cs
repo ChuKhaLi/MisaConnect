@@ -7,6 +7,18 @@ public sealed class MisaESignOptions
 
     public ESignEnvironment Environment { get; set; }
     public string BaseUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Overrides where the login and two-factor endpoints are served, relative
+    /// to the host root derived from <see cref="BaseUrl"/>. <c>null</c> (default)
+    /// derives from <see cref="Environment"/>: <see cref="ESignEnvironment.Sandbox"/>
+    /// serves them under <c>/webdev/</c>, <see cref="ESignEnvironment.Production"/>
+    /// at the host root (per the official API doc). <c>true</c> forces
+    /// <c>/webdev/</c>; <c>false</c> forces the host root. Does not affect the
+    /// refresh-token / resend-otp endpoints (always under <c>/webdev/</c>) or the
+    /// ESRM endpoints (always at the host root).
+    /// </summary>
+    public bool? AuthUnderWebdev { get; set; }
     public string ClientId { get; set; } = string.Empty;
     public string ClientKey { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
