@@ -2,7 +2,7 @@
 
 **Feature Branch**: `006-fix-esrm-routing`
 **Created**: 2026-06-13
-**Status**: Draft
+**Status**: Done (implemented + reviewed; released as `MisaConnect.ESign 2.1.0`)
 **Input**: Verified bug report [`bug-report.md`](./bug-report.md) (in this slice), cross-checked against source and `docs/misa-api-reference/Tài liệu tích hợp API eSign RemoteSigning - V2.md`.
 
 ## Summary

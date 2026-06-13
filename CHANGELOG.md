@@ -4,9 +4,9 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
-### `MisaConnect.ESign` (targets 2.1.0)
+## [2.1.0] - 2026-06-13
 
-Fixes MISA eSign RemoteSigning ESRM routing against environments where the auth app and the ESRM microservices live at different base paths (e.g. the auth app under `/webdev/`, ESRM at the host root). See `specs/006-fix-esrm-routing/`.
+`MisaConnect.ESign` — fixes MISA eSign RemoteSigning ESRM routing against environments where the auth app and the ESRM microservices live at different base paths (e.g. the auth app under `/webdev/`, ESRM at the host root). See `specs/006-fix-esrm-routing/`.
 
 #### Added
 
