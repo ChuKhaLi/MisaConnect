@@ -229,7 +229,23 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.CertificatesByUserId, ct).ConfigureAwait(false);
         }
 
-        var dtos = Deserialize<List<WireCertDto>>(json) ?? new List<WireCertDto>();
+        EnsureEsrmJsonResponse(resp, json, ESignHttpRoutes.CertificatesByUserId);
+
+        var dtos = Deserialize<List<WireCertDto>>(json);
+        if (dtos is null && !string.IsNullOrWhiteSpace(json))
+        {
+            // 2xx, JSON content-type, but the body did not parse as a certificate
+            // array — surface it rather than silently reporting "no active cert".
+            // Unlike the non-JSON guard (where the body is the SPA HTML), this body
+            // is a cert-endpoint payload that may carry PII, so report only its
+            // length — never its content.
+            throw new ESignGeneralException(
+                ESignErrorCategory.MisaUnknown,
+                "UnparseableResponse",
+                $"MISA {ESignHttpRoutes.CertificatesByUserId} returned a {(int)resp.StatusCode} success with a JSON content-type but a body ({json.Length} bytes) that could not be parsed as a certificate array.",
+                _correlation.Current);
+        }
+        dtos ??= new List<WireCertDto>();
         try
         {
             return CertificateMapper.ToDomain(dtos);
@@ -722,7 +738,15 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
 
     private HttpRequestMessage NewRequest(HttpMethod method, string relativePath, bool attachAuthorization = true)
     {
-        var req = new HttpRequestMessage(method, relativePath);
+        // The canonical route (relativePath) is passed verbatim to the error
+        // mappers; only the actual request path is reshaped here (login/two-factor
+        // gain a /webdev/ prefix for the Sandbox topology). ESRM/refresh/resend
+        // are identity, and the base address is the host origin, so ESRM lands at
+        // the host root regardless of any path in the configured BaseUrl.
+        var requestPath = ESignRouteResolver.ResolveRequestPath(
+            relativePath,
+            ESignRouteResolver.EffectiveAuthUnderWebdev(_options.Value));
+        var req = new HttpRequestMessage(method, requestPath);
         req.Headers.TryAddWithoutValidation(ClientIdHeader, _options.Value.ClientId);
         req.Headers.TryAddWithoutValidation(ClientKeyHeader, _options.Value.ClientKey);
         req.Headers.TryAddWithoutValidation(CorrelationIdHeader, _correlation.Current);
@@ -754,6 +778,37 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         {
             return default;
         }
+    }
+
+    private const int BodySnippetMax = 256;
+
+    private static bool IsJsonMediaType(string? mediaType) =>
+        mediaType is not null
+        && (mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
+            || mediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Guards an ESRM JSON endpoint against a <c>2xx</c> response whose body is not
+    /// JSON (Defect D). MISA serves its SPA <c>index.html</c> (<c>200 text/html</c>)
+    /// when an ESRM path is mis-routed; without this guard that silently
+    /// deserializes to an empty result and reads as a business state. The error
+    /// names the endpoint, the content type, and a truncated body snippet — never a
+    /// request header or token.
+    /// </summary>
+    private void EnsureEsrmJsonResponse(HttpResponseMessage resp, string body, string endpoint)
+    {
+        var mediaType = resp.Content?.Headers.ContentType?.MediaType;
+        if (IsJsonMediaType(mediaType))
+        {
+            return;
+        }
+        var snippet = body.Length > BodySnippetMax ? body.Substring(0, BodySnippetMax) : body;
+        throw new ESignGeneralException(
+            ESignErrorCategory.MisaUnknown,
+            "UnexpectedContentType",
+            $"MISA {endpoint} returned a {(int)resp.StatusCode} success with a non-JSON response " +
+            $"(content-type '{mediaType ?? "(none)"}'). This usually means the request was routed to the wrong host or path. Body snippet: {snippet}",
+            _correlation.Current);
     }
 
     private async Task ThrowMappedAsync(

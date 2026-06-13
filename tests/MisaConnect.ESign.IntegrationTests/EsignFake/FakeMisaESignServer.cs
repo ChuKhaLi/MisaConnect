@@ -36,6 +36,19 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
     public byte[] SignedWordBytes { get; set; } = new byte[] { 0x50, 0x4B, 0x03, 0x04, 0x57, 0x4F };
     public byte[] SignedExcelBytes { get; set; } = new byte[] { 0x50, 0x4B, 0x03, 0x04, 0x58, 0x4C };
     public string SignedXmlText { get; set; } = "<signed/>";
+
+    /// <summary>The <c>AuthorizationRM</c> bearer most recently seen on the ESRM
+    /// certificate-list endpoint (without the "Bearer " prefix), for assertions.</summary>
+    public string? LastCertificatesBearer { get; private set; }
+
+    /// <summary>The request path most recently seen on the login endpoint
+    /// (e.g. <c>/api/auth/...</c> vs <c>/webdev/api/auth/...</c>), for asserting
+    /// the resolved auth topology.</summary>
+    public string? LastLoginPath { get; private set; }
+
+    /// <summary>The request path most recently seen on the two-factor endpoint,
+    /// for asserting the resolved auth topology end-to-end.</summary>
+    public string? LastTwoFactorPath { get; private set; }
     public IReadOnlyList<RecordedTwoFactorRequest> TwoFactorBodies
     {
         get { lock (_twoFactorLock) { return _twoFactorBodies.ToArray(); } }
@@ -69,9 +82,14 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
 
         FakeMisaESignServer? self = null;
 
-        app.MapPost("/api/auth/api/v1/auth/login-api", async (HttpContext ctx) =>
+        // Login and two-factor are served at BOTH the host root (Production
+        // topology, per the API doc) and under /webdev/ (Sandbox topology). The
+        // SDK targets one or the other depending on Environment/AuthUnderWebdev;
+        // mapping both keeps the fake agnostic to that choice.
+        async Task LoginHandler(HttpContext ctx)
         {
             self!._counters.Login++;
+            self.LastLoginPath = ctx.Request.Path.Value;
             if (self._scenario.LoginAlways401)
             {
                 ctx.Response.StatusCode = 401;
@@ -90,11 +108,14 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
             ctx.Response.ContentType = "application/json";
             var body = "{\"status\":{\"code\":200,\"error\":false},\"data\":{\"accessToken\":\"raw-token\",\"remoteSigningAccessToken\":\"rs-token\",\"refreshToken\":\"refresh-token\",\"expiresIn\":3600,\"tokenType\":\"Bearer\",\"user\":{\"id\":\"user-id\",\"username\":\"alice\"}}}";
             await ctx.Response.WriteAsync(body);
-        });
+        }
+        app.MapPost("/api/auth/api/v1/auth/login-api", LoginHandler);
+        app.MapPost("/webdev/api/auth/api/v1/auth/login-api", LoginHandler);
 
-        app.MapPost("/api/auth/api/v1/auth/two-factor-auth", async (HttpContext ctx) =>
+        async Task TwoFactorHandler(HttpContext ctx)
         {
             self!._counters.TwoFactorAuth++;
+            self.LastTwoFactorPath = ctx.Request.Path.Value;
             using var reader = new StreamReader(ctx.Request.Body);
             var body = await reader.ReadToEndAsync();
             var hasAuthorizationRm = ctx.Request.Headers.ContainsKey("AuthorizationRM");
@@ -114,7 +135,9 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
             ctx.Response.ContentType = "application/json";
             var ok = "{\"status\":{\"code\":200,\"error\":false},\"data\":{\"accessToken\":\"raw-token-2fa\",\"remoteSigningAccessToken\":\"rs-token-2fa\",\"refreshToken\":\"refresh-token-2fa\",\"expiresIn\":3600,\"tokenType\":\"Bearer\",\"user\":{\"id\":\"user-id\",\"username\":\"alice\"}}}";
             await ctx.Response.WriteAsync(ok);
-        });
+        }
+        app.MapPost("/api/auth/api/v1/auth/two-factor-auth", TwoFactorHandler);
+        app.MapPost("/webdev/api/auth/api/v1/auth/two-factor-auth", TwoFactorHandler);
 
         app.MapPost("/webdev/api/auth/api/v1/auth/resend-otp-auth", async (HttpContext ctx) =>
         {
@@ -170,7 +193,11 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         app.MapGet("/external/esrm/service/general/api/v1/Certificates/by-userId", async (HttpContext ctx) =>
         {
             var headerAuth = ctx.Request.Headers["AuthorizationRM"].ToString();
-            if (self!._scenario.CertsForce401Once && Interlocked.Exchange(ref self._scenario._certs401Consumed, 1) == 0)
+            const string bearerPrefix = "Bearer ";
+            self!.LastCertificatesBearer = headerAuth.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)
+                ? headerAuth.Substring(bearerPrefix.Length)
+                : headerAuth;
+            if (self._scenario.CertsForce401Once && Interlocked.Exchange(ref self._scenario._certs401Consumed, 1) == 0)
             {
                 self._counters.Certificates++;
                 ctx.Response.StatusCode = 401;
@@ -179,11 +206,39 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
                 return;
             }
             self._counters.Certificates++;
+            if (self._scenario.CertsReturnHtml200)
+            {
+                ctx.Response.StatusCode = 200;
+                ctx.Response.ContentType = "text/html";
+                await ctx.Response.WriteAsync("<!DOCTYPE html><html><head><title>MISA</title></head><body>app</body></html>");
+                return;
+            }
+            if (self._scenario.CertsReturnNoContentType200)
+            {
+                // 200 with NO Content-Type header — raw Body write; Kestrel does not
+                // default a content-type for direct body writes.
+                ctx.Response.StatusCode = 200;
+                await ctx.Response.Body.WriteAsync(Encoding.UTF8.GetBytes("[]"));
+                return;
+            }
+            if (self._scenario.CertsReturnJsonNonArray200)
+            {
+                // 200 application/json whose body is valid JSON but NOT a cert array.
+                // The embedded marker proves the SDK error never echoes the body.
+                ctx.Response.StatusCode = 200;
+                ctx.Response.ContentType = "application/json";
+                await ctx.Response.WriteAsync("{\"error\":\"oops\",\"emailName\":\"leak@example.test\"}");
+                return;
+            }
             ctx.Response.StatusCode = 200;
-            ctx.Response.ContentType = "application/json";
+            ctx.Response.ContentType = self._scenario.CertsContentTypeOverride ?? "application/json";
+            if (self._scenario.CertsReturnEmptyArray200)
+            {
+                await ctx.Response.WriteAsync("[]");
+                return;
+            }
             var body = "[{\"userId\":\"user-id\",\"keyAlias\":\"key-alias-1\",\"appName\":\"misa\",\"keyStatus\":\"ACTIVE\",\"certStatus\":\"ACTIVE\",\"certificate\":\"BASE64CERT\",\"certiticateChain\":[\"SIGN\",\"INTERMEDIATE\",\"ROOT\"],\"effectiveDate\":\"2026-01-01T00:00:00Z\",\"expirationDate\":\"2027-01-01T00:00:00Z\",\"emailName\":\"alice@example.com\",\"isAutoSign\":false}]";
             await ctx.Response.WriteAsync(body);
-            _ = headerAuth;
         });
 
         app.MapPost("/external/esrm/service/document/api/v1/documents/hash", async (HttpContext ctx) =>
@@ -460,6 +515,11 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         public bool StatusAlwaysPending { get; set; }
         public bool LoginAlways401 { get; set; }
         public bool CertsForce401Once { get; set; }
+        public bool CertsReturnHtml200 { get; set; }
+        public bool CertsReturnEmptyArray200 { get; set; }
+        public bool CertsReturnJsonNonArray200 { get; set; }
+        public bool CertsReturnNoContentType200 { get; set; }
+        public string? CertsContentTypeOverride { get; set; }
         public bool LoginRequires2FAOnFirstCall { get; set; }
         public string? NextTwoFactorErrorCode { get; set; }
         public ResendOtpResponseMode ResendOtpMode { get; set; } = ResendOtpResponseMode.Success200;

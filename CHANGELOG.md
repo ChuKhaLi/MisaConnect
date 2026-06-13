@@ -4,6 +4,23 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-06-13
+
+`MisaConnect.ESign` — fixes MISA eSign RemoteSigning ESRM routing against environments where the auth app and the ESRM microservices live at different base paths (e.g. the auth app under `/webdev/`, ESRM at the host root). See `specs/006-fix-esrm-routing/`.
+
+#### Added
+
+- `MisaESignOptions.AuthUnderWebdev` (`bool?`, default `null`) — overrides where the `login` / `two-factor` endpoints are served. `null` derives from `Environment` (Sandbox ⇒ under `/webdev/`, Production ⇒ host root, per the API doc); `true`/`false` force it. Does not affect refresh/resend (always `/webdev/`) or ESRM (always host root). Additive, non-breaking.
+
+#### Fixed
+
+- **ESRM calls no longer route under the configured base path.** `Misa:ESign:BaseUrl` is now normalized to its origin (scheme + host), so ESRM endpoints (`external/esrm/…`) always resolve at the host root and `refreshtoken`/`resend-otp` resolve with a single `/webdev/` segment — regardless of whether the configured base URL includes a path such as `/webdev/`. Previously a `/webdev/`-suffixed base sent cert-list/signing requests to `…/webdev/external/esrm/…`, which returned the SPA `index.html`. **No consumer configuration change is required** (the path is tolerated).
+- **A non-JSON success on an ESRM endpoint now fails loudly.** A `2xx` response whose body is not JSON (e.g. `text/html`) on the certificate-list endpoint raises a clear `ESignGeneralException` naming the endpoint and content type (with a truncated body snippet, no secrets) instead of silently collapsing into an empty list / "no active certificate". A legitimately empty JSON array still surfaces as "no active certificate".
+
+#### Notes
+
+- The remote-signing bearer (`AuthorizationRM` = `remoteSigningAccessToken`) was investigated and confirmed already correct; no token-selection change was made.
+
 ## [2.0.2] - 2026-05-23
 
 Documentation patch. No source code or public API changes.
