@@ -63,5 +63,5 @@ Never log secrets, tokens, or buyer PII (names, addresses, line-item content). R
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-[specs/005-release-esign-2-0/plan.md](specs/005-release-esign-2-0/plan.md).
+[specs/006-fix-esrm-routing/plan.md](specs/006-fix-esrm-routing/plan.md).
 <!-- SPECKIT END -->
