@@ -125,4 +125,21 @@ public class ESignRouteResolverTests
             "https://esignapp.misa.vn/webdev/api/auth/api/v1/auth/login-api",
             new Uri(origin, path).ToString());
     }
+
+    // ---- All five ESRM routes resolve at the host root, even with a port +
+    //      deep path in the base, and regardless of the auth flag (Contract C1) ----
+
+    [Theory]
+    [InlineData(ESignHttpRoutes.CertificatesByUserId)]
+    [InlineData(ESignHttpRoutes.DocumentsHash)]
+    [InlineData(ESignHttpRoutes.SigningHash)]
+    [InlineData(ESignHttpRoutes.SigningStatus)]
+    [InlineData(ESignHttpRoutes.DocumentsAttachment)]
+    public void All_esrm_routes_resolve_at_host_root_with_port_and_deep_path_base(string route)
+    {
+        var origin = ESignRouteResolver.Origin("https://host:8443/a/b/c/");
+        // authUnderWebdev=true to prove the flag never shifts ESRM off the root.
+        var absolute = new Uri(origin, ESignRouteResolver.ResolveRequestPath(route, authUnderWebdev: true));
+        Assert.Equal("https://host:8443/" + route, absolute.ToString());
+    }
 }

@@ -65,12 +65,17 @@ All decisions below are grounded in the verified [bug-report.md](./bug-report.md
 
 ## D6 — Body-snippet sanitization (no secret leakage)
 
-**Decision**: The D4 exception message includes only the **response body** snippet (truncated, e.g. first ~256 chars) and the response content type/endpoint. It never includes request headers, the `AuthorizationRM` bearer, or credentials. Existing log scrubbing (`ESignLogScrubber`) remains in force for logs.
+**Decision**: The two Defect-D guards treat the response body differently by how sensitive it can be:
+- **Non-JSON content-type guard** (`EnsureEsrmJsonResponse`, e.g. `text/html`): includes a truncated (~256 char) body snippet + content type + endpoint. The body here is MISA's SPA `index.html` — non-sensitive — and the snippet is the key routing-diagnosis signal.
+- **JSON-but-unparseable guard** (`UnparseableResponse` in the cert-list path): reports only the body **length** + content type + endpoint, **never the body content**. This body is a cert-endpoint JSON payload that can carry PII (e.g. `emailName`) or cert material, so it is not echoed.
 
-**Rationale**: Satisfies Principle VIII / FR-007. The SPA HTML body is non-sensitive; truncation bounds accidental inclusion of anything unexpected.
+Neither path ever includes request headers, the `AuthorizationRM` bearer, or credentials.
+
+**Rationale**: Satisfies Principle VIII / FR-007 while keeping the routing-error case (HTML) diagnosable. (Hardened after code review flagged that the cert-endpoint body could otherwise embed PII into an exception message a consumer might log; the SDK itself never logs `ex.Message` — `ESignCallLogger` logs only category + raw code.)
 
 **Alternatives considered**:
-- *Include full body*. Unbounded log/exception size; truncation preferred.
+- *Include full body*. Unbounded log/exception size; truncation/length-only preferred.
+- *Echo a snippet for the unparseable-JSON case too*. Rejected — the cert-endpoint body may carry PII; length-only is sufficient to diagnose.
 
 ---
 

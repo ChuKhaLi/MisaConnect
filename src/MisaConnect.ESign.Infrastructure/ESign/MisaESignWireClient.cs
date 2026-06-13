@@ -236,11 +236,13 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         {
             // 2xx, JSON content-type, but the body did not parse as a certificate
             // array — surface it rather than silently reporting "no active cert".
-            var snippet = json.Length > BodySnippetMax ? json.Substring(0, BodySnippetMax) : json;
+            // Unlike the non-JSON guard (where the body is the SPA HTML), this body
+            // is a cert-endpoint payload that may carry PII, so report only its
+            // length — never its content.
             throw new ESignGeneralException(
                 ESignErrorCategory.MisaUnknown,
                 "UnparseableResponse",
-                $"MISA {ESignHttpRoutes.CertificatesByUserId} returned a {(int)resp.StatusCode} success whose body could not be parsed as a certificate array. Body snippet: {snippet}",
+                $"MISA {ESignHttpRoutes.CertificatesByUserId} returned a {(int)resp.StatusCode} success with a JSON content-type but a body ({json.Length} bytes) that could not be parsed as a certificate array.",
                 _correlation.Current);
         }
         dtos ??= new List<WireCertDto>();

@@ -45,4 +45,70 @@ public class EsrmContentTypeGuardFakeServerTests
         await Assert.ThrowsAsync<NoActiveCertificateException>(
             () => client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
     }
+
+    [Fact]
+    public async Task Unparseable_json_cert_body_throws_clear_error_without_echoing_body()
+    {
+        await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.CertsReturnJsonNonArray200 = true; // 200 application/json, not a cert array
+        await using var sp = TestServiceProvider.Build(server.BaseUrl);
+
+        using var scope = sp.CreateAsyncScope();
+        var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
+
+        var ex = await Assert.ThrowsAsync<ESignGeneralException>(
+            () => client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
+
+        Assert.Contains("Certificates/by-userId", ex.Message);
+        // The cert-endpoint body can carry PII (e.g. emailName); the error must NOT echo it.
+        Assert.DoesNotContain("leak@example.test", ex.Message);
+        Assert.DoesNotContain("rs-token", ex.Message);
+    }
+
+    [Fact]
+    public async Task Plus_json_content_type_is_accepted_and_parses()
+    {
+        await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.CertsContentTypeOverride = "application/vnd.api+json";
+        await using var sp = TestServiceProvider.Build(server.BaseUrl);
+
+        using var scope = sp.CreateAsyncScope();
+        var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
+        var result = await client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None);
+
+        Assert.NotNull(result.SignedPdf); // +json is treated as JSON and parses
+    }
+
+    [Fact]
+    public async Task Non_json_non_html_content_type_throws_clear_error()
+    {
+        await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.CertsContentTypeOverride = "text/plain";
+        await using var sp = TestServiceProvider.Build(server.BaseUrl);
+
+        using var scope = sp.CreateAsyncScope();
+        var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
+
+        var ex = await Assert.ThrowsAsync<ESignGeneralException>(
+            () => client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
+
+        Assert.Contains("Certificates/by-userId", ex.Message);
+        Assert.Contains("text/plain", ex.Message);
+    }
+
+    [Fact]
+    public async Task Missing_content_type_throws_clear_error()
+    {
+        await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.CertsReturnNoContentType200 = true;
+        await using var sp = TestServiceProvider.Build(server.BaseUrl);
+
+        using var scope = sp.CreateAsyncScope();
+        var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
+
+        var ex = await Assert.ThrowsAsync<ESignGeneralException>(
+            () => client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
+
+        Assert.Contains("Certificates/by-userId", ex.Message);
+    }
 }

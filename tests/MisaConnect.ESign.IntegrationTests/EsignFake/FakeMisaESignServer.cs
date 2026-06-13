@@ -45,6 +45,10 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
     /// (e.g. <c>/api/auth/...</c> vs <c>/webdev/api/auth/...</c>), for asserting
     /// the resolved auth topology.</summary>
     public string? LastLoginPath { get; private set; }
+
+    /// <summary>The request path most recently seen on the two-factor endpoint,
+    /// for asserting the resolved auth topology end-to-end.</summary>
+    public string? LastTwoFactorPath { get; private set; }
     public IReadOnlyList<RecordedTwoFactorRequest> TwoFactorBodies
     {
         get { lock (_twoFactorLock) { return _twoFactorBodies.ToArray(); } }
@@ -111,6 +115,7 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         async Task TwoFactorHandler(HttpContext ctx)
         {
             self!._counters.TwoFactorAuth++;
+            self.LastTwoFactorPath = ctx.Request.Path.Value;
             using var reader = new StreamReader(ctx.Request.Body);
             var body = await reader.ReadToEndAsync();
             var hasAuthorizationRm = ctx.Request.Headers.ContainsKey("AuthorizationRM");
@@ -208,8 +213,25 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
                 await ctx.Response.WriteAsync("<!DOCTYPE html><html><head><title>MISA</title></head><body>app</body></html>");
                 return;
             }
+            if (self._scenario.CertsReturnNoContentType200)
+            {
+                // 200 with NO Content-Type header — raw Body write; Kestrel does not
+                // default a content-type for direct body writes.
+                ctx.Response.StatusCode = 200;
+                await ctx.Response.Body.WriteAsync(Encoding.UTF8.GetBytes("[]"));
+                return;
+            }
+            if (self._scenario.CertsReturnJsonNonArray200)
+            {
+                // 200 application/json whose body is valid JSON but NOT a cert array.
+                // The embedded marker proves the SDK error never echoes the body.
+                ctx.Response.StatusCode = 200;
+                ctx.Response.ContentType = "application/json";
+                await ctx.Response.WriteAsync("{\"error\":\"oops\",\"emailName\":\"leak@example.test\"}");
+                return;
+            }
             ctx.Response.StatusCode = 200;
-            ctx.Response.ContentType = "application/json";
+            ctx.Response.ContentType = self._scenario.CertsContentTypeOverride ?? "application/json";
             if (self._scenario.CertsReturnEmptyArray200)
             {
                 await ctx.Response.WriteAsync("[]");
@@ -495,6 +517,9 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         public bool CertsForce401Once { get; set; }
         public bool CertsReturnHtml200 { get; set; }
         public bool CertsReturnEmptyArray200 { get; set; }
+        public bool CertsReturnJsonNonArray200 { get; set; }
+        public bool CertsReturnNoContentType200 { get; set; }
+        public string? CertsContentTypeOverride { get; set; }
         public bool LoginRequires2FAOnFirstCall { get; set; }
         public string? NextTwoFactorErrorCode { get; set; }
         public ResendOtpResponseMode ResendOtpMode { get; set; } = ResendOtpResponseMode.Success200;
