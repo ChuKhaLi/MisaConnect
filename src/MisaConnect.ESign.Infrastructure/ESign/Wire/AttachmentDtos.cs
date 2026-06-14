@@ -10,17 +10,20 @@ internal sealed class AttachmentRequestDto
     [JsonPropertyName("certificateChain")]
     public List<string> CertificateChain { get; set; } = new();
 
+    // Slice 007: nullable with a null default so WhenWritingNull omits the
+    // document-type arrays not in use (see HashRequestDto). Each build site
+    // assigns exactly one.
     [JsonPropertyName("pdfDocs")]
-    public List<AttachmentPdfDocRequestDto> PdfDocs { get; set; } = new();
+    public List<AttachmentPdfDocRequestDto>? PdfDocs { get; set; }
 
     [JsonPropertyName("xmlDocs")]
-    public List<XmlAttachmentDocRequestDto> XmlDocs { get; set; } = new();
+    public List<XmlAttachmentDocRequestDto>? XmlDocs { get; set; }
 
     [JsonPropertyName("wordDocs")]
-    public List<WordExcelAttachmentDocRequestDto> WordDocs { get; set; } = new();
+    public List<WordExcelAttachmentDocRequestDto>? WordDocs { get; set; }
 
     [JsonPropertyName("excelDocs")]
-    public List<WordExcelAttachmentDocRequestDto> ExcelDocs { get; set; } = new();
+    public List<WordExcelAttachmentDocRequestDto>? ExcelDocs { get; set; }
 }
 
 internal sealed class AttachmentPdfDocRequestDto

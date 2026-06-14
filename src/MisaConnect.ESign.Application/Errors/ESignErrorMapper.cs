@@ -36,9 +36,41 @@ public static class ESignErrorMapper
         HttpStatusCode? lastStatusCode = null,
         string? userName = null,
         DocumentFormat requestedFormat = DocumentFormat.Pdf)
+        => Map(
+            endpoint,
+            statusCode,
+            envelope,
+            correlationId,
+            includeRawErrorMessage,
+            transactionId,
+            attemptCount,
+            lastStatusCode,
+            userName,
+            requestedFormat,
+            validationFailuresDetail: null);
+
+    /// <summary>
+    /// Slice 007 overload: <paramref name="validationFailuresDetail"/> is a
+    /// pre-rendered, sanitized string of MISA's per-property failures. It feeds
+    /// only the human-readable detail (under <paramref name="includeRawErrorMessage"/>)
+    /// and is never used for error-code synthesis, so synthesized codes are
+    /// unchanged. Internal so the public surface stays stable (patch release).
+    /// </summary>
+    internal static ESignException Map(
+        string endpoint,
+        int statusCode,
+        ResponseError? envelope,
+        string correlationId,
+        bool includeRawErrorMessage,
+        string? transactionId,
+        int? attemptCount,
+        HttpStatusCode? lastStatusCode,
+        string? userName,
+        DocumentFormat requestedFormat,
+        string? validationFailuresDetail)
     {
         var rawCode = envelope?.ErrorCode;
-        var detail = BuildDetail(endpoint, rawCode, envelope, includeRawErrorMessage);
+        var detail = BuildDetail(endpoint, rawCode, envelope, includeRawErrorMessage, validationFailuresDetail);
 
         if (statusCode == (int)HttpStatusCode.Unauthorized && !IsAuthEndpoint(endpoint))
         {
@@ -188,14 +220,23 @@ public static class ESignErrorMapper
         return false;
     }
 
-    private static string BuildDetail(string endpoint, string? rawCode, ResponseError? envelope, bool includeRawErrorMessage)
+    private static string BuildDetail(
+        string endpoint,
+        string? rawCode,
+        ResponseError? envelope,
+        bool includeRawErrorMessage,
+        string? validationFailuresDetail = null)
     {
         var summary = $"MISA returned errorCode={rawCode ?? "<none>"} on {endpoint}.";
-        if (!includeRawErrorMessage || envelope is null) return summary;
+        if (!includeRawErrorMessage) return summary;
 
-        var parts = new List<string>(3) { summary };
-        if (!string.IsNullOrWhiteSpace(envelope.UserMsg)) parts.Add($"userMsg={envelope.UserMsg}");
-        if (!string.IsNullOrWhiteSpace(envelope.DevMsg)) parts.Add($"devMsg={envelope.DevMsg}");
+        var parts = new List<string>(4) { summary };
+        if (envelope is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(envelope.UserMsg)) parts.Add($"userMsg={envelope.UserMsg}");
+            if (!string.IsNullOrWhiteSpace(envelope.DevMsg)) parts.Add($"devMsg={envelope.DevMsg}");
+        }
+        if (!string.IsNullOrWhiteSpace(validationFailuresDetail)) parts.Add(validationFailuresDetail);
         return string.Join(" | ", parts);
     }
 

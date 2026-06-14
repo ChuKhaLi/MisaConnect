@@ -28,7 +28,9 @@ internal static class XmlSignatureContextMapper
             DisplayText = source.SignatureDescription.DisplayText,
         },
         // Visual fields (TextColor, PositionX/Y, Width, Height, FontSize,
-        // FontData, SignatureImage, Page, SignaturePosInfos) are left
-        // null/default — JsonIgnore on the wire DTO omits them.
+        // FontData, SignatureImage, Page, SignaturePosInfos) are left null —
+        // the wire profile's global DefaultIgnoreCondition = WhenWritingNull
+        // (ESignJsonOptions.Wire) omits null members. XML signatures are not
+        // page-positioned, so Page is intentionally absent here (no default).
     };
 }

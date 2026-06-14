@@ -249,6 +249,18 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
             var requested = DetectFormat(bodyText);
             lock (self._formatLock) { self._hashRequests.Add(new RecordedFormatRequest(bodyText, requested)); }
 
+            // Slice 007 regression guard (always on): MISA rejects a request that
+            // carries any document-type array present-but-empty ([]). The SDK must
+            // omit unused arrays entirely.
+            var hashEmpty = PresentEmptyDocArrays(bodyText);
+            if (hashEmpty.Count > 0)
+            {
+                ctx.Response.StatusCode = 400;
+                ctx.Response.ContentType = "application/json";
+                await ctx.Response.WriteAsync(BuildEmptyArrayRejectionBody(hashEmpty));
+                return;
+            }
+
             if (self._scenario.HashRejectionForFormat is { } rej && rej.format == requested)
             {
                 ctx.Response.StatusCode = rej.statusCode;
@@ -310,6 +322,16 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
             var requested = DetectFormat(bodyText);
             lock (self._formatLock) { self._attachmentRequests.Add(new RecordedFormatRequest(bodyText, requested)); }
 
+            // Slice 007 regression guard (always on): reject present-but-empty arrays.
+            var attachEmpty = PresentEmptyDocArrays(bodyText);
+            if (attachEmpty.Count > 0)
+            {
+                ctx.Response.StatusCode = 400;
+                ctx.Response.ContentType = "application/json";
+                await ctx.Response.WriteAsync(BuildEmptyArrayRejectionBody(attachEmpty));
+                return;
+            }
+
             if (self._scenario.AttachmentRejectionForFormat is { } rej && rej.format == requested)
             {
                 ctx.Response.StatusCode = rej.statusCode;
@@ -351,6 +373,44 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
 
     private static bool TryArrayHas(JsonElement root, string prop) =>
         root.TryGetProperty(prop, out var arr) && arr.ValueKind == JsonValueKind.Array && arr.GetArrayLength() > 0;
+
+    private static readonly string[] DocArrayNames = { "pdfDocs", "xmlDocs", "wordDocs", "excelDocs" };
+
+    /// <summary>Slice 007: document-type arrays present in the body as an empty
+    /// <c>[]</c> — MISA rejects these; the SDK must omit unused arrays entirely.</summary>
+    private static IReadOnlyList<string> PresentEmptyDocArrays(string body)
+    {
+        var hits = new List<string>();
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            foreach (var name in DocArrayNames)
+            {
+                if (root.TryGetProperty(name, out var arr) && arr.ValueKind == JsonValueKind.Array && arr.GetArrayLength() == 0)
+                {
+                    hits.Add(name);
+                }
+            }
+        }
+        catch (JsonException) { }
+        return hits;
+    }
+
+    /// <summary>Mirrors the captured MISA 400 (bug-report.md): a generic
+    /// <c>errorCode</c> plus per-property <c>validationFailures</c>.</summary>
+    private static string BuildEmptyArrayRejectionBody(IReadOnlyList<string> emptyArrays)
+    {
+        var failures = string.Join(",", emptyArrays.Select(n =>
+        {
+            var prop = char.ToUpperInvariant(n[0]) + n.Substring(1); // MISA uses PascalCase property names
+            return $"{{\"property\":\"{prop}\",\"failureReason\":\"Phải có ít nhất 1 tài liệu\"}}";
+        }));
+        return "{\"error\":null,\"errorCode\":\"e400\"," +
+               "\"devMsg\":\"Dữ liệu truyền lên không chính xác, vui lòng xem trong trường ValidationFailures.\"," +
+               "\"userMsg\":\"Dữ liệu truyền lên không chính xác, vui lòng xem trong trường ValidationFailures.\"," +
+               "\"validationFailures\":[" + failures + "]}";
+    }
 
     private static string BuildHashResponseBody(RequestedFormat requested, Scenario scenario)
     {

@@ -63,10 +63,20 @@ a single-format request now emits exactly that one key.
 `ResponseErrorDto` is `internal` (Infrastructure). New nested DTO mirrors MISA's response field
 names verbatim (Principle IV).
 
+> **Implementation finding (defect 5):** `ResponseErrorDto.Error` was a non-nullable `bool`, but
+> MISA's 400 body sends `"error": null`. Deserialization threw, the wire client's `Deserialize<T>`
+> swallowed it, and the envelope (including `errorCode` and `validationFailures`) was lost —
+> surfacing as `errorCode=<none>`. `Error` is now `bool?` (mapped to the domain `ResponseError.Error`
+> as `dto.Error ?? false`, leaving the public record unchanged). This is the actual cause of the
+> report's `errorCode=<none>`, and is required for `validationFailures` to be readable at all.
+
 ```csharp
 internal sealed class ResponseErrorDto
 {
-    // existing: error / errorCode / devMsg / userMsg ...
+    // existing: errorCode / devMsg / userMsg ...
+    [JsonPropertyName("error")]
+    public bool? Error { get; set; }   // slice 007: nullable — MISA sends "error":null
+
     [JsonPropertyName("validationFailures")]
     public List<ValidationFailureDto>? ValidationFailures { get; set; }
 }

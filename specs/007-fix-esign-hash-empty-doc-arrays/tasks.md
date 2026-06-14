@@ -29,8 +29,8 @@ description: "Task list for slice 007 — fix ESRM hash/attachment empty-doc-arr
 
 **Purpose**: Establish a green baseline and confirm the layout the new tests/impl will use.
 
-- [ ] T001 Build the solution and run the ESign suites to confirm a green baseline: `dotnet build MisaConnect.slnx`, `dotnet test tests/MisaConnect.ESign.UnitTests`, `dotnet test tests/MisaConnect.ESign.IntegrationTests` (sandbox facts skip without creds).
-- [ ] T002 Confirm conventions and entry points the later phases use: the six request-build sites in `src/MisaConnect.ESign.Infrastructure/ESign/MisaESignWireClient.cs` (`HashPdfAsync`, `HashXmlAsync`, `HashWordOrExcelAsync`, `AttachSignatureAsync`, `AttachSignatureToXmlAsync`, `AttachSignatureToWordExcelAsync`); `ESignJsonOptions.Wire` (the serializer to use in serialization tests); the `documents/hash` + `documents/attachment` handlers and format detection in `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs`; the unit-test folders `tests/MisaConnect.ESign.UnitTests/Signing/` and `.../Errors/`, plus the logging-capture helper in `tests/MisaConnect.ESign.UnitTests/Logging/` + `TestSupport/`.
+- [x] T001 Build the solution and run the ESign suites to confirm a green baseline: `dotnet build MisaConnect.slnx`, `dotnet test tests/MisaConnect.ESign.UnitTests`, `dotnet test tests/MisaConnect.ESign.IntegrationTests` (sandbox facts skip without creds).
+- [x] T002 Confirm conventions and entry points the later phases use: the six request-build sites in `src/MisaConnect.ESign.Infrastructure/ESign/MisaESignWireClient.cs` (`HashPdfAsync`, `HashXmlAsync`, `HashWordOrExcelAsync`, `AttachSignatureAsync`, `AttachSignatureToXmlAsync`, `AttachSignatureToWordExcelAsync`); `ESignJsonOptions.Wire` (the serializer to use in serialization tests); the `documents/hash` + `documents/attachment` handlers and format detection in `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs`; the unit-test folders `tests/MisaConnect.ESign.UnitTests/Signing/` and `.../Errors/`, plus the logging-capture helper in `tests/MisaConnect.ESign.UnitTests/Logging/` + `TestSupport/`.
 
 ---
 
@@ -38,7 +38,7 @@ description: "Task list for slice 007 — fix ESRM hash/attachment empty-doc-arr
 
 **Purpose**: A small, behavior-preserving cleanup before editing this area. No cross-story prerequisite exists (the three fixes are independent), so this phase is intentionally minimal.
 
-- [ ] T003 [P] Fix the misleading comment at `src/MisaConnect.ESign.Infrastructure/ESign/Mapping/XmlSignatureContextMapper.cs:30-32`: the `Page` omission is the global `DefaultIgnoreCondition = WhenWritingNull` in `ESignJsonOptions`, not a per-property `[JsonIgnore]`. Comment-only; no behavior change (research D4).
+- [x] T003 [P] Fix the misleading comment at `src/MisaConnect.ESign.Infrastructure/ESign/Mapping/XmlSignatureContextMapper.cs:30-32`: the `Page` omission is the global `DefaultIgnoreCondition = WhenWritingNull` in `ESignJsonOptions`, not a per-property `[JsonIgnore]`. Comment-only; no behavior change (research D4).
 
 **Checkpoint**: Solution still builds; all existing tests still pass.
 
@@ -52,15 +52,15 @@ description: "Task list for slice 007 — fix ESRM hash/attachment empty-doc-arr
 
 ### Tests for User Story 1 (write first — MUST fail) ⚠️
 
-- [ ] T004 [P] [US1] Unit test `tests/MisaConnect.ESign.UnitTests/Signing/Wire/HashRequestSerializationTests.cs`: for each of PDF, XML, Word, Excel, serialize a `HashRequestDto` populated as the corresponding build site does, using `ESignJsonOptions.Wire`; assert the matching key (`pdfDocs`/`xmlDocs`/`wordDocs`/`excelDocs`) is present and the other three keys are **absent**, and `certificate`/`certificateChain` are present. Contracts C1/C2.
-- [ ] T005 [P] [US1] Unit test `tests/MisaConnect.ESign.UnitTests/Signing/Wire/AttachmentRequestSerializationTests.cs`: same assertions for the four `AttachmentRequestDto` paths (PDF, XML, Word, Excel). Contracts C1/C2.
-- [ ] T006 [P] [US1] Integration regression in `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs`: make the `documents/hash` and `documents/attachment` handlers return **HTTP 400** with a MISA-shaped body (`errorCode`, `devMsg`/`userMsg`, and `validationFailures: [{property, failureReason}]`) when any of `pdfDocs`/`xmlDocs`/`wordDocs`/`excelDocs` is **present-but-empty**; otherwise behave as today. Add/extend an `EndToEnd` test asserting `SignPdfAsync` and one non-PDF flow complete successfully. (Existing happy-path E2E sign tests will go RED here — that is the regression guard exposing the bug; US1 impl turns them green.) Spec SC-001/SC-002; this 400 body is reused by US3.
+- [x] T004 [P] [US1] Unit test `tests/MisaConnect.ESign.UnitTests/Signing/Wire/HashRequestSerializationTests.cs`: for each of PDF, XML, Word, Excel, serialize a `HashRequestDto` populated as the corresponding build site does, using `ESignJsonOptions.Wire`; assert the matching key (`pdfDocs`/`xmlDocs`/`wordDocs`/`excelDocs`) is present and the other three keys are **absent**, and `certificate`/`certificateChain` are present. Contracts C1/C2.
+- [x] T005 [P] [US1] Unit test `tests/MisaConnect.ESign.UnitTests/Signing/Wire/AttachmentRequestSerializationTests.cs`: same assertions for the four `AttachmentRequestDto` paths (PDF, XML, Word, Excel). Contracts C1/C2.
+- [x] T006 [P] [US1] Integration regression in `tests/MisaConnect.ESign.IntegrationTests/EsignFake/FakeMisaESignServer.cs`: make the `documents/hash` and `documents/attachment` handlers return **HTTP 400** with a MISA-shaped body (`errorCode`, `devMsg`/`userMsg`, and `validationFailures: [{property, failureReason}]`) when any of `pdfDocs`/`xmlDocs`/`wordDocs`/`excelDocs` is **present-but-empty**; otherwise behave as today. Add/extend an `EndToEnd` test asserting `SignPdfAsync` and one non-PDF flow complete successfully. (Existing happy-path E2E sign tests will go RED here — that is the regression guard exposing the bug; US1 impl turns them green.) Spec SC-001/SC-002; this 400 body is reused by US3.
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] In `src/MisaConnect.ESign.Infrastructure/ESign/Wire/HashDtos.cs`, change `HashRequestDto.PdfDocs`/`XmlDocs`/`WordDocs`/`ExcelDocs` from `List<…> = new()` to `List<…>?` (remove the initializers). Leave `Certificate` and `CertificateChain` non-null. data-model §1.
-- [ ] T008 [US1] In `src/MisaConnect.ESign.Infrastructure/ESign/Wire/AttachmentDtos.cs`, change `AttachmentRequestDto.PdfDocs`/`XmlDocs`/`WordDocs`/`ExcelDocs` to `List<…>?` (remove initializers); leave `Certificate`/`CertificateChain` non-null. data-model §1.
-- [ ] T009 [US1] Run US1 tests + the full ESign suite; confirm red→green and no regression (the formerly-failing E2E sign tests now pass).
+- [x] T007 [US1] In `src/MisaConnect.ESign.Infrastructure/ESign/Wire/HashDtos.cs`, change `HashRequestDto.PdfDocs`/`XmlDocs`/`WordDocs`/`ExcelDocs` from `List<…> = new()` to `List<…>?` (remove the initializers). Leave `Certificate` and `CertificateChain` non-null. data-model §1.
+- [x] T008 [US1] In `src/MisaConnect.ESign.Infrastructure/ESign/Wire/AttachmentDtos.cs`, change `AttachmentRequestDto.PdfDocs`/`XmlDocs`/`WordDocs`/`ExcelDocs` to `List<…>?` (remove initializers); leave `Certificate`/`CertificateChain` non-null. data-model §1.
+- [x] T009 [US1] Run US1 tests + the full ESign suite; confirm red→green and no regression (the formerly-failing E2E sign tests now pass).
 
 **Checkpoint**: All four hash and four attachment flows omit unused arrays; signing succeeds against the fake. MVP complete.
 
@@ -74,13 +74,13 @@ description: "Task list for slice 007 — fix ESRM hash/attachment empty-doc-arr
 
 ### Tests for User Story 2 (write first — MUST fail) ⚠️
 
-- [ ] T010 [P] [US2] Unit test `tests/MisaConnect.ESign.UnitTests/Signing/Wire/SignatureInfoPageDefaultTests.cs`: exercise the PDF/Word/Excel hash build paths (via the wire client against the fake, or by invoking the mapping) with `SignatureInfo.Page = null` → serialized `Page == 1` AND a structured log entry (captured via the `Logging`/`TestSupport` logger helper) records the default; with explicit `Page = N (≥1)` → `Page == N` and no defaulting log. Contract C3.
-- [ ] T011 [P] [US2] Unit test (in the same file or `tests/MisaConnect.ESign.UnitTests/Signing/SignPdfRequestValidatorTests` area) confirming an explicit `Page < 1` is still rejected client-side before any HTTP call (FR-005, guard against regression).
+- [x] T010 [P] [US2] Unit test `tests/MisaConnect.ESign.UnitTests/Signing/Wire/SignatureInfoPageDefaultTests.cs`: exercise the PDF/Word/Excel hash build paths (via the wire client against the fake, or by invoking the mapping) with `SignatureInfo.Page = null` → serialized `Page == 1` AND a structured log entry (captured via the `Logging`/`TestSupport` logger helper) records the default; with explicit `Page = N (≥1)` → `Page == N` and no defaulting log. Contract C3.
+- [x] T011 [P] [US2] Unit test (in the same file or `tests/MisaConnect.ESign.UnitTests/Signing/SignPdfRequestValidatorTests` area) confirming an explicit `Page < 1` is still rejected client-side before any HTTP call (FR-005, guard against regression).
 
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] In `src/MisaConnect.ESign.Infrastructure/ESign/MisaESignWireClient.cs`, make `ToWireSignatureInfo` an **instance** method (drop `static`) so it can use `_logger`/`_correlation`; set `Page = source.Page ?? 1`; when `source.Page is null`, emit a structured log (Debug/Information, correlation-scoped, no PII) recording that `Page` defaulted to 1 for the requested format. Its call sites (`HashPdfAsync`, `HashWordOrExcelAsync` Word/Excel) are already instance methods. The XML path (`XmlSignatureContextMapper`) is unchanged. data-model §2, research D2.
-- [ ] T013 [US2] Run US2 tests + the full ESign suite; confirm red→green and no regression.
+- [x] T012 [US2] In `src/MisaConnect.ESign.Infrastructure/ESign/MisaESignWireClient.cs`, make `ToWireSignatureInfo` an **instance** method (drop `static`) so it can use `_logger`/`_correlation`; set `Page = source.Page ?? 1`; when `source.Page is null`, emit a structured log (Debug/Information, correlation-scoped, no PII) recording that `Page` defaulted to 1 for the requested format. Its call sites (`HashPdfAsync`, `HashWordOrExcelAsync` Word/Excel) are already instance methods. The XML path (`XmlSignatureContextMapper`) is unchanged. data-model §2, research D2.
+- [x] T013 [US2] Run US2 tests + the full ESign suite; confirm red→green and no regression.
 
 **Checkpoint**: A sign with an unset `Page` succeeds and is logged; explicit `Page` preserved; XML unaffected.
 
@@ -94,15 +94,15 @@ description: "Task list for slice 007 — fix ESRM hash/attachment empty-doc-arr
 
 ### Tests for User Story 3 (write first — MUST fail) ⚠️
 
-- [ ] T014 [P] [US3] Unit test `tests/MisaConnect.ESign.UnitTests/Errors/ValidationFailuresDetailTests.cs`: given a `ResponseErrorDto`/400 body with `validationFailures` on the hash endpoint — with `IncludeRawErrorMessage = true`, the thrown `ESignGeneralException.Detail` contains each `[property] failureReason`; with `false`, it contains none of them (and no `devMsg`/`userMsg`); `RawCode` (e.g. `"e400"`) and `Category` (`HashRejected`) are identical in both cases. Absent `validationFailures` ⇒ detail unchanged. Contracts C4/C5/C6.
-- [ ] T015 [P] [US3] Unit test that `ResponseErrorDto` deserializes `validationFailures` (`[{property, failureReason}]`, camelCase) from a MISA-shaped 400 body, and that entries with missing fields render defensively without throwing. data-model §3, Contract C6.
+- [x] T014 [P] [US3] Unit test `tests/MisaConnect.ESign.UnitTests/Errors/ValidationFailuresDetailTests.cs`: given a `ResponseErrorDto`/400 body with `validationFailures` on the hash endpoint — with `IncludeRawErrorMessage = true`, the thrown `ESignGeneralException.Detail` contains each `[property] failureReason`; with `false`, it contains none of them (and no `devMsg`/`userMsg`); `RawCode` (e.g. `"e400"`) and `Category` (`HashRejected`) are identical in both cases. Absent `validationFailures` ⇒ detail unchanged. Contracts C4/C5/C6.
+- [x] T015 [P] [US3] Unit test that `ResponseErrorDto` deserializes `validationFailures` (`[{property, failureReason}]`, camelCase) from a MISA-shaped 400 body, and that entries with missing fields render defensively without throwing. data-model §3, Contract C6.
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] In `src/MisaConnect.ESign.Infrastructure/ESign/Wire/ResponseErrorDto.cs`, add an internal `ValidationFailureDto { [JsonPropertyName("property")] string? Property; [JsonPropertyName("failureReason")] string? FailureReason; }` and `[JsonPropertyName("validationFailures")] List<ValidationFailureDto>? ValidationFailures` on `ResponseErrorDto`. Do NOT touch the public domain `ResponseError` record. data-model §3.
-- [ ] T017 [US3] In `src/MisaConnect.ESign.Application/Errors/ESignErrorMapper.cs`, add an **internal** `Map` overload taking an extra `string? validationFailuresDetail`; the existing public `Map` delegates to it with `null` (public signature preserved). Thread the value into `BuildDetail`, which appends it **only when `includeRawErrorMessage` is true** (alongside the existing `devMsg`/`userMsg` handling). The `SynthesizeHashCode*`/`SynthesizeAttachmentCode*` paths MUST NOT receive it — synthesized codes stay invariant (FR-007). Contracts C5/C7.
-- [ ] T018 [US3] In `src/MisaConnect.ESign.Infrastructure/ESign/MisaESignWireClient.cs`, in `ThrowMappedAsync` (and `BuildAuthFailureAsync` if it can carry validationFailures), after deserializing `ResponseErrorDto`, render any `ValidationFailures` to a single sanitized string (`[<property>] <failureReason>; …`, field names + reason text only — no PII/tokens) and pass it to the internal `Map` overload. Render defensively when entries are partial. Contracts C4/C6, Principle VIII.
-- [ ] T019 [US3] Run US3 tests + the full ESign suite; confirm red→green and no regression (especially existing error-mapping tests: codes/categories unchanged).
+- [x] T016 [US3] In `src/MisaConnect.ESign.Infrastructure/ESign/Wire/ResponseErrorDto.cs`, add an internal `ValidationFailureDto { [JsonPropertyName("property")] string? Property; [JsonPropertyName("failureReason")] string? FailureReason; }` and `[JsonPropertyName("validationFailures")] List<ValidationFailureDto>? ValidationFailures` on `ResponseErrorDto`. Do NOT touch the public domain `ResponseError` record. data-model §3.
+- [x] T017 [US3] In `src/MisaConnect.ESign.Application/Errors/ESignErrorMapper.cs`, add an **internal** `Map` overload taking an extra `string? validationFailuresDetail`; the existing public `Map` delegates to it with `null` (public signature preserved). Thread the value into `BuildDetail`, which appends it **only when `includeRawErrorMessage` is true** (alongside the existing `devMsg`/`userMsg` handling). The `SynthesizeHashCode*`/`SynthesizeAttachmentCode*` paths MUST NOT receive it — synthesized codes stay invariant (FR-007). Contracts C5/C7.
+- [x] T018 [US3] In `src/MisaConnect.ESign.Infrastructure/ESign/MisaESignWireClient.cs`, in `ThrowMappedAsync` (and `BuildAuthFailureAsync` if it can carry validationFailures), after deserializing `ResponseErrorDto`, render any `ValidationFailures` to a single sanitized string (`[<property>] <failureReason>; …`, field names + reason text only — no PII/tokens) and pass it to the internal `Map` overload. Render defensively when entries are partial. Contracts C4/C6, Principle VIII.
+- [x] T019 [US3] Run US3 tests + the full ESign suite; confirm red→green and no regression (especially existing error-mapping tests: codes/categories unchanged).
 
 **Checkpoint**: A rejected request is diagnosable under the opt-in flag; default behavior and error codes unchanged.
 
@@ -110,11 +110,11 @@ description: "Task list for slice 007 — fix ESRM hash/attachment empty-doc-arr
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T020 [P] Add a `CHANGELOG.md` `[Unreleased]` entry under `MisaConnect.ESign`: **Fixed** — (a) `documents/hash`/`documents/attachment` no longer ship empty `xmlDocs`/`wordDocs`/`excelDocs` (etc.) arrays that MISA rejected with HTTP 400; (b) an unset `SignatureInfo.Page` now defaults to `1` (logged) instead of being dropped and rejected. **Note** — MISA `validationFailures` are now included in error detail when `Errors.IncludeRawErrorMessage = true`. Mention target `2.1.1`.
-- [ ] T021 Bump the `MisaConnect.ESign` package version `2.1.0 → 2.1.1` in `src/MisaConnect.ESign.Client/MisaConnect.ESign.Client.csproj`.
-- [ ] T022 [P] Check README/consumer docs (`src/MisaConnect.ESign.Client/README.md`, `docs/`) for statements affected by the `Page`-optional behavior or `IncludeRawErrorMessage` detail; update only if a documented behavior changed (otherwise record that no doc change was needed).
-- [ ] T023 Run `dotnet format MisaConnect.slnx` and the full ESign unit + integration suites; confirm green with `TreatWarningsAsErrors=true` (0 warnings).
-- [ ] T024 Validate [quickstart.md](./quickstart.md) end to end (PDF-only body omits the other arrays; unset `Page` → 1; `validationFailures` gated by the flag).
+- [x] T020 [P] Add a `CHANGELOG.md` `[Unreleased]` entry under `MisaConnect.ESign`: **Fixed** — (a) `documents/hash`/`documents/attachment` no longer ship empty `xmlDocs`/`wordDocs`/`excelDocs` (etc.) arrays that MISA rejected with HTTP 400; (b) an unset `SignatureInfo.Page` now defaults to `1` (logged) instead of being dropped and rejected. **Note** — MISA `validationFailures` are now included in error detail when `Errors.IncludeRawErrorMessage = true`. Mention target `2.1.1`.
+- [x] T021 Bump the `MisaConnect.ESign` package version `2.1.0 → 2.1.1` in `src/MisaConnect.ESign.Client/MisaConnect.ESign.Client.csproj`.
+- [x] T022 [P] Check README/consumer docs (`src/MisaConnect.ESign.Client/README.md`, `docs/`) for statements affected by the `Page`-optional behavior or `IncludeRawErrorMessage` detail; update only if a documented behavior changed (otherwise record that no doc change was needed).
+- [x] T023 Run `dotnet format MisaConnect.slnx` and the full ESign unit + integration suites; confirm green with `TreatWarningsAsErrors=true` (0 warnings).
+- [x] T024 Validate [quickstart.md](./quickstart.md) end to end (PDF-only body omits the other arrays; unset `Page` → 1; `validationFailures` gated by the flag).
 
 ---
 

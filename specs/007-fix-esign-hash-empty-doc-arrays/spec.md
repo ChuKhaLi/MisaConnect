@@ -32,7 +32,8 @@ and surfaces MISA's `validationFailures` so the next such 400 is self-diagnosing
 | 2 | `documents/attachment` has the identical empty-list-default pattern on all build paths | **Pattern confirmed** (source-verified); attachment rejection **inferred by symmetry**, not independently reproduced | ✅ |
 | 3 | Unset `SignatureInfo.Page` (`int? = null`) is dropped on the wire; MISA requires `Page >= 1` | **Confirmed** — `SignPdfRequestValidator` rejects `Page < 1` but **not** `Page == null` | ✅ |
 | 4 | The 400's `validationFailures` (the only field explaining the cause) are silently dropped | **Confirmed** — `ResponseErrorDto` has no `validationFailures` field | ✅ |
-| — | Report claim "SDK surfaces `errorCode=<none>`" | **Refuted** — for the captured body (`errorCode=e400`) the mapper surfaces `e400`; the real gap is the dropped `validationFailures` (defect 4) | n/a |
+| 5 | The whole 400 envelope is swallowed: MISA sends `"error": null`, but `ResponseErrorDto.Error` was a non-nullable `bool`, so deserialization threw and the wire client's `Deserialize<T>` returned null → `errorCode=<none>` | **Confirmed during implementation** (the actual cause of the report's `errorCode=<none>`) | ✅ |
+| — | Report claim "SDK surfaces `errorCode=<none>`" | **Correct in effect** — caused by defect 5 (`"error": null` broke parsing), not by the mapper. Once `Error` is nullable the body parses and the mapper surfaces `e400`. (An earlier static read mis-attributed this to the mapper; running the real body corrected it.) | ✅ (defect 5) |
 
 ## User Scenarios & Testing *(mandatory)*
 
