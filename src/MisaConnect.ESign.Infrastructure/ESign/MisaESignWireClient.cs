@@ -279,7 +279,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
                 {
                     DocumentId = documentId,
                     FileToSign = Convert.ToBase64String(pdfBytes),
-                    SignatureInfo = ToWireSignatureInfo(signatureInfo),
+                    SignatureInfo = ToWireSignatureInfo(signatureInfo, DocumentFormat.Pdf),
                 },
             },
         };
@@ -410,7 +410,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
                 {
                     DocumentId = documentId,
                     FileToSign = Convert.ToBase64String(payload),
-                    SignatureInfo = ToWireSignatureInfo(signatureInfo),
+                    SignatureInfo = ToWireSignatureInfo(signatureInfo, DocumentFormat.Word),
                 },
             };
         }
@@ -422,7 +422,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
                 {
                     DocumentId = documentId,
                     FileToSign = Convert.ToBase64String(payload),
-                    SignatureInfo = ToWireSignatureInfo(signatureInfo),
+                    SignatureInfo = ToWireSignatureInfo(signatureInfo, DocumentFormat.Excel),
                 },
             };
         }
@@ -823,12 +823,17 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         _ = ct;
         var statusCode = (int)resp.StatusCode;
         ResponseError? envelope = null;
+        string? validationFailuresDetail = null;
         if (!string.IsNullOrEmpty(body))
         {
             var dto = Deserialize<ResponseErrorDto>(body);
             if (dto is not null)
             {
                 envelope = ResponseErrorMapper.ToDomain(dto);
+                // Slice 007: surface MISA's per-property validationFailures in the
+                // detail (gated by IncludeRawErrorMessage inside the mapper). Passed
+                // on a separate channel so the error-code synthesis is unaffected.
+                validationFailuresDetail = ResponseErrorMapper.RenderValidationFailures(dto.ValidationFailures);
             }
         }
         throw Application.Errors.ESignErrorMapper.Map(
@@ -841,7 +846,8 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             attemptCount: null,
             lastStatusCode: resp.StatusCode,
             userName: userName,
-            requestedFormat: requestedFormat);
+            requestedFormat: requestedFormat,
+            validationFailuresDetail: validationFailuresDetail);
     }
 
     private async Task<ESignException> BuildAuthFailureAsync(HttpResponseMessage resp, string body, string endpoint, CancellationToken ct)
@@ -883,8 +889,22 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             userName: userName);
     }
 
-    private static SignatureInfoDto ToWireSignatureInfo(SignatureInfo source)
+    private SignatureInfoDto ToWireSignatureInfo(SignatureInfo source, DocumentFormat format)
     {
+        // Slice 007: MISA requires a visible signature's Page >= 1. The domain
+        // SignatureInfo.Page is optional (int? = null); a null was dropped on the
+        // wire (WhenWritingNull) and then rejected by MISA. Default a null Page to
+        // 1 (first page) and record that the default was applied — no PII.
+        var page = source.Page;
+        if (page is null)
+        {
+            page = 1;
+            _logger.LogDebug(
+                "SignatureInfo.Page was not set for a {Format} sign; defaulting to 1. CorrelationId={CorrelationId}",
+                format,
+                _correlation.Current);
+        }
+
         var dto = new SignatureInfoDto
         {
             TextColor = source.TextColor,
@@ -895,7 +915,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             FontSize = source.FontSize,
             FontData = source.FontData,
             SignatureImage = source.SignatureImage,
-            Page = source.Page,
+            Page = page,
             SignatureName = source.SignatureName,
             HashAlgorithm = source.HashAlgorithm.ToString(),
             LogoImage = source.LogoImage,

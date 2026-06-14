@@ -4,6 +4,20 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-06-14
+
+`MisaConnect.ESign` — fixes remote signing against the live MISA ESRM service, latent before 2.1.0 and exposed by the 2.1.0 routing fix. See `specs/007-fix-esign-hash-empty-doc-arrays/`. No public-surface change (patch). Empty-array fix verified against the MISA eSign sandbox.
+
+#### Fixed
+
+- **`documents/hash` and `documents/attachment` no longer ship empty document-type arrays.** A PDF (or Word/Excel/XML) sign populated only its own array but serialized the unused ones as `"xmlDocs":[],"wordDocs":[],"excelDocs":[]`; MISA's ESRM endpoint rejected those with HTTP 400 (`Phải có ít nhất 1 tài liệu`). The four document-type arrays are now omitted when not in use, so each request carries exactly the array it needs. Remote signing now completes against the real ESRM service.
+- **An unset `SignatureInfo.Page` no longer fails.** MISA requires a visible signature's `Page >= 1`; a null `Page` was dropped on the wire and rejected. It now defaults to `1` (first page), and the SDK logs that the default was applied. An explicitly set `Page` is sent unchanged; the existing client-side `Page < 1` validation is unchanged.
+- **MISA error envelopes with `"error": null` are no longer swallowed.** The `error` field is now nullable, so a 400 body that sends `"error": null` (such as the empty-array rejection) parses correctly and surfaces its `errorCode` (e.g. `e400`) instead of `errorCode=<none>`.
+
+#### Changed
+
+- When `MisaESignOptions.Errors.IncludeRawErrorMessage = true`, MISA's per-property `validationFailures` (`property` + `failureReason`) are now included in the error `Detail`, so a rejected request is self-diagnosing. With the flag left at its default (`false`), error detail is unchanged. Synthesized error codes/categories are unchanged.
+
 ## [2.1.0] - 2026-06-13
 
 `MisaConnect.ESign` — fixes MISA eSign RemoteSigning ESRM routing against environments where the auth app and the ESRM microservices live at different base paths (e.g. the auth app under `/webdev/`, ESRM at the host root). See `specs/006-fix-esrm-routing/`.

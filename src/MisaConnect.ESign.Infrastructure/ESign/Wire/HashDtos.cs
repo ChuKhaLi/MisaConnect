@@ -10,17 +10,21 @@ internal sealed class HashRequestDto
     [JsonPropertyName("certificateChain")]
     public List<string> CertificateChain { get; set; } = new();
 
+    // Slice 007: nullable with a null default so the wire profile's
+    // WhenWritingNull omits the document-type arrays not in use. Each build
+    // site assigns exactly one; an empty [] (the old non-null default) was
+    // rejected by MISA's ESRM endpoint with HTTP 400.
     [JsonPropertyName("pdfDocs")]
-    public List<PdfDocRequestDto> PdfDocs { get; set; } = new();
+    public List<PdfDocRequestDto>? PdfDocs { get; set; }
 
     [JsonPropertyName("xmlDocs")]
-    public List<XmlHashDocRequestDto> XmlDocs { get; set; } = new();
+    public List<XmlHashDocRequestDto>? XmlDocs { get; set; }
 
     [JsonPropertyName("wordDocs")]
-    public List<WordHashDocRequestDto> WordDocs { get; set; } = new();
+    public List<WordHashDocRequestDto>? WordDocs { get; set; }
 
     [JsonPropertyName("excelDocs")]
-    public List<ExcelHashDocRequestDto> ExcelDocs { get; set; } = new();
+    public List<ExcelHashDocRequestDto>? ExcelDocs { get; set; }
 }
 
 internal sealed class PdfDocRequestDto
