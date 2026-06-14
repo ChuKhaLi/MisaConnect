@@ -10,6 +10,7 @@ using MisaConnect.ESign.Application.Webhook;
 using MisaConnect.ESign.Infrastructure.Caching;
 using MisaConnect.ESign.Infrastructure.Certificates;
 using MisaConnect.ESign.Infrastructure.Configuration;
+using MisaConnect.ESign.Infrastructure.Credentials;
 using MisaConnect.ESign.Infrastructure.ESign;
 using MisaConnect.ESign.Infrastructure.ESign.Webhook;
 using MisaConnect.ESign.Infrastructure.Http;
@@ -59,18 +60,27 @@ internal static class ServiceCollectionExtensions
         services.TryAddSingleton<ITokenCache, InMemoryTokenCache>();
         services.TryAddSingleton<ITokenCacheKeySelector, DefaultTokenCacheKeySelector>();
         services.TryAddSingleton<ICertificateSelector, FirstActiveCertificateSelector>();
+        services.TryAddSingleton<IMisaCredentialsAccessor, OptionsMisaCredentialsAccessor>();
         services.AddSingleton<SingleFlightRefresh>();
 
         services.AddScoped<RefreshAccessToken>();
         services.AddScoped<EnsureAccessToken>(sp =>
         {
-            var optionsAccessor = sp.GetRequiredService<IOptions<MisaESignOptions>>();
+            // Resolve the credentials port (not IOptions directly) so the login
+            // body is sourced per-call: the closure is invoked lazily inside
+            // EnsureAccessToken.ExecuteAsync, so a consumer's per-call ambient
+            // flows in. The EnsureAccessToken ctor Func parameter is preserved.
+            var credentials = sp.GetRequiredService<IMisaCredentialsAccessor>();
             return new EnsureAccessToken(
                 wire: sp.GetRequiredService<IMisaESignWireClient>(),
                 cache: sp.GetRequiredService<ITokenCache>(),
                 keySelector: sp.GetRequiredService<ITokenCacheKeySelector>(),
                 clock: sp.GetRequiredService<ISystemClock>(),
-                credentialsAccessor: () => (optionsAccessor.Value.UserName, optionsAccessor.Value.Password),
+                credentialsAccessor: () =>
+                {
+                    var c = credentials.Get();
+                    return (c.UserName, c.Password);
+                },
                 refreshUseCase: sp.GetRequiredService<RefreshAccessToken>());
         });
         services.AddScoped<ListActiveCertificates>();

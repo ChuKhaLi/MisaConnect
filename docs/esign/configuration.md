@@ -20,6 +20,7 @@ nav_order: 2
 | `ClientKey` | string | yes | MISA client key. |
 | `UserName` | string | yes | MISA user. |
 | `Password` | string | yes | MISA password. |
+| `CredentialsMode` | enum | no | `Static` (default) or `Dynamic`. `Static` reads the four credentials (`ClientId`/`ClientKey`/`UserName`/`Password`) from these options. `Dynamic` means the four credentials are supplied per-call via a consumer-registered `IMisaCredentialsAccessor`, and the startup validator no longer requires the four static values (every other validation still runs). An absent key resolves to `Static`. |
 
 ### `Polling` (synchronous PDF/XML/Word/Excel signing)
 
@@ -75,14 +76,16 @@ Never commit real credentials. Sample appsettings ship with empty placeholders.
 
 `MisaESignOptionsValidator` runs at startup (`ValidateOnStart`) and fails fast on:
 
-- Missing required keys (`BaseUrl`, `ClientId`, `ClientKey`, `UserName`, `Password`).
+- Missing required keys (`BaseUrl`, `ClientId`, `ClientKey`, `UserName`, `Password`). The `ClientId`/`ClientKey`/`UserName`/`Password` requirement applies in **`Static` mode only** — in `Dynamic` mode these four checks are skipped because credentials are supplied per-call via `IMisaCredentialsAccessor`.
 - `BaseUrl` not absolute `https://`.
 - Host/environment mismatch (e.g. `Production` env with a sandbox host).
 - Out-of-range polling / retry values.
 
+The `BaseUrl`, host/environment, polling, transport-retry, OTP, and webhook validations run in both modes.
+
 ## Custom DI overrides
 
-Register your own adapter before `AddMisaConnectESign`, or just after — both work because `AddMisaConnectESign` uses `TryAdd*` semantics for swappable services. Example:
+For most swappable ports you can register your own adapter before `AddMisaConnectESign`, or just after — both work because `AddMisaConnectESign` uses `TryAdd*` semantics for swappable services. Example:
 
 ```csharp
 services.AddSingleton<ITokenCache, RedisTokenCache>();
@@ -91,5 +94,18 @@ services.AddSingleton<IOtpProvider, MyOtpProvider>();
 services.AddSingleton<IWebhookDeliveryHook, MyDeliveryHook>();
 services.AddMisaConnectESign(config);
 ```
+
+### `IMisaCredentialsAccessor` — register-before only
+
+To supply MISA credentials per signing call (e.g. per-person credentials), set `CredentialsMode = Dynamic` and register a custom `IMisaCredentialsAccessor`. The default `OptionsMisaCredentialsAccessor` is registered via `TryAddSingleton`, so a consumer override only wins when it is registered **before** `AddMisaConnectESign`:
+
+```csharp
+services.AddSingleton<IMisaCredentialsAccessor, MyAmbientCredentialsAccessor>();
+services.AddMisaConnectESign(config); // CredentialsMode: Dynamic
+```
+
+Unlike the other ports above, this one is **register-before only** — do not register it "just after". A plain `AddSingleton` after the SDK's own `TryAddSingleton` appends a *second* descriptor: the options-default accessor stays constructible and both accessors surface through `IEnumerable<IMisaCredentialsAccessor>`, so it is undefined which one resolves. Registering before guarantees exactly one accessor is in effect.
+
+**Lifetime contract:** the accessor MUST be singleton-registrable and resolve the current call's credentials from ambient (`AsyncLocal`) or options state read inside `Get()`. It MUST NOT be scoped — the SDK resolves the accessor from singleton collaborators, so a scoped registration is a captive-dependency failure at build. `Get()` is read per-call regardless of lifetime, so an ambient-backed singleton is sufficient and the only safe shape.
 
 See [docs/architecture.md](../architecture.md#esign-ports) for the full port list.

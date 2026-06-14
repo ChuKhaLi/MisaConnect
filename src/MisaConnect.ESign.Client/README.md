@@ -84,6 +84,8 @@ For production, switch `Environment` to `Production` and `BaseUrl` to `https://e
 "Misa": { "ESign": { "AuthUnderWebdev": true } }
 ```
 
+For per-person credentials (each signer carries their own MISA credential set), set `CredentialsMode` to `Dynamic` and register a custom `IMisaCredentialsAccessor` **before** `AddMisaConnectESign` — its `Get()` is consulted per-call for the login body, the `x-clientId`/`x-clientKey` headers, and the token-cache key. The default (`Static`) reads the four credentials from options and is byte-identical to earlier releases. See the [configuration reference](https://github.com/ChuKhaLi/MisaConnect/blob/main/docs/esign/configuration.md) for the register-before ordering and singleton/ambient lifetime contract.
+
 ## Supported operations
 
 | Operation | Facade method |

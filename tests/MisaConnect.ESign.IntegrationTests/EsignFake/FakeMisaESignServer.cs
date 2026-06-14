@@ -26,8 +26,10 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
     private readonly List<RecordedResendOtpRequest> _resendBodies = new();
     private readonly List<RecordedFormatRequest> _hashRequests = new();
     private readonly List<RecordedFormatRequest> _attachmentRequests = new();
+    private readonly List<RecordedLoginRequest> _loginRequests = new();
     private readonly object _twoFactorLock = new();
     private readonly object _formatLock = new();
+    private readonly object _loginLock = new();
 
     public string BaseUrl { get; }
     public Counters Calls => _counters;
@@ -66,6 +68,13 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         get { lock (_formatLock) { return _attachmentRequests.ToArray(); } }
     }
 
+    /// <summary>Each login request seen, with its body and the <c>x-clientId</c>/
+    /// <c>x-clientKey</c> headers, for asserting per-user credential resolution.</summary>
+    public IReadOnlyList<RecordedLoginRequest> LoginRequests
+    {
+        get { lock (_loginLock) { return _loginRequests.ToArray(); } }
+    }
+
     private FakeMisaESignServer(WebApplication app, string baseUrl)
     {
         _app = app;
@@ -90,6 +99,16 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         {
             self!._counters.Login++;
             self.LastLoginPath = ctx.Request.Path.Value;
+            using (var reader = new StreamReader(ctx.Request.Body))
+            {
+                var loginBody = await reader.ReadToEndAsync();
+                var cid = ctx.Request.Headers.TryGetValue("x-clientId", out var c) ? c.ToString() : null;
+                var ckey = ctx.Request.Headers.TryGetValue("x-clientKey", out var k) ? k.ToString() : null;
+                lock (self._loginLock)
+                {
+                    self._loginRequests.Add(new RecordedLoginRequest(loginBody, cid, ckey));
+                }
+            }
             if (self._scenario.LoginAlways401)
             {
                 ctx.Response.StatusCode = 401;
@@ -614,3 +633,5 @@ internal sealed record RecordedTwoFactorRequest(string Body, bool HasAuthorizati
 internal sealed record RecordedResendOtpRequest(string Body, bool HasAuthorizationRm);
 
 internal sealed record RecordedFormatRequest(string Body, RequestedFormat DetectedFormat);
+
+internal sealed record RecordedLoginRequest(string Body, string? ClientId, string? ClientKey);
