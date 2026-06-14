@@ -201,7 +201,12 @@ and reason; with `false` assert none of that text appears.
 - MISA accepts a `documents/hash` / `documents/attachment` request that **omits** the unused
   document-type arrays. Substantiated by the bug report's consumer-side workaround, which strips
   the empty arrays from the outbound body and unblocks signing — i.e. absent arrays are accepted
-  where present-but-empty arrays are rejected.
+  where present-but-empty arrays are rejected. **Verified against the MISA eSign sandbox
+  (2026-06-14):** with the fix, an XML sign's `documents/hash` request was accepted (HTTP 200,
+  surfacing only a downstream incomplete-response condition) where the empty-array body previously
+  returned HTTP 400. Login, certificate listing, and ESRM routing against a `/webdev/` base all
+  succeeded end to end. (Word/Excel sandbox runs return HTTP 500 on the repo's dummy non-OOXML
+  fixtures — unrelated to this fix.)
 - The `validationFailures` shape is `[{ "property": <string>, "failureReason": <string> }]` per
   the captured 400 body in the bug report.
 - `Page = 1` is the correct, safe default for a visible signature when the caller did not specify
