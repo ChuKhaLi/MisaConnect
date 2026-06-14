@@ -63,5 +63,5 @@ Never log secrets, tokens, or buyer PII (names, addresses, line-item content). R
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-[specs/007-fix-esign-hash-empty-doc-arrays/plan.md](specs/007-fix-esign-hash-empty-doc-arrays/plan.md).
+[specs/008-esign-per-user-credentials/plan.md](specs/008-esign-per-user-credentials/plan.md).
 <!-- SPECKIT END -->
