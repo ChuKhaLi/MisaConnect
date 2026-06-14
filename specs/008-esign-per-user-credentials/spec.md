@@ -2,7 +2,7 @@
 
 **Feature Branch**: `008-esign-per-user-credentials`
 **Created**: 2026-06-15
-**Status**: Draft
+**Status**: Done (implemented + tested; release target `MisaConnect.ESign 2.2.0`)
 **Input**: Change request [`REQUEST.md`](./REQUEST.md) (in this slice), from the `elims-backend` consumer of `MisaConnect.ESign.Client`.
 
 ## Summary
