@@ -4,9 +4,9 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
-### MisaConnect.ESign 2.1.1
+## [2.1.1] - 2026-06-14
 
-`MisaConnect.ESign` — fixes remote signing against the live MISA ESRM service, latent before 2.1.0 and exposed by the 2.1.0 routing fix. See `specs/007-fix-esign-hash-empty-doc-arrays/`. No public-surface change (patch).
+`MisaConnect.ESign` — fixes remote signing against the live MISA ESRM service, latent before 2.1.0 and exposed by the 2.1.0 routing fix. See `specs/007-fix-esign-hash-empty-doc-arrays/`. No public-surface change (patch). Empty-array fix verified against the MISA eSign sandbox.
 
 #### Fixed
 

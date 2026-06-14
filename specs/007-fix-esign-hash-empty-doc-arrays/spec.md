@@ -2,7 +2,7 @@
 
 **Feature Branch**: `fix/esign-hash-empty-doc-arrays`
 **Created**: 2026-06-14
-**Status**: Draft (spec authored; verified against source)
+**Status**: Done (implemented, tested, sandbox-verified; released as `MisaConnect.ESign 2.1.1`)
 **Input**: Verified bug report [`bug-report.md`](./bug-report.md) (in this slice), cross-checked against source and `docs/misa-api-reference/Tài liệu tích hợp API eSign RemoteSigning - V2.md`.
 
 ## Summary
