@@ -24,6 +24,16 @@ public sealed class MisaESignOptions
     public string UserName { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
 
+    /// <summary>
+    /// <see cref="CredentialsMode.Static"/> (default): the four credentials are
+    /// read from these options and the validator requires them at startup.
+    /// <see cref="CredentialsMode.Dynamic"/>: credentials are supplied per-call
+    /// via <see cref="Application.Abstractions.IMisaCredentialsAccessor"/>; the
+    /// validator does NOT require the four static credential values
+    /// (BaseUrl/Environment/Polling/… still apply).
+    /// </summary>
+    public CredentialsMode CredentialsMode { get; set; } = CredentialsMode.Static;
+
     public MisaESignPollingOptions Polling { get; set; } = new();
     public MisaESignTransportRetryOptions TransportRetry { get; set; } = new();
     public MisaESignErrorOptions Errors { get; set; } = new();

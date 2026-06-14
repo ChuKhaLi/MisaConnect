@@ -41,10 +41,16 @@ public sealed class MisaESignOptionsValidator : IValidateOptions<MisaESignOption
             }
         }
 
-        if (string.IsNullOrWhiteSpace(options.ClientId)) errors.Add("Misa:ESign:ClientId is required.");
-        if (string.IsNullOrWhiteSpace(options.ClientKey)) errors.Add("Misa:ESign:ClientKey is required.");
-        if (string.IsNullOrWhiteSpace(options.UserName)) errors.Add("Misa:ESign:UserName is required.");
-        if (string.IsNullOrWhiteSpace(options.Password)) errors.Add("Misa:ESign:Password is required.");
+        // The four credentials are required only in Static mode. In Dynamic mode
+        // they are supplied per-call via IMisaCredentialsAccessor, so skip these
+        // four checks; every other check below still runs in both modes.
+        if (options.CredentialsMode == CredentialsMode.Static)
+        {
+            if (string.IsNullOrWhiteSpace(options.ClientId)) errors.Add("Misa:ESign:ClientId is required.");
+            if (string.IsNullOrWhiteSpace(options.ClientKey)) errors.Add("Misa:ESign:ClientKey is required.");
+            if (string.IsNullOrWhiteSpace(options.UserName)) errors.Add("Misa:ESign:UserName is required.");
+            if (string.IsNullOrWhiteSpace(options.Password)) errors.Add("Misa:ESign:Password is required.");
+        }
 
         if (options.Polling.Interval <= TimeSpan.Zero)
         {

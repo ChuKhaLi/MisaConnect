@@ -1,6 +1,4 @@
-using Microsoft.Extensions.Options;
 using MisaConnect.ESign.Application.Abstractions;
-using MisaConnect.ESign.Infrastructure.Configuration;
 using MisaConnect.ESign.Infrastructure.ESign;
 
 namespace MisaConnect.ESign.Infrastructure.Http;
@@ -13,24 +11,33 @@ namespace MisaConnect.ESign.Infrastructure.Http;
 /// </summary>
 internal sealed class ClientHeadersHandler : DelegatingHandler
 {
-    private readonly IOptions<MisaESignOptions> _options;
+    private readonly IMisaCredentialsAccessor _credentials;
     private readonly ICorrelationIdAccessor _correlation;
 
-    public ClientHeadersHandler(IOptions<MisaESignOptions> options, ICorrelationIdAccessor correlation)
+    public ClientHeadersHandler(IMisaCredentialsAccessor credentials, ICorrelationIdAccessor correlation)
     {
-        _options = options;
+        _credentials = credentials;
         _correlation = correlation;
     }
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        if (!request.Headers.Contains(MisaESignWireClient.ClientIdHeader))
+        // Resolve credentials per-call so a consumer's per-call ambient flows in.
+        // The Contains guards remain: MisaESignWireClient.NewRequest pre-stamps
+        // these from the same accessor, so the values are identical and the guard
+        // is harmless; it also lets any future pre-stamped header win.
+        if (!request.Headers.Contains(MisaESignWireClient.ClientIdHeader)
+            || !request.Headers.Contains(MisaESignWireClient.ClientKeyHeader))
         {
-            request.Headers.TryAddWithoutValidation(MisaESignWireClient.ClientIdHeader, _options.Value.ClientId);
-        }
-        if (!request.Headers.Contains(MisaESignWireClient.ClientKeyHeader))
-        {
-            request.Headers.TryAddWithoutValidation(MisaESignWireClient.ClientKeyHeader, _options.Value.ClientKey);
+            var creds = _credentials.Get();
+            if (!request.Headers.Contains(MisaESignWireClient.ClientIdHeader))
+            {
+                request.Headers.TryAddWithoutValidation(MisaESignWireClient.ClientIdHeader, creds.ClientId);
+            }
+            if (!request.Headers.Contains(MisaESignWireClient.ClientKeyHeader))
+            {
+                request.Headers.TryAddWithoutValidation(MisaESignWireClient.ClientKeyHeader, creds.ClientKey);
+            }
         }
         if (!request.Headers.Contains(MisaESignWireClient.CorrelationIdHeader))
         {

@@ -26,6 +26,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
 
     private readonly HttpClient _http;
     private readonly IOptions<MisaESignOptions> _options;
+    private readonly IMisaCredentialsAccessor _credentials;
     private readonly ISystemClock _clock;
     private readonly ICorrelationIdAccessor _correlation;
     private readonly ILogger<MisaESignWireClient> _logger;
@@ -33,12 +34,14 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
     public MisaESignWireClient(
         HttpClient http,
         IOptions<MisaESignOptions> options,
+        IMisaCredentialsAccessor credentials,
         ISystemClock clock,
         ICorrelationIdAccessor correlation,
         ILogger<MisaESignWireClient> logger)
     {
         _http = http;
         _options = options;
+        _credentials = credentials;
         _clock = clock;
         _correlation = correlation;
         _logger = logger;
@@ -747,8 +750,12 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             relativePath,
             ESignRouteResolver.EffectiveAuthUnderWebdev(_options.Value));
         var req = new HttpRequestMessage(method, requestPath);
-        req.Headers.TryAddWithoutValidation(ClientIdHeader, _options.Value.ClientId);
-        req.Headers.TryAddWithoutValidation(ClientKeyHeader, _options.Value.ClientKey);
+        // Resolve credentials per-call so a consumer's per-call ambient flows in.
+        // This authoritative stamp wins over ClientHeadersHandler (its Contains
+        // guard sees these), and both read the same accessor → identical values.
+        var creds = _credentials.Get();
+        req.Headers.TryAddWithoutValidation(ClientIdHeader, creds.ClientId);
+        req.Headers.TryAddWithoutValidation(ClientKeyHeader, creds.ClientKey);
         req.Headers.TryAddWithoutValidation(CorrelationIdHeader, _correlation.Current);
         // attachAuthorization is honored by callers via ApplyAuth — login/refresh skip it.
         _ = attachAuthorization;

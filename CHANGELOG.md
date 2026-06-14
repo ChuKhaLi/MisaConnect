@@ -4,6 +4,22 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+`MisaConnect.ESign` — adds a per-user credentials seam so a consumer can supply MISA credentials per signing call instead of from static options, without changing any existing signing method. Additive and non-breaking (MINOR); target `2.2.0`. The default path — no accessor registered and `CredentialsMode` unset — is byte-identical to 2.1.1. See `specs/008-esign-per-user-credentials/`.
+
+#### Added
+
+- **`IMisaCredentialsAccessor` (port, `MisaConnect.ESign.Application.Abstractions`) and `MisaCredentials` (record, same namespace).** `IMisaCredentialsAccessor.Get()` resolves the current call's MISA credentials, consulted per-call inside the awaited pipeline. `MisaCredentials(string ClientId, string ClientKey, string UserName, string Password)` carries one signer's full credential set; its `ToString()` redacts `ClientKey` and `Password` so structured logging / interpolation cannot leak the two secrets.
+- **Default accessor `OptionsMisaCredentialsAccessor` (internal)** reads the four credential options and is registered via `TryAddSingleton`, so a consumer that pre-registers its own accessor wins. Overrides for this secret-bearing port MUST be **register-before** `AddMisaConnectESign` (a plain `AddSingleton` after the SDK's `TryAddSingleton` appends a second descriptor and leaves the options-default accessor constructible) and MUST be singleton-safe / ambient (`AsyncLocal`)-backed — never scoped (a scoped accessor is a captive-dependency failure).
+- **`MisaESignOptions.CredentialsMode` (`CredentialsMode { Static = 0, Dynamic = 1 }`, in `MisaConnect.ESign.Infrastructure.Configuration`), default `Static`**, bound from `Misa:ESign:CredentialsMode`. In `Static` mode the four credential options are required at startup; in `Dynamic` mode the validator skips **only** the four credential checks (BaseUrl / Environment / Polling / transport-retry / OTP / webhook still validate). An absent key resolves to `Static`, so existing appsettings are byte-identical.
+
+#### Changed
+
+- `ClientHeadersHandler`, `MisaESignWireClient` request building, the `EnsureAccessToken` login closure, and `DefaultTokenCacheKeySelector` now resolve credentials through `IMisaCredentialsAccessor` per-call. With the default accessor the resolved values equal the static options, so the `x-clientId`/`x-clientKey` header injection, the login body, and the token-cache-key shape `{UserName}|{ClientId}|{host}` are all unchanged.
+
+#### Notes
+
+- The begin-sign / webhook `clientId` usages (session-correlation tag and inbound anti-spoof match value, not outbound credentials) still read the static option — deferred. Per-user webhook sessions would later need per-session handling.
+
 ## [2.1.1] - 2026-06-14
 
 `MisaConnect.ESign` — fixes remote signing against the live MISA ESRM service, latent before 2.1.0 and exposed by the 2.1.0 routing fix. See `specs/007-fix-esign-hash-empty-doc-arrays/`. No public-surface change (patch). Empty-array fix verified against the MISA eSign sandbox.

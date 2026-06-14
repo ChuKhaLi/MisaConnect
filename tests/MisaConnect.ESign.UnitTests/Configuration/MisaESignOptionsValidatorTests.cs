@@ -145,4 +145,65 @@ public class MisaESignOptionsValidatorTests
         var result = new MisaESignOptionsValidator().Validate(null, opts);
         Assert.True(result.Failed);
     }
+
+    // Slice 008 (FR-006): in Dynamic mode the four credential checks are skipped;
+    // every other check still runs in both modes.
+    [Fact]
+    public void Dynamic_mode_allows_empty_credentials()
+    {
+        var validator = new MisaESignOptionsValidator();
+        var opts = ValidOptions();
+        opts.CredentialsMode = CredentialsMode.Dynamic;
+        opts.ClientId = "";
+        opts.ClientKey = "";
+        opts.UserName = "";
+        opts.Password = "";
+
+        var result = validator.Validate(null, opts);
+
+        Assert.True(result.Succeeded, string.Join("; ", result.Failures ?? Array.Empty<string>()));
+    }
+
+    [Fact]
+    public void Dynamic_mode_still_fails_on_missing_baseurl()
+    {
+        var validator = new MisaESignOptionsValidator();
+        var opts = ValidOptions();
+        opts.CredentialsMode = CredentialsMode.Dynamic;
+        opts.ClientId = "";
+        opts.ClientKey = "";
+        opts.UserName = "";
+        opts.Password = "";
+        opts.BaseUrl = "";
+
+        var result = validator.Validate(null, opts);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void Dynamic_mode_still_fails_on_invalid_polling()
+    {
+        var validator = new MisaESignOptionsValidator();
+        var opts = ValidOptions();
+        opts.CredentialsMode = CredentialsMode.Dynamic;
+        opts.UserName = "";
+        opts.Polling.Interval = TimeSpan.Zero;
+
+        var result = validator.Validate(null, opts);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void Default_mode_is_static_and_requires_credentials()
+    {
+        var opts = ValidOptions();
+        Assert.Equal(CredentialsMode.Static, opts.CredentialsMode);
+
+        opts.UserName = "";
+        var result = new MisaESignOptionsValidator().Validate(null, opts);
+
+        Assert.True(result.Failed);
+    }
 }
