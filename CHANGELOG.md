@@ -2,7 +2,23 @@
 
 All notable changes to MisaConnect will be documented here. This project follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.3.0] - 2026-07-13
+
+First stable release of `MisaConnect.EInvoice` — .NET SDK for MISA MeInvoice
+(templates, preview, save draft, draft PDF, delete draft, lookup, replacement /
+adjustment issuance). Previously published as `1.0.0-preview.2`.
+`MisaConnect.ESign` 2.3.0 is identical to 2.2.0 (shared version line — the
+release pipeline packs both packages at one version; nuget push uses
+`--skip-duplicate` so republish is safe).
+
+#### Added
+
+- **`MisaConnect.EInvoice` package (stable).** Facade `IMisaEInvoiceClient`:
+  `ListTemplatesAsync`, `PreviewAsync`, `SaveDraftAsync`, `GetDraftPdfAsync`,
+  `DeleteDraftAsync`, `LookupByRefIdAsync`, `LookupStandardAsync`,
+  `LookupCalculatingAsync`, `IssueReplacementAsync`, `IssueAdjustmentAsync`.
+
+## [2.2.0] - 2026-06-15
 
 `MisaConnect.ESign` — adds a per-user credentials seam so a consumer can supply MISA credentials per signing call instead of from static options, without changing any existing signing method. Additive and non-breaking (MINOR); target `2.2.0`. The default path — no accessor registered and `CredentialsMode` unset — is byte-identical to 2.1.1. See `specs/008-esign-per-user-credentials/`.
 

@@ -72,7 +72,7 @@ jobs:
           VERSION="${{ steps.ver.outputs.version }}"
           awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > RELEASE_NOTES.md
           gh release create "v$VERSION" \
-            --title "MisaConnect.ESign $VERSION" \
+            --title "MisaConnect $VERSION" \
             --notes-file RELEASE_NOTES.md \
             artifacts/*.nupkg artifacts/*.snupkg
 
