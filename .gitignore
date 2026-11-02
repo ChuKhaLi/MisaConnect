@@ -62,3 +62,9 @@ nunit-*.xml
 # Sandbox fixture pool — contains real RefIds/InvNos tied to operator credentials
 tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Sandbox/issued-invoice-fixtures.json
 tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Sandbox/issued-invoice-fixtures.consumption.log
+
+# Node / TypeScript
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo

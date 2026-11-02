@@ -1,0 +1,10 @@
+# TypeScript workspace: always LF so Prettier (endOfLine: lf) passes on Windows checkouts too.
+src/typescript/** text eol=lf
+samples/typescript/** text eol=lf
+/package.json text eol=lf
+/package-lock.json text eol=lf
+/tsconfig.base.json text eol=lf
+/eslint.config.mjs text eol=lf
+/.prettierrc.json text eol=lf
+/.prettierignore text eol=lf
+/.nvmrc text eol=lf

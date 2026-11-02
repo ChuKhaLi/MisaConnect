@@ -18,6 +18,17 @@ dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests --filter "FullyQualified
 dotnet format MisaConnect.slnx                                                                           # required before PR
 ```
 
+TypeScript (npm workspace at repo root; packages under `src/typescript/*`; dev toolchain needs Node ≥ 22.18, packages support Node ≥ 20):
+
+```
+npm ci                                  # install workspace
+npm run build                           # tsup → ESM + CJS + .d.ts per package
+npm test                                # vitest, all packages (builds first)
+npm test -w @misaconnect/einvoice       # one package
+npm run lint && npm run format:check    # required before PR
+npm run typecheck
+```
+
 The unit/integration split is by project, not by xUnit trait — no test uses `[Trait("Category", ...)]`. Sandbox-credential-requiring tests use `[SandboxFact]`, which skips when the relevant env vars are absent or the sandbox host is unreachable: EInvoice tests check `MISACONNECT_SANDBOX_*`, ESign tests check `MISACONNECT_ESIGN_SANDBOX_*`.
 
 - `TreatWarningsAsErrors=true` is set in `Directory.Build.props` — warnings break the build, including in PRs.

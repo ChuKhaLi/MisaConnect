@@ -1,0 +1,15 @@
+# Prettier formats the TypeScript workspace only.
+*
+!src/
+!src/typescript/
+!src/typescript/**
+!samples/
+!samples/typescript/
+!samples/typescript/**
+!package.json
+!tsconfig.base.json
+!eslint.config.mjs
+!.prettierrc.json
+**/dist/
+**/node_modules/
+**/coverage/
