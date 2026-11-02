@@ -33,6 +33,7 @@
     "build": "tsup",
     "pretest": "npm run build",
     "test": "vitest run",
+    "pretypecheck": "npm run build",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke.mjs && node scripts/smoke.cjs"
   }
