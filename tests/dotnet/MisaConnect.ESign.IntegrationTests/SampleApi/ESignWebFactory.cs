@@ -48,27 +48,32 @@ internal sealed class ESignWebFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.ConfigureAppConfiguration((_, config) =>
+        var dict = new Dictionary<string, string?>
         {
-            var dict = new Dictionary<string, string?>
-            {
-                ["Misa:EInvoice:Environment"] = "Sandbox",
-                ["Misa:EInvoice:BaseUrl"] = "https://testapi.meinvoice.vn/api/integration",
-                ["Misa:EInvoice:TaxCode"] = "0000000000",
-                ["Misa:EInvoice:UserName"] = "test@example.com",
-                ["Misa:EInvoice:Password"] = "placeholder",
-                ["Misa:EInvoice:AppId"] = "1",
-                ["Misa:ESign:Environment"] = "Sandbox",
-                ["Misa:ESign:BaseUrl"] = "http://127.0.0.1:65535/",
-                ["Misa:ESign:ClientId"] = "client-id",
-                ["Misa:ESign:ClientKey"] = "client-key",
-                ["Misa:ESign:UserName"] = "alice",
-                ["Misa:ESign:Password"] = "password",
-                ["Misa:ESign:Webhook:Mode"] = "Both",
-            };
-            _configOverride?.Invoke(dict);
-            config.AddInMemoryCollection(dict);
-        });
+            ["Misa:EInvoice:Environment"] = "Sandbox",
+            ["Misa:EInvoice:BaseUrl"] = "https://testapi.meinvoice.vn/api/integration",
+            ["Misa:EInvoice:TaxCode"] = "0000000000",
+            ["Misa:EInvoice:UserName"] = "test@example.com",
+            ["Misa:EInvoice:Password"] = "placeholder",
+            ["Misa:EInvoice:AppId"] = "1",
+            ["Misa:ESign:Environment"] = "Sandbox",
+            ["Misa:ESign:BaseUrl"] = "http://127.0.0.1:65535/",
+            ["Misa:ESign:ClientId"] = "client-id",
+            ["Misa:ESign:ClientKey"] = "client-key",
+            ["Misa:ESign:UserName"] = "alice",
+            ["Misa:ESign:Password"] = "password",
+            ["Misa:ESign:Webhook:Mode"] = "Both",
+        };
+        _configOverride?.Invoke(dict);
+
+        // UseSetting makes the values visible to Program.cs *before* builder.Build(),
+        // where the sample decides whether eSign is configured (Misa:ESign section exists).
+        foreach (var (key, value) in dict)
+        {
+            builder.UseSetting(key, value);
+        }
+
+        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(dict));
 
         builder.ConfigureLogging((_, lb) =>
         {

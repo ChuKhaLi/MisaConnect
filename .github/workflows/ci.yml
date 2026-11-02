@@ -65,6 +65,15 @@ jobs:
       - name: Unit tests (ESign)
         run: dotnet test tests/dotnet/MisaConnect.ESign.UnitTests/MisaConnect.ESign.UnitTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFileName=esign-unit-tests.trx" --results-directory artifacts/test-results
 
+      # Fake-server + sample-host integration tests. No network: [SandboxFact] tests skip
+      # because MISACONNECT_*SANDBOX_* secrets are not exposed to this workflow
+      # (real sandbox runs live in integration.yml).
+      - name: Integration tests (EInvoice, no sandbox)
+        run: dotnet test tests/dotnet/MisaConnect.EInvoice.IntegrationTests/MisaConnect.EInvoice.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --logger "trx;LogFileName=einvoice-integration-tests.trx" --results-directory artifacts/test-results
+
+      - name: Integration tests (ESign, no sandbox)
+        run: dotnet test tests/dotnet/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --logger "trx;LogFileName=esign-integration-tests.trx" --results-directory artifacts/test-results
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

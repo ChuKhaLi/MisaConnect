@@ -14,10 +14,19 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
 builder.Services.AddMisaConnectEInvoice(builder.Configuration);
-builder.Services.AddMisaConnectESign(builder.Configuration);
+// eSign is optional in this sample: wire it up only when a Misa:ESign section is
+// configured, so an eInvoice-only deployment starts without eSign credentials.
+var esignEnabled = builder.Configuration.GetSection("Misa:ESign").Exists();
+if (esignEnabled)
+{
+    builder.Services.AddMisaConnectESign(builder.Configuration);
+}
 builder.Services.AddScoped<HttpContextCorrelationIdAccessor>();
 builder.Services.AddScoped<EInvoiceCorrelationAccessor>(sp => sp.GetRequiredService<HttpContextCorrelationIdAccessor>());
-builder.Services.AddScoped<ESignCorrelationAccessor>(sp => sp.GetRequiredService<HttpContextCorrelationIdAccessor>());
+if (esignEnabled)
+{
+    builder.Services.AddScoped<ESignCorrelationAccessor>(sp => sp.GetRequiredService<HttpContextCorrelationIdAccessor>());
+}
 
 var app = builder.Build();
 
@@ -47,9 +56,11 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 
 app.MapTemplateEndpoints();
 app.MapInvoiceEndpoints();
-app.MapESignWebhookEndpoint(builder.Configuration);
-
-ESignWebhookStartupValidator.EmitWarnIfPubliclyReachable(app.Services);
+if (esignEnabled)
+{
+    app.MapESignWebhookEndpoint(builder.Configuration);
+    ESignWebhookStartupValidator.EmitWarnIfPubliclyReachable(app.Services);
+}
 
 app.Run();
 

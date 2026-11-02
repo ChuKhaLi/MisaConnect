@@ -6,6 +6,8 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 #### Changed
 
+- Sample API (`samples/dotnet/MisaConnect.Samples.Api`) wires up eSign only when a `Misa:ESign` configuration section exists. Since the eSign webhook slice it always required eSign credentials, so an eInvoice-only host failed at startup with `OptionsValidationException` — and 52 `MisaConnect.EInvoice.IntegrationTests` (which host the sample) failed unnoticed.
+- CI (`ci.yml`) now runs both integration test projects (fake server + sample host; sandbox facts skip) on every push/PR, not only weekly.
 - Repository layout: .NET projects moved under `src/dotnet`, `tests/dotnet`, `samples/dotnet` to make room for the TypeScript packages under `src/typescript`. No package changes.
 
 ## [2.3.0] - 2026-07-13
