@@ -94,14 +94,16 @@ Both `MisaConnect.EInvoice` (v1.x) and `MisaConnect.ESign` (v2.x) ship from this
 
 ```
 src/
-  MisaConnect.EInvoice.Domain/         entities, value objects, errors
-  MisaConnect.EInvoice.Application/    use cases + port interfaces
-  MisaConnect.EInvoice.Infrastructure/ MISA HTTP client + DI
-  MisaConnect.EInvoice.Client/         consumer-facing facade (NuGet: MisaConnect.EInvoice)
-  MisaConnect.ESign.Domain/            entities, value objects, errors
-  MisaConnect.ESign.Application/       use cases + port interfaces
-  MisaConnect.ESign.Infrastructure/    MISA HTTP client + DI
-  MisaConnect.ESign.Client/            consumer-facing facade (NuGet: MisaConnect.ESign)
+  dotnet/
+    MisaConnect.EInvoice.Domain/         entities, value objects, errors
+    MisaConnect.EInvoice.Application/    use cases + port interfaces
+    MisaConnect.EInvoice.Infrastructure/ MISA HTTP client + DI
+    MisaConnect.EInvoice.Client/         consumer-facing facade (NuGet: MisaConnect.EInvoice)
+    MisaConnect.ESign.Domain/            entities, value objects, errors
+    MisaConnect.ESign.Application/       use cases + port interfaces
+    MisaConnect.ESign.Infrastructure/    MISA HTTP client + DI
+    MisaConnect.ESign.Client/            consumer-facing facade (NuGet: MisaConnect.ESign)
+  typescript/                          TypeScript (npm) packages — see docs/superpowers/specs/2026-11-02-typescript-sdk-design.md
 ```
 
 The families version independently (EInvoice tags are `v1.x.y`; ESign tags are `v2.x.y`) and have no cross-references. A shared `MisaConnect.Common` layer will be extracted only when real duplication appears between products — not speculatively.

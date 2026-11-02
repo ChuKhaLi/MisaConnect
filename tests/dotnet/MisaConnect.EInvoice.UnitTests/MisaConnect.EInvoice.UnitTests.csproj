@@ -8,9 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Application\MisaConnect.EInvoice.Application.csproj" />
-    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Domain\MisaConnect.EInvoice.Domain.csproj" />
-    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Infrastructure\MisaConnect.EInvoice.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\MisaConnect.EInvoice.Application\MisaConnect.EInvoice.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\MisaConnect.EInvoice.Domain\MisaConnect.EInvoice.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\MisaConnect.EInvoice.Infrastructure\MisaConnect.EInvoice.Infrastructure.csproj" />
     <ProjectReference Include="..\MisaConnect.EInvoice.TestSupport\MisaConnect.EInvoice.TestSupport.csproj" />
   </ItemGroup>
 

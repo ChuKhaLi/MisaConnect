@@ -53,16 +53,16 @@ public sealed class SandboxAmendmentFactAttribute : FactAttribute
             var loader = new FixturePoolLoader(dir, DateTimeOffset.MinValue);
             if (loader.EligibleCount(kind) == 0)
             {
-                Skip = $"FixturePoolExhausted: {kind}; top up via tests/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md";
+                Skip = $"FixturePoolExhausted: {kind}; top up via tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md";
             }
         }
         catch (FileNotFoundException ex)
         {
-            Skip = $"FixturePoolExhausted: {kind}; top up via tests/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md (pool file missing: {ex.FileName}).";
+            Skip = $"FixturePoolExhausted: {kind}; top up via tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md (pool file missing: {ex.FileName}).";
         }
         catch (Exception ex)
         {
-            Skip = $"FixturePoolExhausted: {kind}; top up via tests/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md (loader error: {ex.Message}).";
+            Skip = $"FixturePoolExhausted: {kind}; top up via tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md (loader error: {ex.Message}).";
         }
     }
 }

@@ -68,18 +68,18 @@ internal sealed class FixturePoolLoader
     public static string DefaultPoolDirectory()
     {
         // Walk up from the test assembly's directory to find the
-        // tests/MisaConnect.EInvoice.IntegrationTests/Sandbox folder.
+        // tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Sandbox folder.
         var dir = AppContext.BaseDirectory;
         while (!string.IsNullOrEmpty(dir))
         {
-            var candidate = Path.Combine(dir, "tests", "MisaConnect.EInvoice.IntegrationTests", "Sandbox");
+            var candidate = Path.Combine(dir, "tests", "dotnet", "MisaConnect.EInvoice.IntegrationTests", "Sandbox");
             if (Directory.Exists(candidate)) return candidate;
             var parent = Directory.GetParent(dir);
             if (parent is null) break;
             dir = parent.FullName;
         }
         throw new DirectoryNotFoundException(
-            "Could not locate tests/MisaConnect.EInvoice.IntegrationTests/Sandbox/ from the test assembly location.");
+            "Could not locate tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Sandbox/ from the test assembly location.");
     }
 
     private static bool Matches(Fixture f, string kind) =>
@@ -161,7 +161,7 @@ internal sealed record Fixture(
 /// can't find an eligible fixture for the requested kind. The
 /// <see cref="SandboxFact"/> infrastructure converts this into a clean
 /// test skip with reason
-/// <c>FixturePoolExhausted: &lt;kind&gt;; top up via tests/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md</c>
+/// <c>FixturePoolExhausted: &lt;kind&gt;; top up via tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md</c>
 /// (FR-069).
 /// </summary>
 internal sealed class FixturePoolExhaustedException : Exception
@@ -169,7 +169,7 @@ internal sealed class FixturePoolExhaustedException : Exception
     public string Kind { get; }
 
     public FixturePoolExhaustedException(string kind)
-        : base($"FixturePoolExhausted: {kind}; top up via tests/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md")
+        : base($"FixturePoolExhausted: {kind}; top up via tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md")
     {
         Kind = kind;
     }

@@ -8,10 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\MisaConnect.ESign.Application\MisaConnect.ESign.Application.csproj" />
-    <ProjectReference Include="..\..\src\MisaConnect.ESign.Client\MisaConnect.ESign.Client.csproj" />
-    <ProjectReference Include="..\..\src\MisaConnect.ESign.Domain\MisaConnect.ESign.Domain.csproj" />
-    <ProjectReference Include="..\..\src\MisaConnect.ESign.Infrastructure\MisaConnect.ESign.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\MisaConnect.ESign.Application\MisaConnect.ESign.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\MisaConnect.ESign.Client\MisaConnect.ESign.Client.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\MisaConnect.ESign.Domain\MisaConnect.ESign.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\MisaConnect.ESign.Infrastructure\MisaConnect.ESign.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

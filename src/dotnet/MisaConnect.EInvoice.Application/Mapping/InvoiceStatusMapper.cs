@@ -8,7 +8,7 @@ namespace MisaConnect.EInvoice.Application.Mapping;
 /// <see cref="InvoiceStatus"/> enum. The load-bearing copy of the mapping
 /// table lives in <c>specs/005-misa-invoice-lookup/contracts/status-mapping.md</c>;
 /// the contract-parity test in
-/// <c>tests/MisaConnect.EInvoice.UnitTests/Contracts/StatusMappingContractTests.cs</c>
+/// <c>tests/dotnet/MisaConnect.EInvoice.UnitTests/Contracts/StatusMappingContractTests.cs</c>
 /// asserts the two stay in lockstep.
 /// </summary>
 public static class InvoiceStatusMapper

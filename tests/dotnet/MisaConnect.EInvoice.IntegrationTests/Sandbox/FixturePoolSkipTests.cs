@@ -23,7 +23,7 @@ public class FixturePoolSkipTests
 
         Assert.Equal("replacement", ex.Kind);
         Assert.Equal(
-            "FixturePoolExhausted: replacement; top up via tests/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md",
+            "FixturePoolExhausted: replacement; top up via tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Sandbox/README.md",
             ex.Message);
     }
 

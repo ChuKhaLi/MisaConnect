@@ -10,11 +10,11 @@ This repository is **MisaConnect** — a community .NET SDK for MISA cloud APIs.
 
 ```
 dotnet build MisaConnect.slnx
-dotnet test tests/MisaConnect.EInvoice.UnitTests                                                         # fast unit tests, no network
-dotnet test tests/MisaConnect.EInvoice.IntegrationTests                                                  # integration + sandbox tests (sandbox facts skip cleanly without MISA creds)
-dotnet test tests/MisaConnect.ESign.UnitTests                                                            # ESign unit tests (slice 1–4), fast, no network
-dotnet test tests/MisaConnect.ESign.IntegrationTests                                                     # ESign integration + sandbox tests (sandbox facts skip cleanly)
-dotnet test tests/MisaConnect.EInvoice.UnitTests --filter "FullyQualifiedName~SaveDraftInvoicesTests"    # single test class
+dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests                                                         # fast unit tests, no network
+dotnet test tests/dotnet/MisaConnect.EInvoice.IntegrationTests                                                  # integration + sandbox tests (sandbox facts skip cleanly without MISA creds)
+dotnet test tests/dotnet/MisaConnect.ESign.UnitTests                                                            # ESign unit tests (slice 1–4), fast, no network
+dotnet test tests/dotnet/MisaConnect.ESign.IntegrationTests                                                     # ESign integration + sandbox tests (sandbox facts skip cleanly)
+dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests --filter "FullyQualifiedName~SaveDraftInvoicesTests"    # single test class
 dotnet format MisaConnect.slnx                                                                           # required before PR
 ```
 
@@ -39,7 +39,7 @@ TypeScript packages (npm `@misaconnect/einvoice`, `@misaconnect/esign`) do not u
 
 1. New slice under `specs/NNN-name/` via `/speckit-specify` (spec.md, plan.md, tasks.md, contracts/).
 2. Implement Domain types → Application use case + port → Infrastructure adapter → Client facade.
-3. Unit tests required. Integration tests against the relevant sandbox or in-repo fake server (`tests/MisaConnect.EInvoice.IntegrationTests/MisaFake/` for EInvoice, `tests/MisaConnect.ESign.IntegrationTests/EsignFake/` for ESign).
+3. Unit tests required. Integration tests against the relevant sandbox or in-repo fake server (`tests/dotnet/MisaConnect.EInvoice.IntegrationTests/MisaFake/` for EInvoice, `tests/dotnet/MisaConnect.ESign.IntegrationTests/EsignFake/` for ESign).
 4. Update `README.md` supported-operations table and add a `CHANGELOG.md` entry under `[Unreleased]`.
 
 ## Public surface

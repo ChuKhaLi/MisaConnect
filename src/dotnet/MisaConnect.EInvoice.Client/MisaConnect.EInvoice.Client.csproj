@@ -1,20 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <RootNamespace>MisaConnect.ESign.Client</RootNamespace>
-    <AssemblyName>MisaConnect.ESign.Client</AssemblyName>
-    <PackageId>MisaConnect.ESign</PackageId>
-    <Version>2.2.0</Version>
-    <Description>Community .NET SDK for MISA eSign RemoteSigning. Provides a port-and-adapter facade for the MISA eSign HTTP API: PDF signing end-to-end (login, certificate listing, server-side hashing, sign submission, status polling, signature attachment).</Description>
-    <PackageTags>misa;esign;remotesigning;vietnam;pdf;signature;sdk</PackageTags>
+    <RootNamespace>MisaConnect.EInvoice.Client</RootNamespace>
+    <AssemblyName>MisaConnect.EInvoice.Client</AssemblyName>
+    <PackageId>MisaConnect.EInvoice</PackageId>
+    <Version>2.0.2</Version>
+    <Description>Community .NET SDK for MISA MeInvoice. Provides a port-and-adapter facade for the MISA eInvoice HTTP API: token acquisition, template lookup, invoice preview/save/PDF/delete, lookup, and amendments.</Description>
+    <PackageTags>misa;meinvoice;einvoice;vietnam;invoice;sdk;hoadon</PackageTags>
     <IsPackable>true</IsPackable>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);BundleReferencedProjects</TargetsForTfmSpecificBuildOutput>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MisaConnect.ESign.Application\MisaConnect.ESign.Application.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\MisaConnect.ESign.Domain\MisaConnect.ESign.Domain.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\MisaConnect.ESign.Infrastructure\MisaConnect.ESign.Infrastructure.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\MisaConnect.EInvoice.Application\MisaConnect.EInvoice.Application.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\MisaConnect.EInvoice.Domain\MisaConnect.EInvoice.Domain.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\MisaConnect.EInvoice.Infrastructure\MisaConnect.EInvoice.Infrastructure.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,12 +25,13 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
-    <None Include="..\..\icon.png" Pack="true" PackagePath="\" Condition="Exists('..\..\icon.png')" />
+    <None Include="..\..\..\icon.png" Pack="true" PackagePath="\" Condition="Exists('..\..\..\icon.png')" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="MisaConnect.ESign.UnitTests" />
-    <InternalsVisibleTo Include="MisaConnect.ESign.IntegrationTests" />
+    <InternalsVisibleTo Include="MisaConnect.Samples.Api" />
+    <InternalsVisibleTo Include="MisaConnect.EInvoice.UnitTests" />
+    <InternalsVisibleTo Include="MisaConnect.EInvoice.IntegrationTests" />
   </ItemGroup>
 
   <Target Name="BundleReferencedProjects" DependsOnTargets="ResolveReferences">

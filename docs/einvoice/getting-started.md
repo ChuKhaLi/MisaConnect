@@ -60,11 +60,11 @@ var listTemplates = scope.ServiceProvider.GetRequiredService<ListActiveTemplates
 var templates = await listTemplates.ExecuteAsync(invoiceWithCode: true, CancellationToken.None);
 ```
 
-All use cases live in `MisaConnect.EInvoice.Application.UseCases`. See the [package README](../../src/MisaConnect.EInvoice.Client/README.md#supported-operations) for the full list.
+All use cases live in `MisaConnect.EInvoice.Application.UseCases`. See the [package README](../../src/dotnet/MisaConnect.EInvoice.Client/README.md#supported-operations) for the full list.
 
 ## 5. Provide correlation IDs
 
-Each call goes through a logging decorator that captures an `ICorrelationIdAccessor`. In an ASP.NET host, register a per-request accessor that reads the `X-Correlation-ID` header. In a console app, register a static one (see `samples/MisaConnect.Samples.Console`).
+Each call goes through a logging decorator that captures an `ICorrelationIdAccessor`. In an ASP.NET host, register a per-request accessor that reads the `X-Correlation-ID` header. In a console app, register a static one (see `samples/dotnet/MisaConnect.Samples.Console`).
 
 ## Next steps
 

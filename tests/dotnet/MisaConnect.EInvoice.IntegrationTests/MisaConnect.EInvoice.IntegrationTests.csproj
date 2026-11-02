@@ -8,11 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\samples\MisaConnect.Samples.Api\MisaConnect.Samples.Api.csproj" />
-    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Application\MisaConnect.EInvoice.Application.csproj" />
-    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Client\MisaConnect.EInvoice.Client.csproj" />
-    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Domain\MisaConnect.EInvoice.Domain.csproj" />
-    <ProjectReference Include="..\..\src\MisaConnect.EInvoice.Infrastructure\MisaConnect.EInvoice.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\samples\dotnet\MisaConnect.Samples.Api\MisaConnect.Samples.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\MisaConnect.EInvoice.Application\MisaConnect.EInvoice.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\MisaConnect.EInvoice.Client\MisaConnect.EInvoice.Client.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\MisaConnect.EInvoice.Domain\MisaConnect.EInvoice.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\dotnet\MisaConnect.EInvoice.Infrastructure\MisaConnect.EInvoice.Infrastructure.csproj" />
     <ProjectReference Include="..\MisaConnect.EInvoice.TestSupport\MisaConnect.EInvoice.TestSupport.csproj" />
   </ItemGroup>
 

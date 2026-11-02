@@ -7,7 +7,7 @@ nav_order: 3
 
 # Sandbox setup
 
-To run integration tests or `samples/MisaConnect.Samples.Console` against MISA's sandbox, you need sandbox credentials from MISA.
+To run integration tests or `samples/dotnet/MisaConnect.Samples.Console` against MISA's sandbox, you need sandbox credentials from MISA.
 
 ## 1. Request sandbox access
 
@@ -21,10 +21,10 @@ The sandbox base URL is `https://testapi.meinvoice.vn/api/integration`.
 
 ## 2. Local development — user secrets
 
-For `samples/MisaConnect.Samples.Console`:
+For `samples/dotnet/MisaConnect.Samples.Console`:
 
 ```bash
-cd samples/MisaConnect.Samples.Console
+cd samples/dotnet/MisaConnect.Samples.Console
 dotnet user-secrets set "Misa:EInvoice:Environment" "Sandbox"
 dotnet user-secrets set "Misa:EInvoice:BaseUrl" "https://testapi.meinvoice.vn/api/integration"
 dotnet user-secrets set "Misa:EInvoice:TaxCode" "0000000000"
@@ -33,7 +33,7 @@ dotnet user-secrets set "Misa:EInvoice:Password" "your-misa-password"
 dotnet user-secrets set "Misa:EInvoice:AppId" "your-misa-app-id"
 ```
 
-Same pattern for `samples/MisaConnect.Samples.Api`.
+Same pattern for `samples/dotnet/MisaConnect.Samples.Api`.
 
 ## 3. Integration test secrets
 
@@ -54,7 +54,7 @@ export MISACONNECT_SANDBOX_USERNAME=...
 export MISACONNECT_SANDBOX_PASSWORD=...
 export MISACONNECT_SANDBOX_APPID=...
 
-dotnet test tests/MisaConnect.EInvoice.IntegrationTests
+dotnet test tests/dotnet/MisaConnect.EInvoice.IntegrationTests
 ```
 
 In GitHub Actions, set environment secrets `MISA_TAX_CODE`, `MISA_USERNAME`, `MISA_PASSWORD`, `MISA_APP_ID` on the `misa-sandbox` environment; `.github/workflows/integration.yml` maps them into both env-var sets.

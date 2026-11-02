@@ -7,7 +7,7 @@ nav_order: 3
 
 # Sandbox setup
 
-To run integration tests or `samples/MisaConnect.Samples.Api` against the MISA eSign sandbox, you need sandbox credentials from MISA.
+To run integration tests or `samples/dotnet/MisaConnect.Samples.Api` against the MISA eSign sandbox, you need sandbox credentials from MISA.
 
 ## 1. Request sandbox access
 
@@ -23,10 +23,10 @@ At least one `ACTIVE` remote-signing certificate must be provisioned on the sand
 
 ## 2. Local development — user secrets
 
-For `samples/MisaConnect.Samples.Api`:
+For `samples/dotnet/MisaConnect.Samples.Api`:
 
 ```bash
-cd samples/MisaConnect.Samples.Api
+cd samples/dotnet/MisaConnect.Samples.Api
 dotnet user-secrets set "Misa:ESign:Environment" "Sandbox"
 dotnet user-secrets set "Misa:ESign:BaseUrl" "https://<sandbox-host>/"
 dotnet user-secrets set "Misa:ESign:ClientId" "<your-clientId>"
@@ -47,7 +47,7 @@ export MISACONNECT_ESIGN_SANDBOX_CLIENT_KEY=...
 export MISACONNECT_ESIGN_SANDBOX_USERNAME=...
 export MISACONNECT_ESIGN_SANDBOX_PASSWORD=...
 
-dotnet test tests/MisaConnect.ESign.IntegrationTests
+dotnet test tests/dotnet/MisaConnect.ESign.IntegrationTests
 ```
 
 ### Two-factor sandbox
@@ -80,7 +80,7 @@ The webhook URL must be registered with MISA out-of-band (the SDK does not regis
 
 ## 4. In-repo fake server (no MISA reachability needed)
 
-`tests/MisaConnect.ESign.IntegrationTests/EsignFake/` is a deterministic in-process HTTP host. Integration tests can point at it for fully offline E2E coverage (refresh-stampede counting, polling state machine, terminal-state mapping, webhook round-trips). Use this when you don't have sandbox credentials or want fast, hermetic CI runs.
+`tests/dotnet/MisaConnect.ESign.IntegrationTests/EsignFake/` is a deterministic in-process HTTP host. Integration tests can point at it for fully offline E2E coverage (refresh-stampede counting, polling state machine, terminal-state mapping, webhook round-trips). Use this when you don't have sandbox credentials or want fast, hermetic CI runs.
 
 ## 5. Production cutover
 
