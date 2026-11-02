@@ -35,8 +35,8 @@ The two packages are entirely independent — install whichever you need (or bot
 
 See the per-package READMEs and getting-started guides for runnable examples:
 
-- **EInvoice** — [package README](src/MisaConnect.EInvoice.Client/README.md) · [getting started](docs/einvoice/getting-started.md)
-- **ESign** — [package README](src/MisaConnect.ESign.Client/README.md) · [getting started](docs/esign/getting-started.md)
+- **EInvoice** — [package README](src/dotnet/MisaConnect.EInvoice.Client/README.md) · [getting started](docs/einvoice/getting-started.md)
+- **ESign** — [package README](src/dotnet/MisaConnect.ESign.Client/README.md) · [getting started](docs/esign/getting-started.md)
 
 ## Project layout
 

@@ -94,7 +94,7 @@ Behind that one `SignPdfAsync` call the SDK runs login → certificate listing �
 
 ## 5. Provide correlation IDs
 
-Each call goes through a logging decorator that captures an `ICorrelationIdAccessor`. In an ASP.NET host, register a per-request accessor that reads the `X-Correlation-ID` header. In a console app, register a static one (see `samples/MisaConnect.Samples.Api`).
+Each call goes through a logging decorator that captures an `ICorrelationIdAccessor`. In an ASP.NET host, register a per-request accessor that reads the `X-Correlation-ID` header. In a console app, register a static one (see `samples/dotnet/MisaConnect.Samples.Api`).
 
 ## 6. Two-factor authentication (OTP)
 
@@ -116,4 +116,4 @@ For long-running document signs, use `BeginSign{Pdf,Xml,Word,Excel}Async` to ini
 - [Architecture overview](../architecture.md)
 - [Configuration reference](configuration.md)
 - [Sandbox setup](sandbox-setup.md)
-- [`samples/MisaConnect.Samples.Api`](../../samples/MisaConnect.Samples.Api/) — runnable ASP.NET Core reference host
+- [`samples/dotnet/MisaConnect.Samples.Api`](../../samples/dotnet/MisaConnect.Samples.Api/) — runnable ASP.NET Core reference host

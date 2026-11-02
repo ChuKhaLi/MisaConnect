@@ -1,16 +1,20 @@
 # MisaConnect Constitution
 
-Ratified: 2026-05-13 · Last amended: 2026-05-23 · Version: 1.1.0
+Ratified: 2026-05-13 · Last amended: 2026-11-03 · Version: 1.2.0
 
-MisaConnect is a community .NET SDK for MISA cloud APIs. These principles govern how this codebase evolves. Each is a hard rule — exceptions require an entry in `CHANGELOG.md` and the slice plan that introduced the exception.
+MisaConnect is a community SDK for MISA cloud APIs, shipped as .NET (NuGet) and TypeScript (npm) packages. These principles govern how this codebase evolves. Each is a hard rule — exceptions require an entry in `CHANGELOG.md` and the slice plan that introduced the exception.
 
 ## Principle I — Layered architecture is non-negotiable
 
-Domain has zero external dependencies. Application depends only on Domain and `Microsoft.Extensions.Logging.Abstractions`. Infrastructure depends on Application + Domain + standard .NET extensions. Client depends on Application + Domain + Infrastructure. No layer reaches across.
+For the .NET packages: Domain has zero external dependencies. Application depends only on Domain and `Microsoft.Extensions.Logging.Abstractions`. Infrastructure depends on Application + Domain + standard .NET extensions. Client depends on Application + Domain + Infrastructure. No layer reaches across.
+
+For the TypeScript packages: `domain/` imports nothing outside itself; `application/` imports only `domain/`; `infrastructure/` may additionally use Node built-ins. Published packages have zero runtime npm dependencies.
 
 ## Principle II — Public surface is small and stable
 
-Each product-family package exposes its public surface from exactly two layers: `MisaConnect.<Product>.Client` and `MisaConnect.<Product>.Domain`, where `<Product>` is one of `EInvoice` or `ESign`. Application and Infrastructure types are `internal` unless explicitly part of the consumer-extension contract (port interfaces, DI options, the family's `AddMisaConnect<Product>` extension method). Every public-surface change requires a `CHANGELOG.md` entry and a semver-appropriate version bump on the affected family's package. New product families MUST follow this two-layer public surface pattern.
+For the .NET packages: each product-family package exposes its public surface from exactly two layers: `MisaConnect.<Product>.Client` and `MisaConnect.<Product>.Domain`, where `<Product>` is one of `EInvoice` or `ESign`. Application and Infrastructure types are `internal` unless explicitly part of the consumer-extension contract (port interfaces, DI options, the family's `AddMisaConnect<Product>` extension method). Every public-surface change requires a `CHANGELOG.md` entry and a semver-appropriate version bump on the affected family's package. New product families MUST follow this two-layer public surface pattern.
+
+For the TypeScript packages: the public surface is exactly what the package's `src/index.ts` exports; the entry point is `createMisa<Product>Client(options)`. Every public-surface change requires a package `CHANGELOG.md` entry and a semver-appropriate version bump on that npm package.
 
 ## Principle III — Port-and-adapter for extensibility
 
@@ -24,13 +28,17 @@ DTO field casing, date formats, and envelope shapes match MISA's published CURL 
 
 Each new operation or feature ships as a Spec Kit slice under `specs/NNN-name/` with spec, plan, tasks, and contracts. No code lands without a corresponding slice or a trivial-fix justification (typo, dep bump, doc-only change).
 
+TypeScript packages may instead ship from a design document under `docs/superpowers/specs/` and an implementation plan under `docs/superpowers/plans/`. .NET work keeps the Spec Kit requirement.
+
 ## Principle VI — Tests are the spec
 
 Unit tests are mandatory and must run under 30 seconds without network. Integration tests run against the MISA sandbox and must skip cleanly when the sandbox is unreachable. No mocks for the MISA HTTP boundary in integration tests — use the in-repo fake server (`tests/.../MisaFake/`) if a deterministic harness is needed.
 
 ## Principle VII — Semver discipline
 
-Breaking public-surface changes only in major versions. Minor versions add operations or non-breaking extensions. Patch versions are bug fixes only. Each product-family NuGet package (`MisaConnect.EInvoice`, `MisaConnect.ESign`, and any future family) is versioned independently — a major bump on one family does not require a bump on another. Pre-release identifiers (`-preview.N`, `-rc.N`) may be used for unstable iterations within a family.
+For the .NET packages: breaking public-surface changes only in major versions. Minor versions add operations or non-breaking extensions. Patch versions are bug fixes only. Each product-family NuGet package (`MisaConnect.EInvoice`, `MisaConnect.ESign`, and any future family) is versioned independently — a major bump on one family does not require a bump on another. Pre-release identifiers (`-preview.N`, `-rc.N`) may be used for unstable iterations within a family.
+
+For the TypeScript packages: each npm package (`@misaconnect/einvoice`, `@misaconnect/esign`) is versioned independently of the other and of the NuGet packages. While a package is `0.x`, minor versions may break the public surface; from `1.0.0` the .NET rules above apply.
 
 ## Principle VIII — Logs never leak secrets or PII
 
@@ -45,6 +53,14 @@ No tokens, no buyer names/addresses, no line-item content, no raw MISA error mes
 This document is the source of truth. CLAUDE.md, CONTRIBUTING.md, and slice templates derive from it.
 
 ---
+
+## Sync-impact note — 2026-11-03 (constitution v1.2.0)
+
+MisaConnect adds TypeScript (npm) packages alongside the .NET ones; see [docs/superpowers/specs/2026-11-02-typescript-sdk-design.md](../../docs/superpowers/specs/2026-11-02-typescript-sdk-design.md). Principles I, II and VII now prefix their existing text with "For the .NET packages:" — every pre-existing sentence is kept verbatim — and add a "For the TypeScript packages:" paragraph. Principle V adds a TypeScript-only process alternative (superpowers design + plan instead of a Spec Kit slice).
+
+The amendment is **additive**: no restriction on any .NET package has been added or removed, and the new TypeScript rules govern packages that have not yet shipped. Per the Governance clause this is MINOR (1.1.0 → 1.2.0).
+
+Dependent documents reviewed for cascade: CLAUDE.md and CONTRIBUTING.md (one paragraph each on the TypeScript process; repository paths updated separately with the `dotnet/` restructure), `.specify/templates/*` (no change — they govern .NET slices only).
 
 ## Sync-impact note — 2026-05-23 (constitution v1.1.0)
 

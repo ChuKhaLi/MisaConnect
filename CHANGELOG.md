@@ -2,6 +2,12 @@
 
 All notable changes to MisaConnect will be documented here. This project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+#### Changed
+
+- Repository layout: .NET projects moved under `src/dotnet`, `tests/dotnet`, `samples/dotnet` to make room for the TypeScript packages under `src/typescript`. No package changes.
+
 ## [2.3.0] - 2026-07-13
 
 First stable release of `MisaConnect.EInvoice` — .NET SDK for MISA MeInvoice

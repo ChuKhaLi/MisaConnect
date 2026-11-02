@@ -1,0 +1,145 @@
+name: ts-ci
+
+# TypeScript packages under src/typescript/*. .NET has its own path-filtered ci.yml.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "src/typescript/**"
+      - "samples/typescript/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.base.json"
+      - "eslint.config.mjs"
+      - ".prettierrc.json"
+      - ".prettierignore"
+      - ".nvmrc"
+      - ".gitattributes"
+      - ".github/workflows/ts-ci.yml"
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "src/typescript/**"
+      - "samples/typescript/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.base.json"
+      - "eslint.config.mjs"
+      - ".prettierrc.json"
+      - ".prettierignore"
+      - ".nvmrc"
+      - ".gitattributes"
+      - ".github/workflows/ts-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read # dorny/paths-filter lists PR files via the API
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      einvoice: ${{ steps.filter.outputs.einvoice }}
+      esign: ${{ steps.filter.outputs.esign }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared: &shared
+              - "package.json"
+              - "package-lock.json"
+              - "tsconfig.base.json"
+              - "eslint.config.mjs"
+              - ".prettierrc.json"
+              - ".prettierignore"
+              - ".nvmrc"
+              - ".gitattributes"
+              - ".github/workflows/ts-ci.yml"
+              - "samples/typescript/**"
+            einvoice:
+              - *shared
+              - "src/typescript/einvoice/**"
+            esign:
+              - *shared
+              - "src/typescript/esign/**"
+
+  # Lint + format once for the whole workspace.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+
+  einvoice:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.einvoice == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [ 22, 24 ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck -w @misaconnect/einvoice
+      - run: npm test -w @misaconnect/einvoice
+      - run: npm run smoke -w @misaconnect/einvoice
+      - uses: actions/upload-artifact@v4
+        if: matrix.node == 22
+        with:
+          name: einvoice-dist
+          path: src/typescript/einvoice/dist
+          retention-days: 1
+
+  # Oldest supported runtime (package engines >=20). The dev toolchain needs Node >=22.18,
+  # so the package is built on 22 above and only the built output is exercised on 20.
+  einvoice-node20:
+    needs: einvoice
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: einvoice-dist
+          path: src/typescript/einvoice/dist
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Link workspace package without installing dev tooling
+        run: mkdir -p node_modules/@misaconnect && ln -s ../../src/typescript/einvoice node_modules/@misaconnect/einvoice
+      - run: node --version && npm run smoke -w @misaconnect/einvoice
+
+  esign:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.esign == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # No-op until the @misaconnect/esign package exists.
+      - id: exists
+        run: echo "ok=$([ -f src/typescript/esign/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - if: steps.exists.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - if: steps.exists.outputs.ok == 'true'
+        run: npm ci
+      - if: steps.exists.outputs.ok == 'true'
+        run: npm run typecheck -w @misaconnect/esign
+      - if: steps.exists.outputs.ok == 'true'
+        run: npm test -w @misaconnect/esign
