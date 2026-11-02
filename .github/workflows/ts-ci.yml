@@ -1,0 +1,73 @@
+name: ts-ci
+
+# TypeScript packages under src/typescript/*. .NET has its own path-filtered ci.yml.
+on:
+  push:
+    branches: [ main ]
+    paths: &ts-paths
+      - "src/typescript/**"
+      - "samples/typescript/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.base.json"
+      - "eslint.config.mjs"
+      - ".prettierrc.json"
+      - ".prettierignore"
+      - ".nvmrc"
+      - ".gitattributes"
+      - ".github/workflows/ts-ci.yml"
+  pull_request:
+    branches: [ main ]
+    paths: *ts-paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      einvoice: ${{ steps.filter.outputs.einvoice }}
+      esign: ${{ steps.filter.outputs.esign }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared: &shared
+              - "package.json"
+              - "package-lock.json"
+              - "tsconfig.base.json"
+              - "eslint.config.mjs"
+              - ".prettierrc.json"
+              - ".prettierignore"
+              - ".nvmrc"
+              - ".gitattributes"
+              - ".github/workflows/ts-ci.yml"
+              - "samples/typescript/**"
+            einvoice:
+              - *shared
+              - "src/typescript/einvoice/**"
+            esign:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.esign == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # No-op until the @misaconnect/esign package exists.
+      - id: exists
+        run: echo "ok=$([ -f src/typescript/esign/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - if: steps.exists.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - if: steps.exists.outputs.ok == 'true'
+        run: npm ci
+      - if: steps.exists.outputs.ok == 'true'
+        run: npm run typecheck -w @misaconnect/esign
+      - if: steps.exists.outputs.ok == 'true'
+        run: npm test -w @misaconnect/esign
