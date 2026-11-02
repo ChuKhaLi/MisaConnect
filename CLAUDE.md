@@ -35,6 +35,8 @@ The unit/integration split is by project, not by xUnit trait — no test uses `[
 
 ## Adding an operation
 
+TypeScript packages (npm `@misaconnect/einvoice`, `@misaconnect/esign`) do not use Spec Kit slices: they ship from a design under `docs/superpowers/specs/` and a plan under `docs/superpowers/plans/` (constitution v1.2.0, Principle V). See [docs/superpowers/specs/2026-11-02-typescript-sdk-design.md](docs/superpowers/specs/2026-11-02-typescript-sdk-design.md). The steps below apply to .NET.
+
 1. New slice under `specs/NNN-name/` via `/speckit-specify` (spec.md, plan.md, tasks.md, contracts/).
 2. Implement Domain types → Application use case + port → Infrastructure adapter → Client facade.
 3. Unit tests required. Integration tests against the relevant sandbox or in-repo fake server (`tests/MisaConnect.EInvoice.IntegrationTests/MisaFake/` for EInvoice, `tests/MisaConnect.ESign.IntegrationTests/EsignFake/` for ESign).
