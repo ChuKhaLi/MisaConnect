@@ -1,4 +1,5 @@
 // Credential-free diagnostics: which Node TLS client settings can reach the MISA sandbox?
+/* global console, process, fetch, AbortSignal */
 import https from 'node:https';
 import tls from 'node:tls';
 const host = 'testapi.meinvoice.vn';
