@@ -41,23 +41,41 @@ interface Decimal {
   scale: number;
 }
 const ZERO: Decimal = { int: 0n, scale: 0 };
-const DECIMAL_RE = /^([+-]?)(\d+)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
+const PLAIN_DECIMAL_RE = /^(-?)(\d+)(?:\.(\d+))?$/;
+const NUMBER_RE = /^(-?)(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/;
+/** .NET decimal limits: at most 28 fractional and 29 integer digits. */
+const MAX_SCALE = 28;
+const MAX_INT_DIGITS = 29;
 
-/** Exact decimal of a money value (number via its shortest round-trip string); undefined when not a plain decimal. */
+/**
+ * Exact decimal of a money value, or undefined when unparsable or beyond .NET decimal precision.
+ * Strings must be plain decimals (^-?\d+(\.\d+)?$); exponent form is accepted only for numbers.
+ */
 function parseDecimal(m: Money | undefined | null): Decimal | undefined {
   if (m === undefined || m === null) return undefined;
-  if (typeof m === 'number' && !Number.isFinite(m)) return undefined;
-  const match = DECIMAL_RE.exec(String(m).trim());
-  if (!match) return undefined;
-  const [, sign, whole = '', frac = '', exp = '0'] = match;
-  let digits = BigInt(whole + frac);
-  let scale = frac.length - Number(exp);
-  if (scale < 0) {
-    digits *= 10n ** BigInt(-scale);
-    scale = 0;
+  let match: RegExpExecArray | null;
+  if (typeof m === 'number') {
+    if (!Number.isFinite(m)) return undefined;
+    match = NUMBER_RE.exec(String(m));
+  } else {
+    match = PLAIN_DECIMAL_RE.exec(m);
   }
-  return { int: sign === '-' ? -digits : digits, scale };
+  if (!match) return undefined;
+  const sign = match[1];
+  const whole = match[2] ?? '';
+  const frac = match[3] ?? '';
+  const exp = Number(match[4] ?? '0');
+  // Bound sizes before any BigInt work.
+  if (Math.abs(exp) > 400) return undefined;
+  const scale = frac.length - exp;
+  const intDigits = whole.replace(/^0+(?=\d)/, '').length + Math.max(0, -scale);
+  if (scale > MAX_SCALE || intDigits > MAX_INT_DIGITS) return undefined;
+  let digits = BigInt(whole + frac);
+  if (scale < 0) digits *= 10n ** BigInt(-scale);
+  return { int: sign === '-' ? -digits : digits, scale: Math.max(scale, 0) };
 }
+
+const TOLERANCE = parseDecimal(OcTolerance) ?? ZERO;
 
 function rescale(d: Decimal, scale: number): bigint {
   return d.int * 10n ** BigInt(scale - d.scale);
@@ -194,11 +212,10 @@ function validateInvoice(invoice: InvoiceDto): ValidationFailure[] {
           const d = parseDecimal(line.discountAmountOC);
           if (d !== undefined) goods.push(d);
         }
-        const scale = Math.max(header.scale, ...goods.map((g) => g.scale));
+        const scale = Math.max(header.scale, TOLERANCE.scale, ...goods.map((g) => g.scale));
         const sum = goods.reduce((acc, g) => acc + rescale(g, scale), 0n);
         const diff = rescale(header, scale) - sum;
-        const tolerance = 5n * 10n ** BigInt(scale); // 0.5 scaled by 10^(scale+1)
-        if ((diff < 0n ? -diff : diff) * 10n > tolerance) {
+        if ((diff < 0n ? -diff : diff) > rescale(TOLERANCE, scale)) {
           failures.push(
             fail(
               'totals.totalDiscountAmountOC',

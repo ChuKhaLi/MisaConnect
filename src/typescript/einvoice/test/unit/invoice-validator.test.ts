@@ -205,6 +205,38 @@ describe('InvoiceValidator.validate', () => {
     expect(run(1e-7, 0)).toEqual([]);
   });
 
+  it('FR-025 ignores exponent-form money strings without expanding them', () => {
+    const start = Date.now();
+    const inv = invoice({
+      lines: [line({ discountAmountOC: '1e999999999' })],
+      totals: totals({ totalDiscountAmountOC: 0 }),
+    });
+    expect(v(inv)).toEqual([]);
+    const hdr = invoice({
+      lines: [line({ discountAmountOC: 0 })],
+      totals: totals({ totalDiscountAmountOC: '1e999999999' }),
+    });
+    expect(v(hdr)).toEqual([]);
+    expect(Date.now() - start).toBeLessThan(500);
+  });
+
+  it('FR-025 skips amounts beyond .NET decimal precision (28 fraction / 29 integer digits)', () => {
+    const start = Date.now();
+    const huge = '0.' + '1'.repeat(1_000_000);
+    const mk = (d: string, header: string | number) =>
+      invoice({
+        lines: [line({ discountAmountOC: d })],
+        totals: totals({ totalDiscountAmountOC: header }),
+      });
+    expect(v(mk(huge, 0))).toEqual([]);
+    expect(v(mk('0', huge))).toEqual([]);
+    expect(v(mk('1' + '0'.repeat(30), 0))).toEqual([]);
+    expect(v(mk('0.' + '1'.repeat(29), 0))).toEqual([]);
+    expect(v(mk('0.' + '0'.repeat(27) + '1', 0))).toHaveLength(0);
+    expect(v(mk('7', 0)).map((f) => f.ruleId)).toEqual(['FR-025']);
+    expect(Date.now() - start).toBeLessThan(500);
+  });
+
   it('FR-025 missing header totalDiscountAmountOC counts as 0', () => {
     const inv = invoice({
       lines: [line({ discountAmountOC: 5 })],
