@@ -53,6 +53,7 @@ export function readEnvelope<T>(status: number, text: string): Envelope<T> {
     data: decodeData(body['data']) as T | undefined,
     error: body['error'] ?? undefined,
     errorCode: body['errorCode'] ?? undefined,
+    ...(typeof body['ErrorMessage'] === 'string' ? { errorMessage: body['ErrorMessage'] } : {}),
   };
 }
 

@@ -48,6 +48,8 @@ export interface Envelope<T> {
   data: T | undefined;
   error: unknown;
   errorCode: unknown;
+  /** Top-level `ErrorMessage` string (returned by the delete endpoint); absent otherwise. */
+  errorMessage?: string;
 }
 
 export interface RequestOptions {
@@ -76,6 +78,13 @@ export type InsertOutcome =
       message?: string;
     };
 
+/** Flat shape of MISA's delete response (port `DeleteResponse`). */
+export interface DeleteResponse {
+  success: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
 export interface GatewayCallOptions {
   signal?: AbortSignal;
 }
@@ -97,6 +106,15 @@ export interface MeInvoiceGateway {
   ): Promise<Uint8Array>;
   /** PDF bytes of a stored draft; unknown RefID → `ResourceNotFound`. */
   viewDraftPdf(refId: string, withCode: boolean, opts?: GatewayCallOptions): Promise<Uint8Array>;
+  /**
+   * Deletes a draft. MISA-level failures come back as `success: false`; transport and
+   * auth problems throw `MeInvoiceException`.
+   */
+  deleteDraft(
+    refId: string,
+    invoiceWithCode: boolean,
+    opts?: GatewayCallOptions,
+  ): Promise<DeleteResponse>;
   /**
    * Inserts the drafts in one request; returns one outcome per item in input order.
    * A RefID MISA does not echo yields `MisaUnknown` / `NoEchoedResult`.

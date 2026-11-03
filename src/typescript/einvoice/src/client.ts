@@ -1,3 +1,4 @@
+import { deleteDraftInvoice } from './application/use-cases/delete-draft.js';
 import { getDraftPdf } from './application/use-cases/get-draft-pdf.js';
 import { listActiveTemplates } from './application/use-cases/list-templates.js';
 import { saveDraftInvoices } from './application/use-cases/save-draft.js';
@@ -146,7 +147,21 @@ export function createMisaEInvoiceClient(options: MisaEInvoiceOptions): IMisaEIn
         return result.results;
       });
     },
-    deleteDraft: notImplemented,
+
+    deleteDraft: (refId, invoiceWithCode, opts) =>
+      run('DeleteDraft', opts, refId ? { refId } : {}, () =>
+        deleteDraftInvoice(
+          {
+            gateway,
+            logger: resolved.logger,
+            includeRawErrorMessage: resolved.delete.includeRawErrorMessage,
+          },
+          refId,
+          invoiceWithCode,
+          signalOf(opts),
+        ),
+      ),
+
     lookupByRefId: notImplemented,
     lookupStandard: notImplemented,
     lookupCalculating: notImplemented,

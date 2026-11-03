@@ -19,6 +19,7 @@ export const Routes = Object.freeze({
   Preview: 'webapp/preview',
   ViewRefId: 'webapp/viewrefid',
   Insert: 'webapp/insert',
+  DeleteDraft: 'webapp/delete',
 });
 
 const flag = (b: boolean): string => (b ? 'true' : 'false');
@@ -132,6 +133,23 @@ export function createMeInvoiceGateway(
             rawErrorCode: 'NoEchoedResult',
           },
       );
+    },
+
+    async deleteDraft(refId, withCode, opts) {
+      const envelope = await transport.request<unknown>(
+        'DELETE',
+        Routes.DeleteDraft,
+        { invoiceWithCode: flag(withCode), refid: refId },
+        undefined,
+        opts,
+      );
+      if (envelope.success) return { success: true };
+      const errorCode = extractErrorCode(envelope);
+      return {
+        success: false,
+        ...(errorCode !== undefined ? { errorCode } : {}),
+        ...(envelope.errorMessage !== undefined ? { errorMessage: envelope.errorMessage } : {}),
+      };
     },
 
     async viewDraftPdf(refId, withCode, opts) {
