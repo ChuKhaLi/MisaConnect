@@ -83,7 +83,7 @@ export type InsertOutcome =
       errorCategory: MeInvoiceErrorCategory;
       rawErrorCode: string;
       message?: string;
-      /** Wire-mapping failures (`ValidationFailed`); field paths are relative to the invoice. */
+      /** Wire-mapping failures (`ValidationFailed`); field paths are relative to the invoice (`$` = the invoice itself). */
       failures?: readonly ValidationFailure[];
     };
 

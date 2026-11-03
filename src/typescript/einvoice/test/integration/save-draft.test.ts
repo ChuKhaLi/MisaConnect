@@ -250,6 +250,35 @@ describe('saveDraft', () => {
     ]);
   });
 
+  it('a wire Validation failure without a field is reported at the invoice root invoices[i]', async () => {
+    const gateway = {
+      listTemplates: () =>
+        Promise.resolve([{ ipTemplateID: 'ipt-active-1', invSeries: 'C26TAA', isActive: true }]),
+      // The gateway reports a field-less wire failure at the relative root '$'.
+      insertInvoices: () =>
+        Promise.resolve([
+          {
+            refId: 'r1',
+            outcome: 'Error',
+            errorCategory: 'Validation',
+            rawErrorCode: 'ValidationFailed',
+            failures: [{ fieldPath: '$', message: 'bad' }],
+          },
+        ]),
+    } as unknown as MeInvoiceGateway;
+    const out = await saveDraftInvoices(
+      {
+        gateway,
+        validator: defaultInvoiceValidator,
+        templateResolver: resolveTemplate,
+        refIdGenerator: () => 'gen',
+      },
+      [invoice({ refId: 'r1' })],
+      true,
+    );
+    expect(out.results[0]?.failures).toEqual([{ fieldPath: 'invoices[0]', message: 'bad' }]);
+  });
+
   it('assigns UUID RefIDs to invoices without one', async () => {
     const results = await client().saveDraft([invoice(), invoice({ refId: 'keep' })]);
     expect(results[0]?.refId).toMatch(UUID);
