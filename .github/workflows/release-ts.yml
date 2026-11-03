@@ -26,8 +26,8 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - name: npm CLI with trusted-publishing support (>= 11.5.1)
-        run: npm install -g npm@11 && npm --version
+      - name: npm CLI with trusted + staged publishing support (>= 11.15.0)
+        run: npm install -g "npm@>=11.15.0 <12" && npm --version
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -49,8 +49,10 @@ jobs:
       # Trusted publishing: npm exchanges the GitHub OIDC token for a short-lived publish
       # credential — no NPM_TOKEN secret. Requires the trusted publisher to be configured on
       # npmjs.com (owner ChuKhaLi, repo MisaConnect, workflow release-ts.yml, environment
-      # npm-publish). Provenance is attached automatically. The @misaconnect scope stages
-      # publishes by default: the version stays non-public until a maintainer approves it on
-      # npmjs.com.
+      # npm-publish). Provenance is attached automatically. The trusted publisher is allowed
+      # to *stage* only (plain `npm publish` is rejected with 403 "OIDC permission denied"):
+      # the version stays non-public until a maintainer approves it with 2FA
+      # (`npm stage approve <id>` or the Staged Packages tab on npmjs.com).
       - if: startsWith(github.ref, 'refs/tags/einvoice-ts-v')
-        run: npm publish -w @misaconnect/einvoice --access public
+        working-directory: src/typescript/einvoice
+        run: npm stage publish --access public

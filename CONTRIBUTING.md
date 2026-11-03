@@ -35,7 +35,7 @@ Thanks for considering a contribution. MisaConnect is a community .NET SDK for M
 
 Each product-family package (`MisaConnect.EInvoice`, `MisaConnect.ESign`) ships under its own `v<MAJOR>.<MINOR>.<PATCH>` git tag, with `release.yml` naming that family in the GitHub Release title. EInvoice tags are `v1.x.y`; ESign tags are `v2.x.y`. The release workflow packs and pushes both families' nupkgs on every tag (`--skip-duplicate` no-ops the already-published family).
 
-TypeScript packages release separately. For `@misaconnect/einvoice`: bump `version` in `src/typescript/einvoice/package.json`, add the `CHANGELOG.md` entry, merge to `main`, then push the tag `einvoice-ts-v<version>` (it must equal the package version). `release-ts.yml` runs lint, typecheck and tests and publishes through npm trusted publishing (GitHub OIDC, environment `npm-publish`, no npm token in the repo). The `@misaconnect` scope publishes to **staging** by default: the version is not public until a maintainer approves it on npmjs.com.
+TypeScript packages release separately. For `@misaconnect/einvoice`: bump `version` in `src/typescript/einvoice/package.json`, add the `CHANGELOG.md` entry, merge to `main`, then push the tag `einvoice-ts-v<version>` (it must equal the package version). `release-ts.yml` runs lint, typecheck and tests and stages the version with `npm stage publish` through npm trusted publishing (GitHub OIDC, environment `npm-publish`, no npm token in the repo; the trusted publisher may only stage). The version is not public until a maintainer approves it with 2FA (`npm stage approve <id>` or the Staged Packages tab on npmjs.com).
 
 ## Style
 
