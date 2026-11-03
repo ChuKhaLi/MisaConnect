@@ -1,0 +1,36 @@
+name: ts-sandbox
+
+# Live MISA sandbox tests for @misaconnect/einvoice (test/sandbox/**).
+# Uses the same `misa-sandbox` environment secrets as the .NET integration.yml.
+# Not part of ts-ci: they talk to the real sandbox, create drafts and clean them up.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 6 * * 1" # Monday 06:30 UTC, after the .NET integration run
+
+permissions:
+  contents: read
+
+concurrency:
+  group: misa-sandbox-ts
+  cancel-in-progress: false
+
+jobs:
+  einvoice-sandbox:
+    runs-on: ubuntu-latest
+    environment: misa-sandbox
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @misaconnect/einvoice
+      - name: Sandbox tests
+        env:
+          MISACONNECT_SANDBOX_TAXCODE: ${{ secrets.MISA_TAX_CODE }}
+          MISACONNECT_SANDBOX_USERNAME: ${{ secrets.MISA_USERNAME }}
+          MISACONNECT_SANDBOX_PASSWORD: ${{ secrets.MISA_PASSWORD }}
+          MISACONNECT_SANDBOX_APPID: ${{ secrets.MISA_APP_ID }}
+        run: npm run test:sandbox -w @misaconnect/einvoice
