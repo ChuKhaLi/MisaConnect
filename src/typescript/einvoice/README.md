@@ -184,6 +184,8 @@ Operations that cannot proceed throw `MeInvoiceException`, which carries `catego
 
 Check errors with `isMeInvoiceException(err)` rather than `err instanceof MeInvoiceException`. If both the ESM and the CommonJS build of this package load in one process (the dual-package hazard, e.g. a dependency `require`s it while your code `import`s it), an exception from one copy is not an `instanceof` the other copy's class; the guard falls back to `err.name === 'MeInvoiceException'`.
 
+A `Validation` error raised from your own input (an invoice, an amendment or paged-lookup request, an empty batch) has `rawErrorCode: 'ValidationFailed'`; the individual problems are in `failures`, with the rule id in `failures[].ruleId` (e.g. `FR-047`). A few checks raise their own code directly: `RefIdInvalid` / `RefIdRequired` for a RefID argument, and `InvalidMoney` / `InvalidDate` / `InvalidNumber` for a value outside an invoice (e.g. a paged lookup's `fromDate`). Inside `saveDraft` those value errors are wrapped into the invoice's `ValidationFailed` result.
+
 Some operations report expected business results as **values, not exceptions**:
 
 - `deleteDraft` returns a `DeleteDraftOutcome` with a `status` (`Deleted`, `NotFound`, `NotDeletable`, ...).
@@ -238,7 +240,8 @@ Dates: `yyyy-MM-dd` strings (a `Date` is also accepted and formatted from its lo
 - Untyped-JS `null` / missing inputs (a `null` invoice, line, buyer, request, date) throw or report `Validation` / `ValidationFailed` instead of a `TypeError`; a `null` optional field such as `vatRateName` or `sort` counts as absent.
 - A getlist response with `success:false` and no error code maps to `MisaUnknown` (.NET reports `NotFound` for every RefID).
 - An empty RefId list yields a `Validation` batch outcome.
-- Batch-size codes `InvoiceQuantityTooLarge` / `XMLTooLong` map to `BatchOrSize`. That includes the client-side check for a `saveDraft` batch of more than 30 invoices, where .NET throws `Validation`. An empty batch throws `Validation` without a `rawErrorCode` (.NET reuses `InvoiceQuantityTooLarge`).
+- Paged-lookup request violations throw `rawErrorCode: 'ValidationFailed'` with the rule id in `failures[0].ruleId` (.NET puts the rule id, e.g. `FR-047`, in `rawErrorCode`). `preview` validation failures likewise carry `ValidationFailed`.
+- Batch-size codes `InvoiceQuantityTooLarge` / `XMLTooLong` map to `BatchOrSize`. That includes the client-side check for a `saveDraft` batch of more than 30 invoices, where .NET throws `Validation`. An empty batch throws `Validation` / `ValidationFailed` (.NET reuses `InvoiceQuantityTooLarge`).
 - `saveDraft` also turns wire-mapping failures (malformed money string, impossible date, date-time without offset) into that invoice's own `ValidationFailed` result. .NET's typed DTOs cannot hold such values.
 - The customer tax code is never logged.
 - Each call logs one completion line; failures are logged at `info` with `outcome: 'Error'` and `errorCategory`, a caller abort with `outcome: 'Cancelled'`.

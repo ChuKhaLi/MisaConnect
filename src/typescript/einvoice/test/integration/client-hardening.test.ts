@@ -237,3 +237,33 @@ describe('non-finite numbers in non-money fields', () => {
     expect((JSON.parse(inserts[0]?.bodyText ?? '[]') as unknown[]).length).toBe(1);
   });
 });
+
+describe("caller-input Validation uses rawErrorCode 'ValidationFailed'", () => {
+  const rejection = async (p: Promise<unknown>): Promise<unknown> =>
+    p.then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+
+  it('preview with validator failures', async () => {
+    const err = await rejection(client().preview({ ...invoice, paymentMethod: '' }));
+    expect(err).toMatchObject({ category: 'Validation', rawErrorCode: 'ValidationFailed' });
+  });
+
+  it('paged lookups keep the rule id in failures[].ruleId', async () => {
+    const err = await rejection(
+      client().lookupStandard(
+        { start: -1, length: 10, fromDate: '2026-01-01', toDate: '2026-01-02' },
+        true,
+      ),
+    );
+    expect(err).toMatchObject({ category: 'Validation', rawErrorCode: 'ValidationFailed' });
+    expect((err as MeInvoiceException).failures?.[0]?.ruleId).toBe('FR-047');
+  });
+
+  it('an empty saveDraft batch', async () => {
+    const err = await rejection(client().saveDraft([]));
+    expect(err).toMatchObject({ category: 'Validation', rawErrorCode: 'ValidationFailed' });
+    expect((err as MeInvoiceException).failures?.[0]?.fieldPath).toBe('$batch.count');
+  });
+});

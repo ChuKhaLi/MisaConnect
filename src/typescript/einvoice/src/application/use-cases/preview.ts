@@ -47,7 +47,11 @@ export async function previewInvoice(
 
   const failures = deps.validator.validate(working);
   if (failures.length > 0) {
-    throw new MeInvoiceException('Validation', { failures, refId });
+    throw new MeInvoiceException('Validation', {
+      rawErrorCode: 'ValidationFailed',
+      failures,
+      refId,
+    });
   }
 
   const active = await listActiveTemplates(deps.gateway, withCode, opts);

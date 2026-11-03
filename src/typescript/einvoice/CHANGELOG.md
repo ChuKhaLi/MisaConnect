@@ -13,4 +13,5 @@ All notable changes to `@misaconnect/einvoice` are documented here.
 - The default `fetch` is looked up on every call, so mocks installed after client creation apply. A token cache returning a string or number `expiresAt` is accepted.
 - A throwing logger never changes a call's result; a caller abort is logged as `outcome: 'Cancelled'`.
 - `createMisaEInvoiceClient` always pins `baseUrl` to https and the MISA host of the chosen environment; no option key can disable it.
+- Caller-input `Validation` errors use `rawErrorCode: 'ValidationFailed'` throughout (preview, paged lookups, empty batch), rule ids stay in `failures[].ruleId`.
 - ESM + CJS builds with type declarations; Node >= 20.

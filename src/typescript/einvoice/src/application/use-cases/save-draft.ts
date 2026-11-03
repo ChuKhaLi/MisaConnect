@@ -31,6 +31,7 @@ const BATCH_FIELD = '$batch.count';
 function assertBatchSize(count: number): void {
   if (count < 1) {
     throw new MeInvoiceException('Validation', {
+      rawErrorCode: 'ValidationFailed',
       failures: [
         {
           fieldPath: BATCH_FIELD,

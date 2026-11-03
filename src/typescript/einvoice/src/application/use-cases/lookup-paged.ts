@@ -27,7 +27,7 @@ export async function lookupPaged(
   const [failure] = validatePagedLookup(request);
   if (failure !== undefined) {
     throw new MeInvoiceException('Validation', {
-      ...(failure.ruleId !== undefined ? { rawErrorCode: failure.ruleId } : {}),
+      rawErrorCode: 'ValidationFailed',
       message: failure.message,
       field: failure.fieldPath,
       failures: [failure],
