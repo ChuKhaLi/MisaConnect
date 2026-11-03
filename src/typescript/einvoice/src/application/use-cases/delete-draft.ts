@@ -9,6 +9,8 @@ export interface DeleteDraftDeps {
   logger: Logger;
   /** `delete.includeRawErrorMessage` (spec §9.1). */
   includeRawErrorMessage: boolean;
+  /** The call's correlation id, attached to the ARCH-DEL-001 warning. */
+  correlationId?: string;
 }
 
 const MAX_REF_ID_LENGTH = 64;
@@ -93,7 +95,12 @@ export async function deleteDraftInvoice(
         includeMessage,
       );
     }
-    emitDisambiguationWarningIfNeeded(deps.logger, response.errorMessage, includeMessage);
+    emitDisambiguationWarningIfNeeded(
+      deps.logger,
+      response.errorMessage,
+      includeMessage,
+      deps.correlationId,
+    );
     return outcome('NotFound', refId, rawCode, response.errorMessage, undefined, includeMessage);
   }
 
@@ -113,6 +120,7 @@ function emitDisambiguationWarningIfNeeded(
   logger: Logger,
   errorMessage: string | undefined,
   includeMessage: boolean,
+  correlationId: string | undefined,
 ): void {
   if (
     errorMessage !== undefined &&
@@ -131,6 +139,7 @@ function emitDisambiguationWarningIfNeeded(
       eventId: 'ARCH-DEL-001',
       errorCode: 'InvalidTransactionID',
       ...(excerpt !== undefined ? { errorMessageExcerpt: excerpt } : {}),
+      ...(correlationId !== undefined ? { correlationId } : {}),
     },
   );
 }

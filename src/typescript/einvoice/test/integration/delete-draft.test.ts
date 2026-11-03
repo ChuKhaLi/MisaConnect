@@ -92,9 +92,21 @@ describe('deleteDraft', () => {
     expect(outcome.status).toBe('NotFound');
     const w = archWarnings();
     expect(w).toHaveLength(1);
-    expect(w[0]?.fields).toEqual({ eventId: 'ARCH-DEL-001', errorCode: 'InvalidTransactionID' });
+    const completion = logs.find((l) => l.message === 'MeInvoice call completed');
+    expect(w[0]?.fields).toEqual({
+      eventId: 'ARCH-DEL-001',
+      errorCode: 'InvalidTransactionID',
+      correlationId: completion?.fields?.['correlationId'],
+    });
+    expect(typeof completion?.fields?.['correlationId']).toBe('string');
     expect(w[0]?.message).toContain('ARCH-DEL-001');
     expect(JSON.stringify(logs)).not.toContain('Lỗi không xác định');
+  });
+
+  it('the ARCH-DEL-001 warn carries the per-call correlationId override', async () => {
+    fake.state.setDeleteError('r1', 'InvalidTransactionID', 'Lỗi không xác định khác');
+    await client().deleteDraft('r1', true, { correlationId: 'req-42' });
+    expect(archWarnings()[0]?.fields?.['correlationId']).toBe('req-42');
   });
 
   it('unmatched phrase with the flag on → excerpt (max 80 chars) in the warning', async () => {

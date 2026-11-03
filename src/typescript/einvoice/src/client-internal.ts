@@ -49,16 +49,19 @@ export function createMisaEInvoiceClientInternal(
     endpoint: string,
     opts: CallOptions | undefined,
     ctx: CallLogContext,
-    action: () => Promise<T>,
-  ): Promise<T> =>
-    logCall(
+    action: (correlationId: string) => Promise<T>,
+  ): Promise<T> => {
+    // One id per call, shared by the completion line and any warning the action emits.
+    const correlationId = opts?.correlationId ?? resolved.correlationId();
+    return logCall(
       resolved.logger,
       endpoint,
-      opts?.correlationId ?? resolved.correlationId(),
+      correlationId,
       ctx,
-      action,
+      () => action(correlationId),
       opts?.signal,
     );
+  };
 
   const amend = (
     endpoint: 'IssueReplacement' | 'IssueAdjustment',
@@ -163,12 +166,13 @@ export function createMisaEInvoiceClientInternal(
 
     deleteDraft: (refId, invoiceWithCode, opts) => {
       const ctx: CallLogContext = refId ? { refId } : {};
-      return run('DeleteDraft', opts, ctx, async () => {
+      return run('DeleteDraft', opts, ctx, async (correlationId) => {
         const outcome = await deleteDraftInvoice(
           {
             gateway,
             logger: resolved.logger,
             includeRawErrorMessage: resolved.delete.includeRawErrorMessage,
+            correlationId,
           },
           refId,
           invoiceWithCode,

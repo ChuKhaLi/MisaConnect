@@ -62,7 +62,6 @@ export interface Envelope<T> {
 
 export interface RequestOptions {
   signal?: AbortSignal;
-  correlationId?: string;
 }
 
 export interface MeInvoiceTransport {
