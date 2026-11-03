@@ -63,6 +63,14 @@ Bind credentials under the `Misa:EInvoice` configuration section (env vars, user
 
 For production, switch `Environment` to `Production` and `BaseUrl` to `https://api.meinvoice.vn/api/integration`. The options validator refuses to start if the environment and base-URL host disagree.
 
+`TaxCode` is the bare tax code, without the AppID. MISA often hands out credentials as a "Mã số thuế" such as `6868686868-267`, which is `<TaxCode>-<AppId>`. In that case set `TaxCode` to `6868686868` and `AppId` to `267`. The SDK sends `<TaxCode>-<AppId>` itself. If you pass the combined value, MISA's token endpoint answers `INVALID_TAXCODE`.
+
+## Calling MISA from outside Vietnam
+
+Measured from GitHub-hosted runners (2026-11-03), the network path to `testapi.meinvoice.vn` is a path-MTU blackhole: TCP segments near 1500 bytes are dropped, and the ICMP message that would make the sender shrink them never arrives. Any request larger than about 1.4 KB hangs until `HttpClient.Timeout` (100 s by default). That includes every authenticated call, because the bearer token alone is about 2 KB. The sign-in call is small and still succeeds, so the failure looks like a slow or flaky MISA. curl shows the same behaviour, so this is not specific to .NET and the SDK cannot work around it.
+
+Hosts in Vietnam are not affected. Elsewhere, lower the MTU of the network interface that reaches MISA, e.g. `ip link set dev eth0 mtu 1280` on Linux. This repository's sandbox CI (`integration.yml`) does exactly that. Before the change, 14 sandbox tests timed out; after it, all of them passed. Enabling TCP MTU probing (`sysctl -w net.ipv4.tcp_mtu_probing=1`) may also help, but it has not been tested against MISA.
+
 ## Supported operations
 
 | Operation | Use case | Status |

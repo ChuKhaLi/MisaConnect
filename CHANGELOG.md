@@ -9,6 +9,12 @@ All notable changes to MisaConnect will be documented here. This project follows
 - Sample API (`samples/dotnet/MisaConnect.Samples.Api`) wires up eSign only when a `Misa:ESign` configuration section exists. Since the eSign webhook slice it always required eSign credentials, so an eInvoice-only host failed at startup with `OptionsValidationException` — and 52 `MisaConnect.EInvoice.IntegrationTests` (which host the sample) failed unnoticed.
 - CI (`ci.yml`) now runs both integration test projects (fake server + sample host; sandbox facts skip) on every push/PR, not only weekly.
 - Repository layout: .NET projects moved under `src/dotnet`, `tests/dotnet`, `samples/dotnet` to make room for the TypeScript packages under `src/typescript`. No package changes.
+- Sandbox CI (`integration.yml`) lowers the runner's MTU to 1280. Without it, 14 `MisaConnect.EInvoice` sandbox tests hung until `HttpClient.Timeout` and the weekly run had been failing since October.
+
+#### Documentation
+
+- `MisaConnect.EInvoice` README, new section "Calling MISA from outside Vietnam". The network path to MISA's eInvoice API drops TCP segments near 1500 bytes (a path-MTU blackhole). From outside Vietnam, any request over ~1.4 KB therefore times out, and that includes every bearer-authenticated call. Lowering the interface MTU to 1280 fixes it. Hosts in Vietnam are not affected.
+- `MisaConnect.EInvoice` README: `TaxCode` is the bare tax code. A "Mã số thuế" such as `6868686868-267` from MISA is `<TaxCode>-<AppId>` and must be split into the two options.
 
 ## [2.3.0] - 2026-07-13
 
