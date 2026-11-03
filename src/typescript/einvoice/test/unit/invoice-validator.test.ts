@@ -359,6 +359,15 @@ describe('InvoiceValidator.validateBatch', () => {
   });
 });
 
+describe('InvoiceValidator.validateBatch root failures', () => {
+  it('maps a null invoice root to invoices[i], not invoices[i].$', () => {
+    const r = defaultInvoiceValidator.validateBatch([invoice(), null as never]);
+    expect(r).toEqual([
+      { fieldPath: 'invoices[1]', message: 'Invoice is null.', ruleId: 'FR-006' },
+    ]);
+  });
+});
+
 describe('validatePagedLookup', () => {
   const ok = { start: 0, length: 100, fromDate: '2026-01-01', toDate: '2026-01-31' };
   it('accepts a valid request', () => {

@@ -1,5 +1,6 @@
 import type { InvoiceDto, SaveResultDto, TemplateDto } from '../../domain/dtos.js';
 import { MeInvoiceException, type ValidationFailure } from '../../domain/errors.js';
+import { indexFailures } from '../failure-paths.js';
 import { mapErrorCode } from '../error-mapper.js';
 import { MaxInvoicesPerBatch } from '../invoice-validator.js';
 import type {
@@ -57,16 +58,6 @@ function assertBatchSize(count: number): void {
   }
 }
 
-/** Prefixes `invoices[i].`; the invoice root (`$` or empty) becomes `invoices[i]`. */
-const indexed = (index: number, failures: readonly ValidationFailure[]): ValidationFailure[] =>
-  failures.map((f) => ({
-    ...f,
-    fieldPath:
-      f.fieldPath === '$' || f.fieldPath === ''
-        ? `invoices[${index}]`
-        : `invoices[${index}].${f.fieldPath}`,
-  }));
-
 /**
  * Port SaveDraftInvoices.cs. Only an empty or oversize batch throws. Each invoice is validated
  * first (deviation: .NET resolves the template first), so a batch with no valid invoice makes no
@@ -111,7 +102,7 @@ export async function saveDraftInvoices(
         outcome: 'Error',
         errorCategory: 'Validation',
         rawErrorCode: 'ValidationFailed',
-        failures: indexed(index, failures),
+        failures: indexFailures(index, failures),
       };
       return;
     }
@@ -159,7 +150,9 @@ export async function saveDraftInvoices(
                 errorCategory: o.errorCategory,
                 rawErrorCode: o.rawErrorCode,
                 ...(o.message !== undefined ? { errorMessage: o.message } : {}),
-                ...(o.failures !== undefined ? { failures: indexed(item.index, o.failures) } : {}),
+                ...(o.failures !== undefined
+                  ? { failures: indexFailures(item.index, o.failures) }
+                  : {}),
               };
     });
   }

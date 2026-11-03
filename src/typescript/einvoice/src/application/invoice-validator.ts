@@ -9,6 +9,7 @@ import type {
 } from '../domain/dtos.js';
 import type { ValidationFailure } from '../domain/errors.js';
 import { parseVatRate } from '../domain/vat-rate.js';
+import { indexFailures } from './failure-paths.js';
 import type { InvoiceValidator } from './ports.js';
 
 export const MaxLinesPerInvoice = 200;
@@ -292,9 +293,7 @@ function validateBatch(invoices: InvoiceDto[]): ValidationFailure[] {
     );
   }
   invoices.forEach((inv, i) => {
-    for (const f of validateInvoice(inv)) {
-      all.push({ ...f, fieldPath: `invoices[${i}].${f.fieldPath}` });
-    }
+    all.push(...indexFailures(i, validateInvoice(inv)));
   });
   return all;
 }
