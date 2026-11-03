@@ -49,6 +49,8 @@ jobs:
       # Trusted publishing: npm exchanges the GitHub OIDC token for a short-lived publish
       # credential — no NPM_TOKEN secret. Requires the trusted publisher to be configured on
       # npmjs.com (owner ChuKhaLi, repo MisaConnect, workflow release-ts.yml, environment
-      # npm-publish). Provenance is attached automatically.
+      # npm-publish). Provenance is attached automatically. The @misaconnect scope stages
+      # publishes by default: the version stays non-public until a maintainer approves it on
+      # npmjs.com.
       - if: startsWith(github.ref, 'refs/tags/einvoice-ts-v')
         run: npm publish -w @misaconnect/einvoice --access public
