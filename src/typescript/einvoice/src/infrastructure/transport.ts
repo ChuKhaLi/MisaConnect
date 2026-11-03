@@ -147,8 +147,8 @@ export function createTransport(
     } catch (err) {
       if (signal?.aborted) throw signal.reason;
       if (attempt.timedOut()) throw new AttemptFailure('Timeout', err);
-      if (err instanceof TypeError) throw new AttemptFailure('ConnectionFailed', err);
-      throw err;
+      // Any other fetch/body failure (undici TypeError, node-fetch FetchError, proxy agents…).
+      throw new AttemptFailure('ConnectionFailed', err);
     } finally {
       attempt.dispose();
     }
@@ -212,7 +212,9 @@ export function createTransport(
 
     const second = await attempt();
     if (!(second instanceof AttemptFailure) && !isRetryableStatus(second.status)) return second;
-    throw retryExhausted(second);
+    // .NET parity (ThrottleRetryHandler): when the first attempt got no response, the
+    // first failure decides the error even if the retry returned 429/5xx.
+    throw retryExhausted(first instanceof AttemptFailure ? first : second);
   }
 
   async function execute<T>(

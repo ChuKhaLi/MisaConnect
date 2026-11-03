@@ -275,6 +275,44 @@ describe('transport: retry', () => {
     }
   });
 
+  it('timeout then 503 → TransportFailed Timeout (.NET parity: first failure wins)', async () => {
+    const hang: Handler = (c) =>
+      new Promise((_, reject) => {
+        c.signal?.addEventListener('abort', () => reject(c.signal?.reason), { once: true });
+      });
+    const s = setup([hang, () => new Response('', { status: 503 })], { deps: { timeoutMs: 5 } });
+    const err = await rejection(s.transport.request('POST', 'webapp/insert', {}, []));
+    expect(err).toMatchObject({ category: 'TransportFailed', rawErrorCode: 'Timeout' });
+    expect(s.apiCalls()).toHaveLength(2);
+  });
+
+  it('connection failure then 429 → TransportFailed ConnectionFailed', async () => {
+    const s = setup([
+      () => {
+        throw new TypeError('fetch failed');
+      },
+      () => new Response('', { status: 429 }),
+    ]);
+    const err = await rejection(s.transport.request('POST', 'webapp/insert', {}, []));
+    expect(err).toMatchObject({ category: 'TransportFailed', rawErrorCode: 'ConnectionFailed' });
+    expect(s.apiCalls()).toHaveLength(2);
+  });
+
+  it('non-TypeError fetch failure twice (custom fetch) → TransportFailed ConnectionFailed', async () => {
+    const boom = new Error('ECONNRESET');
+    const s = setup([
+      () => {
+        throw boom;
+      },
+    ]);
+    const err = await rejection(s.transport.request('POST', 'webapp/insert', {}, []));
+    expect(err).toBeInstanceOf(MeInvoiceException);
+    expect(err).toMatchObject({ category: 'TransportFailed', rawErrorCode: 'ConnectionFailed' });
+    expect((err as MeInvoiceException).cause).toBe(boom);
+    expect(s.apiCalls()).toHaveLength(2);
+    expect(s.delays).toHaveLength(1);
+  });
+
   it('per-request timeout twice → TransportFailed Timeout', async () => {
     const hang: Handler = (c) =>
       new Promise((_, reject) => {
