@@ -214,7 +214,7 @@ Any object with `debug/info/warn/error(message, fields?)` works. An exception th
 
 ## Money
 
-`Money = number | string`. A string must be a plain decimal (`^-?\d+(\.\d+)?$`) and is written to the JSON body **verbatim as a number literal**, so no precision is lost. JavaScript `number` is a binary double: for foreign-currency amounts, exchange rates and anything that must be exact, compute with a decimal library (decimal.js, big.js, ...) and pass `value.toFixed()` strings. Amounts in responses are `number`.
+`Money = number | string`. A string must be a plain decimal (`^-?\d+(\.\d+)?$`) and is written to the JSON body **verbatim as a number literal**, so no precision is lost. Surrounding whitespace is rejected rather than trimmed: .NET money fields are typed `decimal`, so there is no .NET string form whose parsing rules to copy, and rejecting is the safer default. JavaScript `number` is a binary double: for foreign-currency amounts, exchange rates and anything that must be exact, compute with a decimal library (decimal.js, big.js, ...) and pass `value.toFixed()` strings. Amounts in responses are `number`.
 
 ## Property names
 

@@ -50,7 +50,8 @@ const MAX_INT_DIGITS = 29;
 
 /**
  * Exact decimal of a money value, or undefined when unparsable or beyond .NET decimal precision.
- * Strings must be plain decimals (^-?\d+(\.\d+)?$); exponent form is accepted only for numbers.
+ * Strings must be plain decimals (^-?\d+(\.\d+)?$) once trimmed; exponent form is accepted only
+ * for numbers.
  */
 function parseDecimal(m: Money | undefined | null): Decimal | undefined {
   if (m === undefined || m === null) return undefined;
@@ -58,8 +59,11 @@ function parseDecimal(m: Money | undefined | null): Decimal | undefined {
   if (typeof m === 'number') {
     if (!Number.isFinite(m)) return undefined;
     match = NUMBER_RE.exec(String(m));
+  } else if (typeof m === 'string') {
+    // Surrounding whitespace is tolerated here, as `Number()` (toNumber) does.
+    match = PLAIN_DECIMAL_RE.exec(m.trim());
   } else {
-    match = PLAIN_DECIMAL_RE.exec(m);
+    return undefined;
   }
   if (!match) return undefined;
   const sign = match[1];
@@ -69,14 +73,26 @@ function parseDecimal(m: Money | undefined | null): Decimal | undefined {
   // Bound sizes before any BigInt work.
   if (Math.abs(exp) > 400) return undefined;
   const scale = frac.length - exp;
-  const intDigits = whole.replace(/^0+(?=\d)/, '').length + Math.max(0, -scale);
-  if (scale > MAX_SCALE || intDigits > MAX_INT_DIGITS) return undefined;
+  if (scale > MAX_SCALE || integerDigits(whole, frac, exp) > MAX_INT_DIGITS) return undefined;
   let digits = BigInt(whole + frac);
   if (scale < 0) digits *= 10n ** BigInt(-scale);
   return { int: sign === '-' ? -digits : digits, scale: Math.max(scale, 0) };
 }
 
-const TOLERANCE = parseDecimal(OcTolerance) ?? ZERO;
+/** Exact count of integer digits of `whole.frac × 10^exp` (no BigInt; inputs may be huge). */
+function integerDigits(whole: string, frac: string, exp: number): number {
+  const w = whole.replace(/^0+/, '');
+  if (w !== '') return Math.max(0, w.length + exp);
+  const rest = frac.replace(/^0+/, '');
+  if (rest === '') return 0;
+  return Math.max(0, exp - (frac.length - rest.length));
+}
+
+const TOLERANCE: Decimal = (() => {
+  const d = parseDecimal(OcTolerance);
+  if (d === undefined) throw new Error(`OcTolerance ${OcTolerance} is not a valid decimal.`);
+  return d;
+})();
 
 function rescale(d: Decimal, scale: number): bigint {
   return d.int * 10n ** BigInt(scale - d.scale);

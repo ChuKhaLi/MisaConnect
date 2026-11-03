@@ -237,6 +237,27 @@ describe('InvoiceValidator.validate', () => {
     expect(Date.now() - start).toBeLessThan(500);
   });
 
+  it('FR-025 counts integer digits of exponent-form numbers exactly', () => {
+    const mk = (header: number) =>
+      invoice({
+        lines: [line({ discountAmountOC: 0 })],
+        totals: totals({ totalDiscountAmountOC: header }),
+      });
+    // 1.2345e28 has 29 integer digits (in range); 1.2345e29 has 30 (beyond .NET decimal).
+    expect(v(mk(1.2345e28)).map((f) => f.ruleId)).toEqual(['FR-025']);
+    expect(v(mk(1.2345e29))).toEqual([]);
+  });
+
+  it('FR-025 trims surrounding whitespace on money strings', () => {
+    const mk = (header: string, d: string) =>
+      invoice({
+        lines: [line({ discountAmountOC: d })],
+        totals: totals({ totalDiscountAmountOC: header }),
+      });
+    expect(v(mk(' 7 ', '0')).map((f) => f.ruleId)).toEqual(['FR-025']);
+    expect(v(mk('\t10\n', ' 10'))).toEqual([]);
+  });
+
   it('FR-025 missing header totalDiscountAmountOC counts as 0', () => {
     const inv = invoice({
       lines: [line({ discountAmountOC: 5 })],
