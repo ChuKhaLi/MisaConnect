@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createMisaEInvoiceClient, type IMisaEInvoiceClient } from '../../src/client.js';
+import type { IMisaEInvoiceClient } from '../../src/client.js';
+import { createMisaEInvoiceClientInternal } from '../../src/client-internal.js';
 import type { Logger } from '../../src/application/ports.js';
 import type { PagedLookupRequestDto } from '../../src/domain/dtos.js';
 import { MeInvoiceException } from '../../src/domain/errors.js';
@@ -19,17 +20,19 @@ function capture(): Logger {
 }
 
 function client(includeRawErrorMessage = false): IMisaEInvoiceClient {
-  return createMisaEInvoiceClient({
-    environment: 'sandbox',
-    baseUrl: fake.baseUrl,
-    taxCode: '0101243150',
-    userName: 'user@example.com',
-    password: 'pa55-secret',
-    appId: 'APP-1',
-    logger: capture(),
-    delete: { includeRawErrorMessage },
-    __unsafeAllowAnyBaseUrl: true,
-  } as MisaEInvoiceOptions);
+  return createMisaEInvoiceClientInternal(
+    {
+      environment: 'sandbox',
+      baseUrl: fake.baseUrl,
+      taxCode: '0101243150',
+      userName: 'user@example.com',
+      password: 'pa55-secret',
+      appId: 'APP-1',
+      logger: capture(),
+      delete: { includeRawErrorMessage },
+    } as MisaEInvoiceOptions,
+    { allowAnyBaseUrl: true },
+  );
 }
 
 const nonToken = () => fake.state.requests.filter((r) => r.path !== '/webapp/token');

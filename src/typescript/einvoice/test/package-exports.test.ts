@@ -39,3 +39,22 @@ describe('isMeInvoiceException (dual-package hazard)', () => {
     expect(esm.isMeInvoiceException(undefined)).toBe(false);
   });
 });
+
+describe('no base-URL escape hatch in the published build', () => {
+  it('dist exposes neither __unsafeAllowAnyBaseUrl nor the internal factory', async () => {
+    const { readFileSync } = await import('node:fs');
+    const dist = new URL('../dist/', import.meta.url);
+    for (const file of ['index.js', 'index.cjs', 'index.d.ts', 'index.d.cts']) {
+      expect(readFileSync(new URL(file, dist), 'utf8')).not.toContain('__unsafeAllowAnyBaseUrl');
+    }
+    for (const file of ['index.d.ts', 'index.d.cts']) {
+      expect(readFileSync(new URL(file, dist), 'utf8')).not.toContain(
+        'createMisaEInvoiceClientInternal',
+      );
+    }
+    const esm = (await import('@misaconnect/einvoice')) as Record<string, unknown>;
+    const cjs = createRequire(import.meta.url)('@misaconnect/einvoice') as Record<string, unknown>;
+    expect(esm['createMisaEInvoiceClientInternal']).toBeUndefined();
+    expect(cjs['createMisaEInvoiceClientInternal']).toBeUndefined();
+  });
+});

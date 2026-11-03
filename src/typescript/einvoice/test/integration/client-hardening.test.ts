@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMisaEInvoiceClient, type IMisaEInvoiceClient } from '../../src/client.js';
+import { createMisaEInvoiceClientInternal } from '../../src/client-internal.js';
 import type { Logger } from '../../src/application/ports.js';
 import type { MisaEInvoiceOptions } from '../../src/infrastructure/options.js';
 import { startFakeMisa, type FakeMisa } from '../fake/fake-misa-server.js';
@@ -8,16 +9,18 @@ import { invoice } from '../fixtures/readme-invoice.js';
 let fake: FakeMisa;
 
 function client(over: Partial<MisaEInvoiceOptions> = {}): IMisaEInvoiceClient {
-  return createMisaEInvoiceClient({
-    environment: 'sandbox',
-    baseUrl: fake.baseUrl,
-    taxCode: '0101243150',
-    userName: 'user@example.com',
-    password: 'pa55-secret',
-    appId: 'APP-1',
-    __unsafeAllowAnyBaseUrl: true,
-    ...over,
-  } as MisaEInvoiceOptions);
+  return createMisaEInvoiceClientInternal(
+    {
+      environment: 'sandbox',
+      baseUrl: fake.baseUrl,
+      taxCode: '0101243150',
+      userName: 'user@example.com',
+      password: 'pa55-secret',
+      appId: 'APP-1',
+      ...over,
+    } as MisaEInvoiceOptions,
+    { allowAnyBaseUrl: true },
+  );
 }
 
 beforeEach(async () => {
@@ -102,5 +105,23 @@ describe('caller abort is logged as Cancelled', () => {
     expect(err).toBe(reason);
     expect(fields[0]).toMatchObject({ outcome: 'Cancelled' });
     expect(fields[0]).not.toHaveProperty('errorCategory');
+  });
+});
+
+describe('public factory has no base-URL escape hatch', () => {
+  it('ignores __unsafeAllowAnyBaseUrl and rejects a non-MISA http baseUrl', () => {
+    const attempt = (): unknown =>
+      createMisaEInvoiceClient({
+        environment: 'sandbox',
+        baseUrl: 'http://127.0.0.1:1',
+        taxCode: '0101243150',
+        userName: 'user@example.com',
+        password: 'pa55-secret',
+        appId: 'APP-1',
+        __unsafeAllowAnyBaseUrl: true,
+      } as unknown as MisaEInvoiceOptions);
+    expect(attempt).toThrow(
+      expect.objectContaining({ category: 'Configuration', rawErrorCode: 'InvalidOptions' }),
+    );
   });
 });

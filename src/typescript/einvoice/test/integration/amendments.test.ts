@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createMisaEInvoiceClient, type IMisaEInvoiceClient } from '../../src/client.js';
+import type { IMisaEInvoiceClient } from '../../src/client.js';
+import { createMisaEInvoiceClientInternal } from '../../src/client-internal.js';
 import type { Logger } from '../../src/application/ports.js';
 import type {
   AdjustmentRequestDto,
@@ -24,17 +25,19 @@ function capture(): Logger {
 }
 
 function client(over: Partial<MisaEInvoiceOptions> = {}): IMisaEInvoiceClient {
-  return createMisaEInvoiceClient({
-    environment: 'sandbox',
-    baseUrl: fake.baseUrl,
-    taxCode: '0101243150',
-    userName: 'user@example.com',
-    password: 'pa55-secret',
-    appId: 'APP-1',
-    logger: capture(),
-    __unsafeAllowAnyBaseUrl: true,
-    ...over,
-  } as MisaEInvoiceOptions);
+  return createMisaEInvoiceClientInternal(
+    {
+      environment: 'sandbox',
+      baseUrl: fake.baseUrl,
+      taxCode: '0101243150',
+      userName: 'user@example.com',
+      password: 'pa55-secret',
+      appId: 'APP-1',
+      logger: capture(),
+      ...over,
+    } as MisaEInvoiceOptions,
+    { allowAnyBaseUrl: true },
+  );
 }
 
 const invoice = (over: Partial<InvoiceDto> = {}): InvoiceDto => ({
