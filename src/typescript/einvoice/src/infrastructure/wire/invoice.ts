@@ -107,7 +107,9 @@ function formatOffsetDateTime(text: string, field: string): string {
   if (!p || p.offset === undefined) {
     throw new MeInvoiceException('Validation', {
       rawErrorCode: 'InvalidDate',
-      message: 'Date-time must be ISO-8601 with an offset.',
+      message: !p
+        ? 'Date-time is not a valid ISO-8601 date-time (yyyy-MM-ddTHH:mm[:ss[.fff]] with Z or ±hh:mm).'
+        : 'Date-time has no UTC offset; add Z or +hh:mm / -hh:mm (e.g. 2026-05-11T08:30:15+07:00).',
       field,
     });
   }

@@ -361,3 +361,32 @@ describe('fromWireTemplate', () => {
     });
   });
 });
+
+describe('date-time error messages', () => {
+  const failOf = (createdDate: string): MeInvoiceException => {
+    try {
+      toWireInvoice({ ...typical, createdDate }, TYPICAL_ID, template);
+    } catch (e) {
+      return e as MeInvoiceException;
+    }
+    throw new Error('expected a failure');
+  };
+
+  it('a well-formed date-time without offset says the offset is missing', () => {
+    const err = failOf('2026-05-11T08:30:15');
+    expect(err).toMatchObject({ rawErrorCode: 'InvalidDate', field: 'createdDate' });
+    expect(err.message).toBe(
+      'Date-time has no UTC offset; add Z or +hh:mm / -hh:mm (e.g. 2026-05-11T08:30:15+07:00).',
+    );
+  });
+
+  it('a malformed date-time says it is malformed', () => {
+    for (const bad of ['yesterday', '2026-02-30T00:00:00Z', '2026-05-11T25:00:00+07:00']) {
+      const err = failOf(bad);
+      expect(err).toMatchObject({ rawErrorCode: 'InvalidDate', field: 'createdDate' });
+      expect(err.message).toBe(
+        'Date-time is not a valid ISO-8601 date-time (yyyy-MM-ddTHH:mm[:ss[.fff]] with Z or ±hh:mm).',
+      );
+    }
+  });
+});
