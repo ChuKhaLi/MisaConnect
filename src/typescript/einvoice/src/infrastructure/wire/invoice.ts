@@ -114,6 +114,18 @@ function formatOffsetDateTime(text: string, field: string): string {
   return `${p.date}T${p.time}.${p.fraction.padEnd(7, '0').slice(0, 7)}${p.offset}`;
 }
 
+/** A plain (non-money) number: must be finite when present, so it fails this invoice only. */
+function optNumber(v: number | undefined, field: string): number | undefined {
+  if (typeof v === 'number' && !Number.isFinite(v)) {
+    throw new MeInvoiceException('Validation', {
+      rawErrorCode: 'InvalidNumber',
+      message: 'Number must be finite.',
+      field,
+    });
+  }
+  return v;
+}
+
 function wireLine(l: InvoiceLineDto, i: number): WireInvoiceDetail {
   const f = (name: string) => `lines[${i}].${name}`;
   let vat: { name: string; numeric?: number } | undefined;
@@ -129,9 +141,9 @@ function wireLine(l: InvoiceLineDto, i: number): WireInvoiceDetail {
     vat = wireVat(parsed);
   }
   return {
-    InventoryItemType: l.inventoryItemType,
-    SortOrder: l.sortOrder,
-    SortOrderView: l.sortOrderView,
+    InventoryItemType: optNumber(l.inventoryItemType, f('inventoryItemType')) as number,
+    SortOrder: optNumber(l.sortOrder, f('sortOrder')),
+    SortOrderView: optNumber(l.sortOrderView, f('sortOrderView')),
     Description: l.description,
     UnitName: l.unitName,
     Quantity: optMoney(l.quantity, f('quantity')),

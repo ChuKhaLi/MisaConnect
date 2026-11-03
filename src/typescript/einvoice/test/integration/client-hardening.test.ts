@@ -210,3 +210,30 @@ describe('untyped-JS null inputs never surface a raw TypeError', () => {
     expect(templates.map((t) => t.ipTemplateID)).toEqual([good?.IPTemplateID]);
   });
 });
+
+describe('non-finite numbers in non-money fields', () => {
+  it('fail only their own invoice, before HTTP, with a domain field path', async () => {
+    const bad = {
+      ...invoice,
+      refId: 'nan-1',
+      lines: [{ ...invoice.lines[0], sortOrder: Number.NaN }],
+    } as typeof invoice;
+    const badType = {
+      ...invoice,
+      refId: 'inf-1',
+      lines: [{ ...invoice.lines[0], inventoryItemType: Number.POSITIVE_INFINITY }],
+    } as typeof invoice;
+    const results = await client().saveDraft([bad, badType, { ...invoice, refId: 'ok-1' }]);
+    expect(results[0]).toMatchObject({ outcome: 'Error', rawErrorCode: 'ValidationFailed' });
+    expect(results[0]?.failures?.map((f) => f.fieldPath)).toEqual([
+      'invoices[0].lines[0].sortOrder',
+    ]);
+    expect(results[1]?.failures?.map((f) => f.fieldPath)).toEqual([
+      'invoices[1].lines[0].inventoryItemType',
+    ]);
+    expect(results[2]).toEqual({ refId: 'ok-1', outcome: 'Success' });
+    const inserts = fake.state.requests.filter((r) => r.path === '/webapp/insert');
+    expect(inserts).toHaveLength(1);
+    expect((JSON.parse(inserts[0]?.bodyText ?? '[]') as unknown[]).length).toBe(1);
+  });
+});
