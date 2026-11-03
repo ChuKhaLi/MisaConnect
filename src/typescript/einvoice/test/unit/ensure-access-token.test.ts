@@ -302,3 +302,35 @@ describe('ensureAccessToken when the cache read fails', () => {
     expect(reads).toBe(1);
   });
 });
+
+describe('ensureAccessToken when the cache write fails', () => {
+  it('every joined waiter gets the raw set error, the entry is cleared, the next call retries', async () => {
+    const boom = new Error('cache write down');
+    let writes = 0;
+    let acquisitions = 0;
+    const cache: TokenCache = {
+      get: () => Promise.resolve(undefined),
+      set: () => {
+        writes++;
+        return writes === 1 ? Promise.reject(boom) : Promise.resolve();
+      },
+      delete: () => Promise.resolve(),
+    };
+    const deps: EnsureAccessTokenDeps = {
+      ...makeDeps(() => {
+        acquisitions++;
+        return Promise.resolve({ value: `t${acquisitions}`, expiresAt: new Date(0) });
+      }),
+      tokenCache: cache,
+    };
+    const results = await Promise.allSettled([ensureAccessToken(deps), ensureAccessToken(deps)]);
+    for (const r of results) {
+      expect(r.status).toBe('rejected');
+      expect((r as PromiseRejectedResult).reason).toBe(boom);
+    }
+    expect(acquisitions).toBe(1);
+    expect(deps.inflight.size).toBe(0);
+    expect(await ensureAccessToken(deps)).toBe('t2');
+    expect(writes).toBe(2);
+  });
+});

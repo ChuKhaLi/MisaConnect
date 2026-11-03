@@ -51,6 +51,19 @@ afterEach(async () => {
 });
 
 describe('deleteDraft', () => {
+  it('a TokenCache error propagates unchanged (not turned into an outcome), no request sent', async () => {
+    const boom = new Error('token cache down');
+    const c = client({
+      tokenCache: {
+        get: () => Promise.reject(boom),
+        set: () => Promise.resolve(),
+        delete: () => Promise.resolve(),
+      },
+    });
+    await expect(c.deleteDraft('r1', true)).rejects.toBe(boom);
+    expect(fake.state.requests).toHaveLength(0);
+  });
+
   it('success → Deleted, DELETE with url-encoded refid', async () => {
     const outcome = await client().deleteDraft('ref a&b', true);
     expect(outcome).toEqual({ status: 'Deleted', refId: 'ref a&b' });

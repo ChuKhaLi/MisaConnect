@@ -81,6 +81,8 @@ const tokenCache: TokenCache = {
 
 If a cache returns an ISO string or an epoch number instead of a `Date`, it is converted; an unparseable value counts as expired, so a new token is acquired.
 
+An error thrown (or a promise rejected) by your `TokenCache` propagates unchanged from every operation, including `deleteDraft`, `lookupByRefId` and `saveDraft`, whose MISA and transport failures otherwise become outcomes: it is not wrapped in a `MeInvoiceException`. Concurrent calls waiting on the same token all get that same error, and the next call retries the cache.
+
 ## Operations
 
 Every method takes an optional last argument `opts?: CallOptions` (`{ signal?: AbortSignal; correlationId?: string }`). `withCode` defaults to `true` on the methods that have it.
