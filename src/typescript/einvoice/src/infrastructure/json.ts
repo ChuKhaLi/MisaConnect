@@ -2,6 +2,8 @@ import { MeInvoiceException } from '../domain/errors.js';
 import type { Money } from '../domain/dtos.js';
 
 const MONEY_PATTERN = /^-?\d+(\.\d+)?$/;
+// Emitted text: plain decimals, or exponent form produced by JSON.stringify of a number.
+const EMIT_PATTERN = /^-?d+(.d+)?([eE][+-]?d+)?$/;
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Branded wrapper; its text is emitted verbatim as a JSON number literal. */
@@ -9,32 +11,44 @@ export interface MoneyLiteral {
   readonly __money: string;
 }
 
-function invalidMoney(message: string): MeInvoiceException {
-  return new MeInvoiceException('Validation', { rawErrorCode: 'InvalidMoney', message });
+/** Objects actually returned by `money()`; makes the brand unforgeable by caller data. */
+const issuedMoney = new WeakSet<object>();
+
+function invalidMoney(message: string, field?: string): MeInvoiceException {
+  return new MeInvoiceException('Validation', {
+    rawErrorCode: 'InvalidMoney',
+    message,
+    ...(field !== undefined ? { field } : {}),
+  });
+}
+
+function invalidDate(message: string, field?: string): MeInvoiceException {
+  return new MeInvoiceException('Validation', {
+    rawErrorCode: 'InvalidDate',
+    message,
+    ...(field !== undefined ? { field } : {}),
+  });
 }
 
 /** Validates a money value and wraps it so `serializeRequest` writes it verbatim. */
-export function money(value: Money): MoneyLiteral {
+export function money(value: Money, field?: string): MoneyLiteral {
+  let text: string;
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw invalidMoney('Money amount must be a finite number.');
-    return { __money: JSON.stringify(value) };
+    if (!Number.isFinite(value)) {
+      throw invalidMoney('Money amount must be a finite number.', field);
+    }
+    text = JSON.stringify(value);
+  } else if (typeof value === 'string' && MONEY_PATTERN.test(value)) {
+    text = value;
+  } else {
+    throw invalidMoney('Money amount must be a plain decimal number.', field);
   }
-  if (typeof value !== 'string' || !MONEY_PATTERN.test(value)) {
-    throw invalidMoney('Money amount must be a plain decimal number.');
-  }
-  return { __money: value };
+  const literal: MoneyLiteral = Object.freeze({ __money: text });
+  issuedMoney.add(literal);
+  return literal;
 }
 
-function isMoneyLiteral(v: unknown): v is MoneyLiteral {
-  return (
-    typeof v === 'object' &&
-    v !== null &&
-    typeof (v as { __money?: unknown }).__money === 'string' &&
-    Object.keys(v).length === 1
-  );
-}
-
-function write(v: unknown): string | undefined {
+function write(v: unknown, path: string): string | undefined {
   if (v === null) return 'null';
   switch (typeof v) {
     case 'undefined':
@@ -50,21 +64,31 @@ function write(v: unknown): string | undefined {
         throw new MeInvoiceException('Validation', {
           rawErrorCode: 'InvalidNumber',
           message: 'Non-finite numbers cannot be serialized.',
+          field: path,
         });
       }
       return JSON.stringify(v);
     case 'bigint':
       return v.toString();
   }
-  if (isMoneyLiteral(v)) return v.__money;
-  if (v instanceof Date) return JSON.stringify(v.toISOString());
+  if (issuedMoney.has(v as object)) {
+    const text = (v as MoneyLiteral).__money;
+    if (!EMIT_PATTERN.test(text)) {
+      throw invalidMoney('Money amount must be a plain decimal number.', path);
+    }
+    return text;
+  }
+  if (v instanceof Date) {
+    if (Number.isNaN(v.getTime())) throw invalidDate('Invalid Date value.', path);
+    return JSON.stringify(v.toISOString());
+  }
   if (Array.isArray(v)) {
-    return `[${v.map((x) => write(x) ?? 'null').join(',')}]`;
+    return `[${v.map((x, i) => write(x, `${path}[${i}]`) ?? 'null').join(',')}]`;
   }
   const parts: string[] = [];
   for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
     if (val === null) continue;
-    const text = write(val);
+    const text = write(val, path === '' ? k : `${path}.${k}`);
     if (text !== undefined) parts.push(`${JSON.stringify(k)}:${text}`);
   }
   return `{${parts.join(',')}}`;
@@ -72,20 +96,18 @@ function write(v: unknown): string | undefined {
 
 /** Like `JSON.stringify`, but omits null/undefined members and writes `money()` values verbatim. */
 export function serializeRequest(value: unknown): string {
-  return write(value) ?? 'null';
+  return write(value, '') ?? 'null';
 }
 
 /** Formats a date as `yyyy-MM-dd` (local calendar fields for `Date`). */
 export function formatDateOnly(v: string | Date): string {
   if (typeof v === 'string') {
     if (!DATE_ONLY_PATTERN.test(v)) {
-      throw new MeInvoiceException('Validation', {
-        rawErrorCode: 'InvalidDate',
-        message: 'Date must be formatted yyyy-MM-dd.',
-      });
+      throw invalidDate('Date must be formatted yyyy-MM-dd.');
     }
     return v;
   }
+  if (Number.isNaN(v.getTime())) throw invalidDate('Invalid Date value.');
   const y = String(v.getFullYear()).padStart(4, '0');
   const m = String(v.getMonth() + 1).padStart(2, '0');
   const d = String(v.getDate()).padStart(2, '0');

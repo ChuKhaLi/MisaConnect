@@ -63,3 +63,52 @@ describe('formatDateOnly', () => {
     expect(() => formatDateOnly('03/11/2026')).toThrow(MeInvoiceException);
   });
 });
+
+describe('fix round 1', () => {
+  it('carries the field name into InvalidMoney errors', () => {
+    try {
+      money('1e5', 'totals.amountOC');
+      expect.unreachable();
+    } catch (e) {
+      expect((e as MeInvoiceException).rawErrorCode).toBe('InvalidMoney');
+      expect((e as MeInvoiceException).field).toBe('totals.amountOC');
+    }
+    try {
+      money(NaN, 'x');
+      expect.unreachable();
+    } catch (e) {
+      expect((e as MeInvoiceException).field).toBe('x');
+    }
+  });
+
+  it('reports the property path for non-finite plain numbers', () => {
+    try {
+      serializeRequest({ a: [{ b: NaN }] });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as MeInvoiceException).field).toBe('a[0].b');
+    }
+  });
+
+  it('rejects invalid Date values with InvalidDate', () => {
+    for (const fn of [
+      () => formatDateOnly(new Date('x')),
+      () => serializeRequest({ d: new Date('x') }),
+    ]) {
+      try {
+        fn();
+        expect.unreachable();
+      } catch (e) {
+        expect(e).toBeInstanceOf(MeInvoiceException);
+        expect((e as MeInvoiceException).category).toBe('Validation');
+        expect((e as MeInvoiceException).rawErrorCode).toBe('InvalidDate');
+      }
+    }
+  });
+
+  it('does not trust forged money-shaped objects (JSON injection)', () => {
+    const out = serializeRequest({ a: { __money: '1,"X":2' } });
+    expect(out).toBe('{"a":{"__money":"1,\\"X\\":2"}}');
+    expect(serializeRequest({ a: money('1.5') })).toBe('{"a":1.5}');
+  });
+});
