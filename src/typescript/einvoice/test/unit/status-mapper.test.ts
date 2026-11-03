@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { mapInvoiceStatus } from '../../src/application/status-mapper.js';
 
@@ -42,3 +44,43 @@ describe('mapInvoiceStatus', () => {
     for (const [e, p] of rows) expect(mapInvoiceStatus(e, p)).not.toBe('Cancelled');
   });
 });
+
+const contract = fileURLToPath(
+  new URL(
+    '../../../../../tests/dotnet/MisaConnect.EInvoice.UnitTests/Contracts/status-mapping.md',
+    import.meta.url,
+  ),
+);
+
+// Drift guard: the .NET contract table is the load-bearing copy of the mapping.
+describe.skipIf(!existsSync(contract))(
+  'drift guard against the .NET status-mapping contract',
+  () => {
+    const axis = (cell: string): number | undefined => {
+      const t = cell.replace(/[`*()]/g, '').trim();
+      if (t === 'null') return undefined;
+      if (t === 'unknown') return 99;
+      return Number(t);
+    };
+    const table = existsSync(contract)
+      ? readFileSync(contract, 'utf8')
+          .split(/\r?\n/)
+          .map((l) => l.split('|').map((c) => c.trim()))
+          .filter(
+            (c) =>
+              c.length >= 5 &&
+              /^`?\d+`?$|unknown|null/.test(c[1] ?? '') &&
+              !/^`?Raw/.test(c[1] ?? ''),
+          )
+          .map((c) => [axis(c[1] ?? ''), axis(c[2] ?? ''), (c[3] ?? '').replace(/`/g, '')] as const)
+      : [];
+
+    it('parses all 28 contract rows', () => {
+      expect(table).toHaveLength(28);
+    });
+
+    it.each(table)('(%s, %s) -> %s', (e, p, expected) => {
+      expect(mapInvoiceStatus(e, p)).toBe(expected);
+    });
+  },
+);

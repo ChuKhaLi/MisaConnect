@@ -1,5 +1,5 @@
 import { connect } from 'node:net';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   createMisaEInvoiceClient,
   MeInvoiceException,
@@ -20,7 +20,11 @@ const password = process.env['MISACONNECT_SANDBOX_PASSWORD']?.trim();
 const appId = process.env['MISACONNECT_SANDBOX_APPID']?.trim();
 const hasSandboxEnv = !!taxCode && !!userName && !!password && !!appId;
 
-/** One-shot TCP-connect probe with a short timeout; never throws. */
+/**
+ * One-shot TCP-connect probe with a short timeout; never throws. It dials the host directly
+ * and therefore ignores HTTP(S) proxy settings: behind a proxy-only network it reports
+ * "unreachable" and the suite skips even though fetch (via a proxy) could have succeeded.
+ */
 function isReachable(): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = connect({ host: HOST, port: PORT });
@@ -96,8 +100,12 @@ function sampleInvoice(refId?: string): InvoiceDto {
 }
 
 describe.skipIf(!runnable)('MISA sandbox (live)', () => {
-  // Constructed only when runnable: option validation rejects empty credentials.
-  const client = runnable ? createClient() : (undefined as unknown as IMisaEInvoiceClient);
+  // Created in beforeAll (which only runs when the suite is not skipped): option validation
+  // rejects empty credentials, so it cannot be built at collection time.
+  let client: IMisaEInvoiceClient;
+  beforeAll(() => {
+    client = createClient();
+  });
   const created = new Set<string>();
 
   /** Saves one draft and tracks it for afterAll cleanup. */
@@ -115,7 +123,7 @@ describe.skipIf(!runnable)('MISA sandbox (live)', () => {
     await Promise.allSettled([...created].map((refId) => client.deleteDraft(refId, true)));
   });
 
-  it('acquires a token on first call and reuses it on the second', async () => {
+  it('listTemplates is repeatable: two consecutive calls return the same templates', async () => {
     const first = await client.listTemplates();
     const second = await client.listTemplates();
     expect(first.length).toBeGreaterThan(0);
@@ -124,7 +132,13 @@ describe.skipIf(!runnable)('MISA sandbox (live)', () => {
 
   it('wrong password surfaces a MeInvoiceException', async () => {
     const bad = createClient('wrong-password-on-purpose');
-    await expect(bad.listTemplates()).rejects.toBeInstanceOf(MeInvoiceException);
+    const err = await bad.listTemplates().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(MeInvoiceException);
+    // MISA normally answers a JSON Authentication error, but some sandbox builds reply with
+    // a non-JSON body; accept those mapped categories too rather than pin one gateway behaviour.
+    expect(['Authentication', 'TransportFailed', 'MisaUnknown']).toContain(
+      (err as MeInvoiceException).category,
+    );
   });
 
   it('listTemplates returns active templates with ids and series', async () => {

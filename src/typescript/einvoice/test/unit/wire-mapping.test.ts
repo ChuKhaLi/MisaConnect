@@ -219,6 +219,54 @@ describe('toWireInvoice (golden parity with .NET)', () => {
     }
   });
 
+  it('normalises a +0700 offset to +07:00 and pads the fraction to 7 digits', () => {
+    const dto = { ...typical, createdDate: '2026-05-11T08:30:15.5+0700' };
+    const wire = toWireInvoice(dto, 'r', template);
+    expect(wire.CreatedDate).toBe('2026-05-11T08:30:15.5000000+07:00');
+  });
+
+  it('maps every optional buyer and line field onto the wire', () => {
+    const dto: InvoiceDto = {
+      ...typical,
+      buyer: {
+        name: 'ACME',
+        taxCode: '0123456789',
+        address: '1 Main St',
+        contactName: 'Contact',
+        email: 'a@b.vn',
+        receiverName: 'Receiver',
+        mobile: '0900000000',
+        bankAccount: '123456',
+        bankName: 'VCB',
+      },
+      lines: [
+        {
+          ...line(1, 'x', 'y', 1, 1, 1, '10%', 0),
+          discountRate: 5,
+          discountAmountOC: 2.5,
+          discountAmount: '3.25',
+        },
+      ],
+    };
+    const wire = JSON.parse(serializeRequest(toWireInvoice(dto, 'r', template)));
+    expect(wire).toMatchObject({
+      AccountObjectName: 'ACME',
+      AccountObjectTaxCode: '0123456789',
+      AccountObjectAddress: '1 Main St',
+      ContactName: 'Contact',
+      ReceiverEmail: 'a@b.vn',
+      ReceiverName: 'Receiver',
+      ReceiverMobile: '0900000000',
+      AccountObjectBankAccount: '123456',
+      AccountObjectBankName: 'VCB',
+    });
+    expect(wire.InvoiceDetails[0]).toMatchObject({
+      DiscountRate: 5,
+      DiscountAmountOC: 2.5,
+      DiscountAmount: 3.25,
+    });
+  });
+
   it('rejects an unknown VAT rate name with the line field path', () => {
     const dto = { ...typical, lines: [line(1, 'x', 'y', 1, 1, 1, 'weird', 0)] };
     try {

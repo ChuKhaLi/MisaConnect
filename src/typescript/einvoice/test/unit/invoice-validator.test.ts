@@ -105,6 +105,16 @@ describe('InvoiceValidator.validate', () => {
     expect(v(invoice({ currency: 'vnd', exchangeRate: 0 }))).toEqual([]);
   });
 
+  it('FR-023 non-VND with exchangeRate undefined fails', () => {
+    expect(v(invoice({ currency: 'USD', exchangeRate: undefined }))).toEqual([
+      {
+        fieldPath: 'exchangeRate',
+        message: 'ExchangeRate must be supplied and > 0 for non-VND invoices.',
+        ruleId: 'FR-023',
+      },
+    ]);
+  });
+
   it('FR-024 organization buyer needs taxCode', () => {
     expect(v(invoice({ buyerType: 1, buyer: { name: 'ACME', taxCode: '  ' } }))).toEqual([
       {
@@ -177,6 +187,16 @@ describe('InvoiceValidator.validate', () => {
     expect(v(invoice({ lines: [line({ vatRateName: 'KHAC:1,000%' })] }))[0]?.message).toBe(
       "VATRateName 'KHAC:1,000%' is not in the accepted set.",
     );
+  });
+
+  it('FR-029 an empty vatRateName is not in the accepted set', () => {
+    expect(v(invoice({ lines: [line({ vatRateName: '' })] }))).toEqual([
+      {
+        fieldPath: 'lines[0].vatRateName',
+        message: "VATRateName '' is not in the accepted set.",
+        ruleId: 'FR-029',
+      },
+    ]);
   });
 
   it('FR-025 discount reconciliation tolerance is 0.5 (inclusive)', () => {

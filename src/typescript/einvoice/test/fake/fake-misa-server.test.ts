@@ -46,8 +46,42 @@ describe('fake MISA server', () => {
 
   it('serves a queued 503 once, then recovers', async () => {
     fake.state.queueStatus(503);
-    expect((await post('webapp/templates', {})).status).toBe(503);
+    const queued = await post('webapp/templates', {});
+    expect(queued.status).toBe(503);
+    const text = await queued.text();
+    expect(text).toBe('queued status 503');
+    expect(() => JSON.parse(text)).toThrow();
     expect((await post('webapp/templates', {})).status).toBe(200);
+  });
+
+  it('answers an insert without any RefID with 400 InvalidInvoiceData', async () => {
+    const res = await post('webapp/insert', [{ InvSeries: 'C26TAA' }]);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, errorCode: 'InvalidInvoiceData' });
+    expect(fake.state.drafts.size).toBe(0);
+  });
+
+  it('serves an empty 200 body once when queued', async () => {
+    fake.state.queueEmptyBody();
+    const res = await post('webapp/templates', {});
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('');
+    expect((await post('webapp/templates', {})).status).toBe(200);
+  });
+
+  it('catch-all records the error in state.errors and answers 500 with its message', async () => {
+    fake.state.rawLookupRows = [{ boom: 1n }];
+    const res = await post('webapp/paging', {});
+    expect(res.status).toBe(500);
+    expect(await res.text()).toContain('BigInt');
+    expect(fake.state.errors).toHaveLength(1);
+    expect(fake.state.errors[0]).toBeInstanceOf(Error);
+  });
+
+  it('close() is idempotent', async () => {
+    const other = await startFakeMisa();
+    await other.close();
+    await expect(other.close()).resolves.toBeUndefined();
   });
 
   it('requires bearer + taxcode on non-token routes and honours queue401', async () => {
@@ -134,5 +168,21 @@ describe('fake MISA server', () => {
       await post('webapp/paging/calculating', { Start: 0, Length: 10 })
     ).json()) as { data: { RefID: string }[] };
     expect(calc.data.map((x) => x.RefID)).toEqual(['c01']);
+  });
+
+  it('filters paging by FromDate, ToDate and PublishStatus', async () => {
+    fake.state.seedDraft({ RefID: 'p1', InvDate: '2026-05-01', PublishStatus: '0' });
+    fake.state.seedDraft({ RefID: 'p2', InvDate: '2026-05-10', PublishStatus: '6' });
+    fake.state.seedDraft({ RefID: 'p3', InvDate: '2026-05-20', PublishStatus: '6' });
+    const ids = async (body: unknown): Promise<string[]> =>
+      ((await (await post('webapp/paging', body)).json()) as Env).data.map(
+        (x: { RefID: string }) => x.RefID,
+      );
+    expect(await ids({ FromDate: '2026-05-10' })).toEqual(['p2', 'p3']);
+    expect(await ids({ ToDate: '2026-05-10' })).toEqual(['p1', 'p2']);
+    expect(await ids({ PublishStatus: '6' })).toEqual(['p2', 'p3']);
+    expect(await ids({ FromDate: '2026-05-05', ToDate: '2026-05-15', PublishStatus: '6' })).toEqual(
+      ['p2'],
+    );
   });
 });

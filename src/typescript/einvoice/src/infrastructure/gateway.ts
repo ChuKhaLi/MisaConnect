@@ -57,8 +57,10 @@ function decodeBase64(data: unknown, refId?: string): Uint8Array {
  * Port `DeserializeSnapshots`: `data` is a raw array, or (some sandbox builds) a string the
  * envelope reader could not pre-parse; unparseable / non-array data is empty, and rows that
  * are not JSON objects are skipped (.NET returns empty rather than throwing).
+ *
+ * @internal exported for tests only; not part of the package surface.
  */
-function toSnapshots(data: unknown): InvoiceSnapshotDto[] {
+export function toSnapshots(data: unknown): InvoiceSnapshotDto[] {
   let rows: unknown = data;
   if (typeof rows === 'string' && rows !== '') {
     try {

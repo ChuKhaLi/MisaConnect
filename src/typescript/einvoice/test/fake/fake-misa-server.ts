@@ -83,7 +83,13 @@ export class FakeState {
   /** Every request received, in order (including rejected ones). */
   readonly requests: FakeRequest[] = [];
 
+  /** Errors thrown while handling a request (the server answers those with a 500). */
+  readonly errors: unknown[] = [];
+  /** Delay (ms) before every non-token request is handled; lets tests abort mid-flight. */
+  responseDelayMs = 0;
+
   /** @internal */ readonly statusQueue: number[] = [];
+  /** @internal */ emptyBodies = 0;
   /** @internal */ pending401 = 0;
   /** @internal */ readonly insertErrors = new Map<
     string,
@@ -104,6 +110,11 @@ export class FakeState {
   /** Next `times` non-token requests are answered with `status` and a non-JSON body. */
   queueStatus(status: number, times = 1): void {
     for (let i = 0; i < times; i++) this.statusQueue.push(status);
+  }
+
+  /** Next `times` non-token requests are answered 200 with an empty body. */
+  queueEmptyBody(times = 1): void {
+    this.emptyBodies += times;
   }
 
   /** Next `times` non-token requests get 401 regardless of credentials. */
@@ -157,8 +168,9 @@ function readBody(req: IncomingMessage): Promise<string> {
 }
 
 function send(res: ServerResponse, status: number, body: unknown): void {
+  const text = JSON.stringify(body); // before writeHead: a serialisation error must still yield a 500
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify(body));
+  res.end(text);
 }
 
 /** MISA envelope: `data` is a stringified JSON value (or null). */
@@ -236,6 +248,12 @@ function handle(state: FakeState, req: FakeRequest, res: ServerResponse): void {
   if (state.pending401 > 0) {
     state.pending401--;
     send(res, 401, UNAUTHORIZED);
+    return;
+  }
+  if (state.emptyBodies > 0) {
+    state.emptyBodies--;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end();
     return;
   }
   const queued = state.statusQueue.shift();
@@ -376,21 +394,26 @@ export async function startFakeMisa(): Promise<FakeMisa> {
         bodyText,
       };
       state.requests.push(entry);
+      if (state.responseDelayMs > 0 && entry.path !== '/webapp/token') {
+        await new Promise((resolve) => setTimeout(resolve, state.responseDelayMs));
+      }
       handle(state, entry, res);
-    })().catch(() => {
-      if (!res.headersSent) res.writeHead(500);
-      res.end();
+    })().catch((e: unknown) => {
+      state.errors.push(e);
+      if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end(e instanceof Error ? e.message : String(e));
     });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
+  let closing: Promise<void> | undefined;
   return {
     baseUrl: `http://127.0.0.1:${port}`,
     state,
     close: () =>
-      new Promise<void>((resolve, reject) => {
+      (closing ??= new Promise<void>((resolve, reject) => {
         server.closeAllConnections();
         server.close((e) => (e ? reject(e) : resolve()));
-      }),
+      })),
   };
 }

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IMisaEInvoiceClient } from '../../src/client.js';
 import { createMisaEInvoiceClientInternal } from '../../src/client-internal.js';
 import type { Logger } from '../../src/application/ports.js';
@@ -127,7 +127,7 @@ describe('deleteDraft', () => {
     expect(on.message).toBe('Hóa đơn đã phát hành');
   });
 
-  it('other MISA error codes are mapped (DuplicateInvoiceRefID → MisaUnknown, InvalidTokenCode → AuthFailed)', async () => {
+  it('other MISA error codes are mapped (unknown code → MisaUnknown, InvalidAppID → Configuration)', async () => {
     fake.state.setDeleteError('r1', 'SomethingNew', 'boom');
     const o = await client().deleteDraft('r1', true);
     expect(o).toEqual({ status: 'MisaUnknown', rawErrorCode: 'SomethingNew', refId: 'r1' });
@@ -137,6 +137,37 @@ describe('deleteDraft', () => {
       status: 'Configuration',
       rawErrorCode: 'InvalidAppID',
       message: 'bad app',
+    });
+  });
+
+  it.each([undefined, ''])(
+    'InvalidTransactionID with message %j → NotFound + one ARCH-DEL-001 warn',
+    async (message) => {
+      fake.state.setDeleteError('r1', 'InvalidTransactionID', message as unknown as string);
+      const outcome = await client().deleteDraft('r1', true);
+      expect(outcome).toEqual({
+        status: 'NotFound',
+        rawErrorCode: 'InvalidTransactionID',
+        refId: 'r1',
+      });
+      expect(archWarnings()).toHaveLength(1);
+    },
+  );
+
+  it('an empty 200 response body → MisaUnknown EmptyResponse outcome, no throw', async () => {
+    fake.state.queueEmptyBody();
+    const outcome = await client().deleteDraft('r1', true);
+    expect(outcome).toEqual({ status: 'MisaUnknown', rawErrorCode: 'EmptyResponse', refId: 'r1' });
+  });
+
+  it('passes the mapped field of a prefixed error code through', async () => {
+    fake.state.setDeleteError('r1', 'InvoiceDetail_Quantity_Line3', 'bad');
+    const outcome = await client().deleteDraft('r1', true);
+    expect(outcome).toEqual({
+      status: 'MisaUnknown',
+      rawErrorCode: 'InvoiceDetail_Quantity_Line3',
+      field: 'Quantity',
+      refId: 'r1',
     });
   });
 
@@ -178,5 +209,21 @@ describe('deleteDraft', () => {
       .deleteDraft('r1', true, { signal: ac.signal })
       .catch((e: unknown) => e);
     expect((err as Error).name).toBe('AbortError');
+  });
+
+  it('a mid-flight abort (response delayed by the server) rejects with AbortError', async () => {
+    const c = client();
+    await c.deleteDraft('warm-up', true); // cache the access token so only the delete is delayed
+    fake.state.responseDelayMs = 2000;
+    const ac = new AbortController();
+    const pending = c.deleteDraft('r1', true, { signal: ac.signal }).catch((e: unknown) => e);
+    await vi.waitFor(() =>
+      expect(nonToken().filter((r) => r.path === '/webapp/delete')).toHaveLength(2),
+    );
+    ac.abort();
+    const started = Date.now();
+    const err = await pending;
+    expect((err as Error).name).toBe('AbortError');
+    expect(Date.now() - started).toBeLessThan(1500);
   });
 });

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { IMisaEInvoiceClient } from '../../src/client.js';
 import { createMisaEInvoiceClientInternal } from '../../src/client-internal.js';
 import type { Logger } from '../../src/application/ports.js';
+import { toSnapshots } from '../../src/infrastructure/gateway.js';
 import type { PagedLookupRequestDto } from '../../src/domain/dtos.js';
 import { MeInvoiceException } from '../../src/domain/errors.js';
 import type { MisaEInvoiceOptions } from '../../src/infrastructure/options.js';
@@ -207,6 +208,21 @@ describe('lookup data shapes', () => {
     const paged = await client().lookupCalculating(range(), true);
     expect(paged.items.map((i) => i.refId)).toEqual(['r-a']);
     expect(paged.returnedCount).toBe(1);
+  });
+});
+
+describe('toSnapshots string fallback', () => {
+  it('parses a stringified array the envelope reader did not pre-parse', () => {
+    const rows = toSnapshots(JSON.stringify([{ RefID: 'r-s', EInvoiceStatus: '1' }, 5]));
+    expect(rows.map((r) => r.refId)).toEqual(['r-s']);
+  });
+
+  it('returns empty for unparseable or non-array strings and other shapes', () => {
+    expect(toSnapshots('not json')).toEqual([]);
+    expect(toSnapshots('{"RefID":"x"}')).toEqual([]);
+    expect(toSnapshots('')).toEqual([]);
+    expect(toSnapshots(undefined)).toEqual([]);
+    expect(toSnapshots({ RefID: 'x' })).toEqual([]);
   });
 });
 

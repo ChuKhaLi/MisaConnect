@@ -1,7 +1,11 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { mapErrorCode } from '../../src/application/error-mapper.js';
 import type { MeInvoiceErrorCategory } from '../../src/domain/errors.js';
 
+// This table was copied from src/dotnet/.../Errors/MeInvoiceErrorMapper.cs (ExactMap). The
+// "matches the .NET ExactMap" test below parses that file and guards against drift.
 const exact: ReadonlyArray<readonly [string, MeInvoiceErrorCategory]> = [
   ['InvalidAppID', 'Configuration'],
   ['InActiveAppID', 'Configuration'],
@@ -77,6 +81,14 @@ describe('mapErrorCode', () => {
     expect(r.rawCode).toBe('unauthorize');
   });
 
+  it('matches prefixes case-insensitively', () => {
+    expect(mapErrorCode('invoicedetail_Quantity_Line3')).toMatchObject({
+      category: 'Validation',
+      field: 'Quantity',
+      component: 'Line3',
+    });
+  });
+
   it('splits prefix tails into field and component', () => {
     expect(mapErrorCode('InvoiceDetail_Quantity_Line3')).toMatchObject({
       category: 'Validation',
@@ -116,5 +128,30 @@ describe('mapErrorCode detail', () => {
     expect(mapErrorCode('InvoiceDetail_Qty_X', '')).not.toHaveProperty('detail');
     expect(mapErrorCode('Unknown', '')).not.toHaveProperty('detail');
     expect(mapErrorCode('InvalidTaxCode', 'x').detail).toBe('x');
+  });
+});
+
+// Documented spec 9.3 deviations: TS reports these as BatchOrSize, .NET as Validation.
+const BATCH_OR_SIZE_DEVIATIONS = new Set(['InvoiceQuantityTooLarge', 'XMLTooLong']);
+const dotnetMapper = fileURLToPath(
+  new URL(
+    '../../../../dotnet/MisaConnect.EInvoice.Application/Errors/MeInvoiceErrorMapper.cs',
+    import.meta.url,
+  ),
+);
+
+describe.skipIf(!existsSync(dotnetMapper))('drift guard against MeInvoiceErrorMapper.cs', () => {
+  const source = existsSync(dotnetMapper) ? readFileSync(dotnetMapper, 'utf8') : '';
+  const entries = [...source.matchAll(/\["(\w+)"\]\s*=\s*MeInvoiceErrorCategory\.(\w+)/g)].map(
+    (m) => [m[1] as string, m[2] as string] as const,
+  );
+
+  it('parses every .NET ExactMap entry', () => {
+    expect(entries).toHaveLength(exact.length);
+  });
+
+  it.each(entries)('maps %s like .NET (%s) except documented deviations', (code, dotnetCat) => {
+    const expected = BATCH_OR_SIZE_DEVIATIONS.has(code) ? 'BatchOrSize' : dotnetCat;
+    expect(mapErrorCode(code).category).toBe(expected);
   });
 });

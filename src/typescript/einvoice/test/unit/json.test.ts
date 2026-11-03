@@ -48,45 +48,7 @@ describe('serializeRequest', () => {
   it('rejects non-finite plain numbers', () => {
     expect(() => serializeRequest({ a: NaN })).toThrow(MeInvoiceException);
   });
-});
 
-describe('formatDateOnly', () => {
-  it('formats a Date from local calendar fields', () => {
-    expect(formatDateOnly(new Date(2026, 10, 3))).toBe('2026-11-03');
-  });
-
-  it('passes yyyy-MM-dd strings through', () => {
-    expect(formatDateOnly('2026-11-03')).toBe('2026-11-03');
-  });
-
-  it('rejects other string shapes', () => {
-    expect(() => formatDateOnly('03/11/2026')).toThrow(MeInvoiceException);
-  });
-
-  it.each(['2026-13-45', '2026-00-10', '2026-02-29', '2026-04-31', '2026-01-00'])(
-    'rejects the impossible date %s with Validation InvalidDate and the field',
-    (text) => {
-      let err: unknown;
-      try {
-        formatDateOnly(text, 'invDate');
-      } catch (e) {
-        err = e;
-      }
-      expect(err).toBeInstanceOf(MeInvoiceException);
-      expect(err).toMatchObject({
-        category: 'Validation',
-        rawErrorCode: 'InvalidDate',
-        field: 'invDate',
-      });
-    },
-  );
-
-  it('accepts a leap day in a leap year', () => {
-    expect(formatDateOnly('2028-02-29')).toBe('2028-02-29');
-  });
-});
-
-describe('fix round 1', () => {
   it('carries the field name into InvalidMoney errors', () => {
     try {
       money('1e5', 'totals.amountOC');
@@ -132,6 +94,66 @@ describe('fix round 1', () => {
     const out = serializeRequest({ a: { __money: '1,"X":2' } });
     expect(out).toBe('{"a":{"__money":"1,\\"X\\":2"}}');
     expect(serializeRequest({ a: money('1.5') })).toBe('{"a":1.5}');
+  });
+
+  it('writes money inside an array', () => {
+    expect(serializeRequest({ l: [money('1.50'), money(2)] })).toBe('{"l":[1.50,2]}');
+  });
+
+  it('rejects bigint money with InvalidMoney', () => {
+    try {
+      money(10n as unknown as number);
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toBeInstanceOf(MeInvoiceException);
+      expect((e as MeInvoiceException).rawErrorCode).toBe('InvalidMoney');
+    }
+  });
+
+  it('serialises a Date member as its ISO string', () => {
+    expect(serializeRequest({ d: new Date(Date.UTC(2026, 0, 5, 1, 2, 3)) })).toBe(
+      '{"d":"2026-01-05T01:02:03.000Z"}',
+    );
+  });
+});
+
+describe('formatDateOnly', () => {
+  it('formats a Date from local calendar fields', () => {
+    expect(formatDateOnly(new Date(2026, 10, 3))).toBe('2026-11-03');
+  });
+
+  it('passes yyyy-MM-dd strings through', () => {
+    expect(formatDateOnly('2026-11-03')).toBe('2026-11-03');
+  });
+
+  it('rejects other string shapes', () => {
+    expect(() => formatDateOnly('03/11/2026')).toThrow(MeInvoiceException);
+  });
+
+  it.each(['2026-13-45', '2026-00-10', '2026-02-29', '2026-04-31', '2026-01-00'])(
+    'rejects the impossible date %s with Validation InvalidDate and the field',
+    (text) => {
+      let err: unknown;
+      try {
+        formatDateOnly(text, 'invDate');
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(MeInvoiceException);
+      expect(err).toMatchObject({
+        category: 'Validation',
+        rawErrorCode: 'InvalidDate',
+        field: 'invDate',
+      });
+    },
+  );
+
+  it('accepts a leap day in a leap year', () => {
+    expect(formatDateOnly('2028-02-29')).toBe('2028-02-29');
+  });
+
+  it('zero-pads month and day of a Date', () => {
+    expect(formatDateOnly(new Date(2026, 0, 5))).toBe('2026-01-05');
   });
 });
 
