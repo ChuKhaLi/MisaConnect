@@ -17,7 +17,7 @@ import type { ResolvedOptions } from './options.js';
 import { formatDateOnly } from './json.js';
 import { wireTaxCode } from './transport.js';
 import { fromWireSnapshot, type WireLookupRow } from './wire/lookup.js';
-import { toWireAmendment, toWireInvoice } from './wire/invoice.js';
+import { toWireAmendment, toWireInvoice, type WireInvoice } from './wire/invoice.js';
 import { fromWireTemplate, type WireTemplate } from './wire/templates.js';
 
 /** Port `MeInvoiceHttpRoutes`. */
@@ -177,17 +177,41 @@ export function createMeInvoiceGateway(
     },
 
     async insertInvoices(items, withCode, opts) {
+      const outcomes: InsertOutcome[] = new Array<InsertOutcome>(items.length);
+      const bodies: WireInvoice[] = [];
+      const sent: { index: number; refId: string }[] = [];
+      items.forEach((item, index) => {
+        try {
+          bodies.push(toWireInvoice(item.invoice, item.refId, item.template));
+          sent.push({ index, refId: item.refId });
+        } catch (err) {
+          if (!(err instanceof MeInvoiceException) || err.category !== 'Validation') throw err;
+          outcomes[index] = {
+            refId: item.refId,
+            outcome: 'Error',
+            errorCategory: 'Validation',
+            rawErrorCode: 'ValidationFailed',
+            failures: [{ fieldPath: err.field ?? '$', message: err.message }],
+          };
+        }
+      });
+      if (bodies.length === 0) return outcomes;
+
       const envelope = await transport.request<unknown>(
         'POST',
         Routes.Insert,
         { invoiceWithCode: flag(withCode) },
-        items.map((i) => toWireInvoice(i.invoice, i.refId, i.template)),
+        bodies,
         opts,
       );
-      return interpretInsertEnvelope(
+      const echoed = interpretInsertEnvelope(
         envelope,
-        items.map((i) => i.refId),
+        sent.map((s) => s.refId),
       );
+      sent.forEach((s, k) => {
+        outcomes[s.index] = echoed[k] as InsertOutcome;
+      });
+      return outcomes;
     },
 
     async insertAmendment(kind, request, refId, template, withCode, opts) {

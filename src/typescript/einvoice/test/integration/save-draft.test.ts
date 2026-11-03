@@ -4,7 +4,10 @@ import type { Logger } from '../../src/application/ports.js';
 import type { InvoiceDto } from '../../src/domain/dtos.js';
 import { createMeInvoiceGateway } from '../../src/infrastructure/gateway.js';
 import type { ResolvedOptions } from '../../src/infrastructure/options.js';
-import type { MeInvoiceTransport } from '../../src/application/ports.js';
+import type { MeInvoiceGateway, MeInvoiceTransport } from '../../src/application/ports.js';
+import { defaultInvoiceValidator } from '../../src/application/invoice-validator.js';
+import { resolveTemplate } from '../../src/application/template-resolver.js';
+import { saveDraftInvoices } from '../../src/application/use-cases/save-draft.js';
 import { MeInvoiceException } from '../../src/domain/errors.js';
 import type { MisaEInvoiceOptions } from '../../src/infrastructure/options.js';
 import { startFakeMisa, type FakeMisa } from '../fake/fake-misa-server.js';
@@ -124,7 +127,7 @@ describe('saveDraft', () => {
     });
   });
 
-  it('31 invoices throws Validation ($batch.count) and sends nothing', async () => {
+  it('31 invoices throws BatchOrSize InvoiceQuantityTooLarge ($batch.count) and sends nothing', async () => {
     const many = Array.from({ length: 31 }, (_, i) => invoice({ refId: `r${i}` }));
     let err: unknown;
     try {
@@ -134,20 +137,95 @@ describe('saveDraft', () => {
     }
     expect(err).toBeInstanceOf(MeInvoiceException);
     const ex = err as MeInvoiceException;
-    expect(ex.category).toBe('Validation');
-    expect(ex.failures?.some((f) => f.fieldPath === '$batch.count')).toBe(true);
+    expect(ex.category).toBe('BatchOrSize');
+    expect(ex.rawErrorCode).toBe('InvoiceQuantityTooLarge');
+    expect(ex.failures).toEqual([
+      {
+        fieldPath: '$batch.count',
+        message: 'Batch size 31 exceeds the MISA limit of 30 invoices per request.',
+        ruleId: 'FR-030',
+      },
+    ]);
     expect(fake.state.requests).toHaveLength(0);
   });
 
-  it('an invalid invoice in the batch throws Validation with indexed paths, no HTTP', async () => {
-    const err = await client()
-      .saveDraft([invoice({ refId: 'r1' }), invoice({ refId: 'r2', lines: [] })])
-      .catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(MeInvoiceException);
-    expect(
-      (err as MeInvoiceException).failures?.some((f) => f.fieldPath.startsWith('invoices[1]')),
-    ).toBe(true);
-    expect(fake.state.requests).toHaveLength(0);
+  it('an invalid invoice becomes its own ValidationFailed result; the others are submitted', async () => {
+    const results = await client().saveDraft([
+      invoice({ refId: 'r1' }),
+      invoice({ refId: 'r2', lines: [] }),
+      invoice({ refId: 'r3' }),
+    ]);
+    expect(results.map((r) => [r.refId, r.outcome])).toEqual([
+      ['r1', 'Success'],
+      ['r2', 'Error'],
+      ['r3', 'Success'],
+    ]);
+    expect(results[1]).toMatchObject({
+      errorCategory: 'Validation',
+      rawErrorCode: 'ValidationFailed',
+    });
+    expect(results[1]?.failures?.length).toBeGreaterThan(0);
+    expect(results[1]?.failures?.every((f) => f.fieldPath.startsWith('invoices[1].'))).toBe(true);
+    const reqs = nonToken().filter((r) => r.path === '/webapp/insert');
+    expect(reqs).toHaveLength(1);
+    const body = JSON.parse(reqs[0]?.bodyText ?? '') as { RefID: string }[];
+    expect(body.map((b) => b.RefID)).toEqual(['r1', 'r3']);
+  });
+
+  it('a bad money string on invoice 2 fails only invoice 2 with an indexed field path', async () => {
+    const bad = invoice({ refId: 'r2' });
+    bad.lines = bad.lines.map((l) => ({ ...l, unitPrice: '1e3' }));
+    const results = await client().saveDraft([invoice({ refId: 'r1' }), bad]);
+    expect(results[0]).toEqual({ refId: 'r1', outcome: 'Success' });
+    expect(results[1]).toMatchObject({
+      refId: 'r2',
+      outcome: 'Error',
+      errorCategory: 'Validation',
+      rawErrorCode: 'ValidationFailed',
+    });
+    expect(results[1]?.failures?.map((f) => f.fieldPath)).toEqual([
+      'invoices[1].lines[0].unitPrice',
+    ]);
+    const req = nonToken().find((r) => r.path === '/webapp/insert');
+    const body = JSON.parse(req?.bodyText ?? '') as { RefID: string }[];
+    expect(body.map((b) => b.RefID)).toEqual(['r1']);
+  });
+
+  it('a date-time without offset on the only invoice: ValidationFailed and no insert request', async () => {
+    const bad = invoice({ refId: 'r1', createdDate: '2026-05-12T10:30:00' });
+    const results = await client().saveDraft([bad]);
+    expect(results[0]).toMatchObject({
+      outcome: 'Error',
+      rawErrorCode: 'ValidationFailed',
+      failures: [expect.objectContaining({ fieldPath: 'invoices[0].createdDate' })],
+    });
+    expect(nonToken().some((r) => r.path === '/webapp/insert')).toBe(false);
+  });
+
+  it('a gateway that returns no outcome for an item yields MisaUnknown NoEchoedResult', async () => {
+    const gateway = {
+      listTemplates: () =>
+        Promise.resolve([{ ipTemplateID: 'ipt-active-1', invSeries: 'C26TAA', isActive: true }]),
+      insertInvoices: () => Promise.resolve([]),
+    } as unknown as MeInvoiceGateway;
+    const out = await saveDraftInvoices(
+      {
+        gateway,
+        validator: defaultInvoiceValidator,
+        templateResolver: resolveTemplate,
+        refIdGenerator: () => 'gen',
+      },
+      [invoice({ refId: 'r1' })],
+      true,
+    );
+    expect(out.results).toEqual([
+      {
+        refId: 'r1',
+        outcome: 'Error',
+        errorCategory: 'MisaUnknown',
+        rawErrorCode: 'NoEchoedResult',
+      },
+    ]);
   });
 
   it('assigns UUID RefIDs to invoices without one', async () => {

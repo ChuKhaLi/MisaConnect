@@ -84,6 +84,8 @@ export type InsertOutcome =
       errorCategory: MeInvoiceErrorCategory;
       rawErrorCode: string;
       message?: string;
+      /** Wire-mapping failures (`ValidationFailed`); field paths are relative to the invoice. */
+      failures?: readonly ValidationFailure[];
     };
 
 /** Flat shape of MISA's delete response (port `DeleteResponse`). */
@@ -153,7 +155,10 @@ export interface MeInvoiceGateway {
   ): Promise<InvoiceSnapshotDto[]>;
   /**
    * Inserts the drafts in one request; returns one outcome per item in input order.
-   * A RefID MISA does not echo yields `MisaUnknown` / `NoEchoedResult`.
+   * Each item is mapped to the wire body first: an item that cannot be mapped (invalid
+   * money, date-time without offset, unknown VAT rate) becomes a `Validation` /
+   * `ValidationFailed` outcome and is left out of the request; no request is sent when no
+   * item remains. A RefID MISA does not echo yields `MisaUnknown` / `NoEchoedResult`.
    */
   insertInvoices(
     items: readonly { invoice: InvoiceDto; refId: string; template: TemplateDto }[],

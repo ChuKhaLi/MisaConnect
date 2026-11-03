@@ -1,5 +1,7 @@
 import type { InvoiceDto, SaveResultDto, TemplateDto } from '../../domain/dtos.js';
-import { MeInvoiceException } from '../../domain/errors.js';
+import { MeInvoiceException, type ValidationFailure } from '../../domain/errors.js';
+import { mapErrorCode } from '../error-mapper.js';
+import { MaxInvoicesPerBatch } from '../invoice-validator.js';
 import type {
   GatewayCallOptions,
   InvoiceValidator,
@@ -23,11 +25,45 @@ export interface SaveDraftResult {
   templateId?: string;
 }
 
+const BATCH_FIELD = '$batch.count';
+
+/** Port of the .NET batch-size guard; the only failures that throw instead of becoming results. */
+function assertBatchSize(count: number): void {
+  if (count < 1) {
+    throw new MeInvoiceException('Validation', {
+      failures: [
+        {
+          fieldPath: BATCH_FIELD,
+          message: `Batch must contain between 1 and ${MaxInvoicesPerBatch} invoices.`,
+          ruleId: 'FR-030',
+        },
+      ],
+    });
+  }
+  if (count > MaxInvoicesPerBatch) {
+    // Category via the error mapper so the code stays consistent with MISA's own answer (BatchOrSize).
+    const code = mapErrorCode('InvoiceQuantityTooLarge');
+    throw new MeInvoiceException(code.category, {
+      rawErrorCode: code.rawCode,
+      failures: [
+        {
+          fieldPath: BATCH_FIELD,
+          message: `Batch size ${count} exceeds the MISA limit of ${MaxInvoicesPerBatch} invoices per request.`,
+          ruleId: 'FR-030',
+        },
+      ],
+    });
+  }
+}
+
+const indexed = (index: number, failures: readonly ValidationFailure[]): ValidationFailure[] =>
+  failures.map((f) => ({ ...f, fieldPath: `invoices[${index}].${f.fieldPath}` }));
+
 /**
- * Port SaveDraftInvoices.cs. Deviation: the whole batch is validated first and any
- * failure throws Validation before any HTTP call. Templates are fetched once and each
- * invoice is resolved against them; unresolvable invoices become their own Error result
- * while the rest go out in one insert call.
+ * Port SaveDraftInvoices.cs. Only an empty or oversize batch throws. Templates are fetched
+ * once; each invoice is resolved, then validated, and an unresolvable or invalid invoice
+ * becomes its own `Error` result (`ValidationFailed` with `invoices[i].`-prefixed failures)
+ * while the rest go out in one insert call. Results follow input order.
  */
 export async function saveDraftInvoices(
   deps: SaveDraftDeps,
@@ -35,38 +71,40 @@ export async function saveDraftInvoices(
   withCode: boolean,
   opts?: GatewayCallOptions,
 ): Promise<SaveDraftResult> {
-  const working = invoices.map((inv) => ({
-    invoice: inv,
-    refId: inv.refId ? inv.refId : deps.refIdGenerator(),
-  }));
-
-  const failures = deps.validator.validateBatch(
-    working.map((w) => ({ ...w.invoice, refId: w.refId })),
-  );
-  if (failures.length > 0) {
-    throw new MeInvoiceException('Validation', { failures });
-  }
+  assertBatchSize(invoices.length);
 
   const active = await listActiveTemplates(deps.gateway, withCode, opts);
   const results: (SaveResultDto | undefined)[] = new Array<SaveResultDto | undefined>(
-    working.length,
+    invoices.length,
   );
   const toSubmit: { index: number; invoice: InvoiceDto; refId: string; template: TemplateDto }[] =
     [];
-  working.forEach((w, index) => {
-    const resolution = deps.templateResolver(active, w.invoice.template);
-    if (resolution.kind === 'Resolved') {
-      toSubmit.push({ index, ...w, template: resolution.template });
+  invoices.forEach((inv, index) => {
+    const refId = inv?.refId ? inv.refId : deps.refIdGenerator();
+    const resolution = deps.templateResolver(active, inv?.template);
+    if (resolution.kind !== 'Resolved') {
+      const ex = templateResolutionError(resolution);
+      results[index] = {
+        refId,
+        outcome: 'Error',
+        errorCategory: ex.category,
+        rawErrorCode: resolution.kind,
+        errorMessage: ex.message,
+      };
       return;
     }
-    const ex = templateResolutionError(resolution);
-    results[index] = {
-      refId: w.refId,
-      outcome: 'Error',
-      errorCategory: ex.category,
-      rawErrorCode: resolution.kind,
-      errorMessage: ex.message,
-    };
+    const failures = deps.validator.validate({ ...inv, refId });
+    if (failures.length > 0) {
+      results[index] = {
+        refId,
+        outcome: 'Error',
+        errorCategory: 'Validation',
+        rawErrorCode: 'ValidationFailed',
+        failures: indexed(index, failures),
+      };
+      return;
+    }
+    toSubmit.push({ index, invoice: inv, refId, template: resolution.template });
   });
 
   if (toSubmit.length > 0) {
@@ -74,15 +112,23 @@ export async function saveDraftInvoices(
     toSubmit.forEach((item, k) => {
       const o = outcomes[k];
       results[item.index] =
-        o === undefined || o.outcome === 'Success'
-          ? { refId: item.refId, outcome: 'Success' }
-          : {
+        o === undefined
+          ? {
               refId: item.refId,
               outcome: 'Error',
-              errorCategory: o.errorCategory,
-              rawErrorCode: o.rawErrorCode,
-              ...(o.message !== undefined ? { errorMessage: o.message } : {}),
-            };
+              errorCategory: 'MisaUnknown',
+              rawErrorCode: 'NoEchoedResult',
+            }
+          : o.outcome === 'Success'
+            ? { refId: item.refId, outcome: 'Success' }
+            : {
+                refId: item.refId,
+                outcome: 'Error',
+                errorCategory: o.errorCategory,
+                rawErrorCode: o.rawErrorCode,
+                ...(o.message !== undefined ? { errorMessage: o.message } : {}),
+                ...(o.failures !== undefined ? { failures: indexed(item.index, o.failures) } : {}),
+              };
     });
   }
 
