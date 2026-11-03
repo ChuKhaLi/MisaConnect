@@ -4,13 +4,14 @@ import { describe, it, expect } from 'vitest';
 describe('package exports', () => {
   it('loads via ESM import', async () => {
     const mod = await import('@misaconnect/einvoice');
-    expect(mod.PACKAGE_NAME).toBe('@misaconnect/einvoice');
+    expect(mod.MeInvoiceErrorCategory.Validation).toBe('Validation');
+    expect(new mod.MeInvoiceException('Validation')).toBeInstanceOf(Error);
   });
 
   it('loads via CommonJS require', () => {
     const mod = createRequire(import.meta.url)('@misaconnect/einvoice') as {
-      PACKAGE_NAME: string;
+      MeInvoiceErrorCategory: { Validation: string };
     };
-    expect(mod.PACKAGE_NAME).toBe('@misaconnect/einvoice');
+    expect(mod.MeInvoiceErrorCategory.Validation).toBe('Validation');
   });
 });
