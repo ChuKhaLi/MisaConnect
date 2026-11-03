@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { HUGE_INPUT_BUDGET_MS, largestBigIntInput } from './bigint-guard.js';
 import {
   defaultInvoiceValidator,
   validateAmendment,
@@ -239,13 +240,16 @@ describe('InvoiceValidator.validate', () => {
       lines: [line({ discountAmountOC: '1e999999999' })],
       totals: totals({ totalDiscountAmountOC: 0 }),
     });
-    expect(v(inv)).toEqual([]);
     const hdr = invoice({
       lines: [line({ discountAmountOC: 0 })],
       totals: totals({ totalDiscountAmountOC: '1e999999999' }),
     });
-    expect(v(hdr)).toEqual([]);
-    expect(Date.now() - start).toBeLessThan(500);
+    const largest = largestBigIntInput(() => {
+      expect(v(inv)).toEqual([]);
+      expect(v(hdr)).toEqual([]);
+    });
+    expect(largest).toBeLessThanOrEqual(1_000);
+    expect(Date.now() - start).toBeLessThan(HUGE_INPUT_BUDGET_MS);
   });
 
   it('FR-025 skips amounts beyond .NET decimal precision (28 fraction digits, decimal.MaxValue)', () => {
@@ -256,13 +260,16 @@ describe('InvoiceValidator.validate', () => {
         lines: [line({ discountAmountOC: d })],
         totals: totals({ totalDiscountAmountOC: header }),
       });
-    expect(v(mk(huge, 0))).toEqual([]);
-    expect(v(mk('0', huge))).toEqual([]);
-    expect(v(mk('1' + '0'.repeat(30), 0))).toEqual([]);
-    expect(v(mk('0.' + '1'.repeat(29), 0))).toEqual([]);
-    expect(v(mk('0.' + '0'.repeat(27) + '1', 0))).toHaveLength(0);
-    expect(v(mk('7', 0)).map((f) => f.ruleId)).toEqual(['FR-025']);
-    expect(Date.now() - start).toBeLessThan(500);
+    const largest = largestBigIntInput(() => {
+      expect(v(mk(huge, 0))).toEqual([]);
+      expect(v(mk('0', huge))).toEqual([]);
+      expect(v(mk('1' + '0'.repeat(30), 0))).toEqual([]);
+      expect(v(mk('0.' + '1'.repeat(29), 0))).toEqual([]);
+      expect(v(mk('0.' + '0'.repeat(27) + '1', 0))).toHaveLength(0);
+      expect(v(mk('7', 0)).map((f) => f.ruleId)).toEqual(['FR-025']);
+    });
+    expect(largest).toBeLessThanOrEqual(1_000);
+    expect(Date.now() - start).toBeLessThan(HUGE_INPUT_BUDGET_MS);
   });
 
   it('FR-025 counts integer digits of exponent-form numbers exactly', () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { HUGE_INPUT_BUDGET_MS, largestBigIntInput } from './bigint-guard.js';
 import { formatDateOnly, money, serializeRequest } from '../../src/infrastructure/json.js';
 import { MeInvoiceException } from '../../src/domain/errors.js';
 
@@ -249,9 +250,12 @@ describe('money range (.NET decimal: |x| <= decimal.MaxValue, <= 28 fractional d
 
   it('bounds huge strings before any BigInt work', () => {
     const start = Date.now();
-    expect(code(() => money('1'.repeat(1_000_000))).code).toBe('InvalidMoney');
-    expect(code(() => money('0.' + '1'.repeat(1_000_000))).code).toBe('InvalidMoney');
-    expect(Date.now() - start).toBeLessThan(500);
+    const largest = largestBigIntInput(() => {
+      expect(code(() => money('1'.repeat(1_000_000))).code).toBe('InvalidMoney');
+      expect(code(() => money('0.' + '1'.repeat(1_000_000))).code).toBe('InvalidMoney');
+    });
+    expect(largest).toBeLessThanOrEqual(1_000);
+    expect(Date.now() - start).toBeLessThan(HUGE_INPUT_BUDGET_MS);
   });
 
   it('still accepts 1e21 and 1e-7', () => {
