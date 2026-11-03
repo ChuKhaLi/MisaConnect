@@ -17,7 +17,7 @@ const required = (name: string): string => {
       useFactory: (): IMisaEInvoiceClient =>
         createMisaEInvoiceClient({
           environment: 'sandbox',
-          baseUrl: process.env['MISA_BASEURL'] ?? 'https://testapi.meinvoice.vn/api/integration',
+          baseUrl: 'https://testapi.meinvoice.vn/api/integration',
           taxCode: required('MISACONNECT_SANDBOX_TAXCODE'),
           userName: required('MISACONNECT_SANDBOX_USERNAME'),
           password: required('MISACONNECT_SANDBOX_PASSWORD'),

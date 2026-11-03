@@ -58,3 +58,17 @@ export class MeInvoiceException extends Error {
     if (opts.failures !== undefined) this.failures = opts.failures;
   }
 }
+
+/**
+ * True for a `MeInvoiceException` from any copy of this package. Prefer it over `instanceof`
+ * when both the ESM and CommonJS builds can load in one process (dual-package hazard): an
+ * exception created by one copy is not an `instanceof` the other copy's class.
+ */
+export function isMeInvoiceException(err: unknown): err is MeInvoiceException {
+  if (err instanceof MeInvoiceException) return true;
+  return (
+    err instanceof Error &&
+    err.name === 'MeInvoiceException' &&
+    typeof (err as { category?: unknown }).category === 'string'
+  );
+}

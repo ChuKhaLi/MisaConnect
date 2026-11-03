@@ -13,25 +13,27 @@ npm install @misaconnect/einvoice
 ## Quick start
 
 ```ts
-import { createMisaEInvoiceClient, MeInvoiceException } from '@misaconnect/einvoice';
+import { createMisaEInvoiceClient, isMeInvoiceException } from '@misaconnect/einvoice';
 
 const client = createMisaEInvoiceClient({
   environment: 'sandbox', // or 'production'
   baseUrl: 'https://testapi.meinvoice.vn/api/integration',
-  taxCode: process.env.MISA_TAXCODE!,
-  userName: process.env.MISA_USERNAME!,
-  password: process.env.MISA_PASSWORD!,
-  appId: process.env.MISA_APPID!,
+  taxCode: process.env.MISACONNECT_SANDBOX_TAXCODE!,
+  userName: process.env.MISACONNECT_SANDBOX_USERNAME!,
+  password: process.env.MISACONNECT_SANDBOX_PASSWORD!,
+  appId: process.env.MISACONNECT_SANDBOX_APPID!,
 });
 
 try {
   const templates = await client.listTemplates();
   console.log(templates.map((t) => `${t.invSeries} (${t.ipTemplateID})`));
 } catch (e) {
-  if (e instanceof MeInvoiceException) console.error(e.category, e.rawErrorCode, e.message);
+  if (isMeInvoiceException(e)) console.error(e.category, e.rawErrorCode, e.message);
   else throw e;
 }
 ```
+
+The quick start, the samples (`samples/typescript/`) and the sandbox tests all read the same `MISACONNECT_SANDBOX_*` variables (the names the .NET SDK uses).
 
 `baseUrl` must be an `https` URL whose host matches the chosen `environment` (`testapi.meinvoice.vn` for sandbox, `api.meinvoice.vn` for production). Invalid options throw a `MeInvoiceException` with category `Configuration`.
 
@@ -41,11 +43,41 @@ try {
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | `environment`                                                            | `'sandbox'` (default) or `'production'`.                                       |
 | `baseUrl`, `taxCode`, `userName`, `password`, `appId`                    | Required.                                                                      |
-| `delete.includeRawErrorMessage`                                          | Opt in to raw MISA error messages in results and logs (default `false`).       |
+| `delete.includeRawErrorMessage`                                          | Opt in to raw MISA error text (default `false`); see below.                    |
 | `logger`                                                                 | `{ debug, info, warn, error }(message, fields?)`. Default is a no-op.          |
 | `correlationId`                                                          | `() => string` producing the id logged per call (default `crypto.randomUUID`). |
-| `fetch`                                                                  | Custom `fetch` implementation.                                                 |
-| `tokenCache`, `refIdGenerator`, `clock`, `validator`, `templateResolver` | Swappable collaborators (same ports as the .NET SDK).                          |
+| `fetch`                                                                  | Custom `fetch`. Default: the global `fetch`, looked up on every call.          |
+| `tokenCache`, `refIdGenerator`, `clock`, `validator`, `templateResolver` | Swappable collaborators (same ports as the .NET SDK); see below.               |
+
+`delete.includeRawErrorMessage` gates exactly these: the `message` on `deleteDraft` outcomes and on `lookupByRefId` per-RefId outcomes, the MISA-text excerpt in the `ARCH-DEL-001` warning, and logging of an amendment's `changeReason`. `saveDraft` and `issueReplacement` / `issueAdjustment` results always carry MISA's `errorMessage` (as in .NET), and `MeInvoiceException.message` is not gated.
+
+Because the default `fetch` is resolved per call, a mock installed after the client is created (MSW, nock, `vi.stubGlobal`) is honoured.
+
+### Swappable collaborators
+
+The port types are exported: `TokenCache`, `AccessToken`, `Clock`, `RefIdGenerator`, `InvoiceValidator`, `TemplateResolver` and `TemplateResolution`. So are the defaults `defaultInvoiceValidator` and `resolveTemplate`, so you can wrap them instead of reimplementing them.
+
+```ts
+import type { TokenCache } from '@misaconnect/einvoice';
+
+// Share tokens across processes (e.g. Redis). `expiresAt` is a `Date`: revive it when reading.
+const tokenCache: TokenCache = {
+  async get(key) {
+    const raw = await redis.get(`misa:token:${key}`);
+    if (raw === null) return undefined;
+    const { value, expiresAt } = JSON.parse(raw) as { value: string; expiresAt: string };
+    return { value, expiresAt: new Date(expiresAt) };
+  },
+  async set(key, token) {
+    await redis.set(`misa:token:${key}`, JSON.stringify(token));
+  },
+  async delete(key) {
+    await redis.del(`misa:token:${key}`);
+  },
+};
+```
+
+If a cache returns an ISO string or an epoch number instead of a `Date`, it is converted; an unparseable value counts as expired, so a new token is acquired.
 
 ## Operations
 
@@ -65,9 +97,12 @@ Every method takes an optional last argument `opts?: CallOptions` (`{ signal?: A
 | `issueAdjustment(request)`             | `AmendmentResultDto`    | Issue an adjustment invoice.                   |
 
 ```ts
-const [result] = await client.saveDraft([invoice]);
-if (result?.outcome === 'Success') console.log('saved', result.refId);
-else console.warn(result?.errorCategory, result?.failures);
+const results = await client.saveDraft([invoice]); // one result per invoice, in input order
+for (const r of results) {
+  if (r.outcome === 'Success') console.log('saved', r.refId);
+  else console.warn(r.refId, r.errorCategory, r.rawErrorCode, r.failures ?? r.errorMessage);
+}
+const result = results[0];
 
 const pdf = await client.preview(invoice); // pdf.content is a Uint8Array
 
@@ -83,15 +118,77 @@ const page = await client.lookupStandard(
 );
 ```
 
+### A complete invoice
+
+A minimal VND invoice for an organisation buyer with one goods line. This exact object is type-checked and saved against the fake MISA server in the package tests.
+
+```ts
+import type { InvoiceDto } from '@misaconnect/einvoice';
+
+const invoice: InvoiceDto = {
+  refId: 'order-2026-0001', // your idempotency key; omit to get a generated UUID
+  template: { ipTemplateID: 'ipt-active-1', invSeries: 'C26TAA' }, // omit if you have one active template
+  invDate: '2026-11-03',
+  createdDate: '2026-11-03T09:00:00+07:00',
+  modifiedDate: '2026-11-03T09:00:00+07:00',
+  currency: 'VND',
+  exchangeRate: 1,
+  paymentMethod: 'TM/CK',
+  buyerType: 1, // 1 = organisation (buyer.taxCode required)
+  buyer: {
+    name: 'Công ty TNHH Ví Dụ',
+    taxCode: '0312345678',
+    address: '1 Lê Lợi, Quận 1, TP. Hồ Chí Minh',
+    email: 'ketoan@example.com',
+  },
+  lines: [
+    {
+      inventoryItemType: 0, // 0 = goods
+      sortOrder: 1,
+      description: 'Bàn phím cơ',
+      unitName: 'cái',
+      quantity: 2,
+      unitPrice: 500000,
+      amountOC: 1000000,
+      amount: 1000000,
+      amountWithoutVATOC: 1000000,
+      amountWithoutVAT: 1000000,
+      vatRateName: '8%',
+      vatAmountOC: 80000,
+      vatAmount: 80000,
+    },
+  ],
+  totals: {
+    totalSaleAmountOC: 1000000,
+    totalSaleAmount: 1000000,
+    totalDiscountAmountOC: 0,
+    totalDiscountAmount: 0,
+    totalAmountWithoutVATOC: 1000000,
+    totalAmountWithoutVAT: 1000000,
+    totalVATAmountOC: 80000,
+    totalVATAmount: 80000,
+    totalAmountOC: 1080000,
+    totalAmount: 1080000,
+    totalAmountInWords: 'Một triệu không trăm tám mươi nghìn đồng',
+  },
+};
+```
+
+### Retries and duplicate drafts
+
+Every request, inserts included, is retried once after a timeout, network error, 429 or 5xx (as in .NET). If the first insert attempt was in fact saved, MISA answers the retry with `DuplicateInvoiceRefID` for that draft. Pass explicit `refId`s, and on `DuplicateInvoiceRefID` (or any unclear failure) look the draft up with `lookupByRefId` before creating it again.
+
 ## Error handling
 
 Operations that cannot proceed throw `MeInvoiceException`, which carries `category` (a `MeInvoiceErrorCategory`: `Configuration`, `Authentication`, `Validation`, `BatchOrSize`, `MisaThrottled`, `MisaUnavailable`, `TransportFailed`, `MisaUnknown`, ...), plus `rawErrorCode`, `field`, `refId` and `failures` (`{ fieldPath, message, ruleId? }[]`) when known.
+
+Check errors with `isMeInvoiceException(err)` rather than `err instanceof MeInvoiceException`. If both the ESM and the CommonJS build of this package load in one process (the dual-package hazard, e.g. a dependency `require`s it while your code `import`s it), an exception from one copy is not an `instanceof` the other copy's class; the guard falls back to `err.name === 'MeInvoiceException'`.
 
 Some operations report expected business results as **values, not exceptions**:
 
 - `deleteDraft` returns a `DeleteDraftOutcome` with a `status` (`Deleted`, `NotFound`, `NotDeletable`, ...).
 - `lookupByRefId` returns a `LookupBatchOutcomeDto`: batch `status` is `Completed` or `Validation`; each entry has its own `LookupStatus`.
-- `saveDraft` returns one `SaveResultDto` per invoice (`outcome: 'Success' | 'Error'` with `errorCategory` / `failures`). `issueReplacement` / `issueAdjustment` return an `AmendmentResultDto` the same way.
+- `saveDraft` returns one `SaveResultDto` per invoice, in input order (`outcome: 'Success' | 'Error'` with `errorCategory`, `rawErrorCode`, and `errorMessage` or `failures`). An invoice that fails validation gets `errorCategory: 'Validation'`, `rawErrorCode: 'ValidationFailed'` and `failures` with paths like `invoices[1].lines[0].unitPrice`. That includes values that cannot be put on the wire: a malformed money string, an impossible date, a date-time without offset. Such an invoice is not sent, and the valid invoices still go out in one insert call. An unresolvable template likewise fails only its own invoice. Only the batch itself throws: an empty batch (`Validation`) or more than 30 invoices (`BatchOrSize`, `rawErrorCode: 'InvoiceQuantityTooLarge'`), both with a `$batch.count` failure. `issueReplacement` / `issueAdjustment` return an `AmendmentResultDto` the same way.
 
 ## Cancellation and correlation
 
@@ -100,7 +197,7 @@ const ac = new AbortController();
 const templates = await client.listTemplates(true, { signal: ac.signal, correlationId: 'req-42' });
 ```
 
-Aborting rejects with the native `AbortError` (never wrapped, never retried), including during retry backoff.
+Aborting rejects with the native `AbortError` (or the reason you passed to `abort()`): never wrapped, never retried, also during retry backoff. The call's log line then has `outcome: 'Cancelled'` and no `errorCategory`.
 
 ## Logging
 
@@ -111,7 +208,7 @@ import { createMisaEInvoiceClient, fromPino } from '@misaconnect/einvoice';
 const client = createMisaEInvoiceClient({ /* ... */ logger: fromPino(pino()) });
 ```
 
-Any object with `debug/info/warn/error(message, fields?)` works. Tokens, credentials, tax-code headers, buyer data, line content, amounts and the customer tax code are never logged.
+Any object with `debug/info/warn/error(message, fields?)` works. An exception thrown by your logger is swallowed and never changes a call's result. Tokens, credentials, tax-code headers, buyer data, line content, amounts and the customer tax code are never logged.
 
 ## Money
 
@@ -136,12 +233,13 @@ Dates: `yyyy-MM-dd` strings (a `Date` is also accepted and formatted from its lo
 
 ## Differences from the .NET SDK
 
-- `preview` validates before resolving the template, so an invalid invoice makes no HTTP call.
+- `preview` validates before resolving the template, so an invalid invoice makes no HTTP call. `saveDraft` does the same per invoice: a batch with no valid invoice makes no HTTP call, and an invoice that is both invalid and has an unresolvable template reports `ValidationFailed` (.NET reports the template error).
 - A getlist response with `success:false` and no error code maps to `MisaUnknown` (.NET reports `NotFound` for every RefID).
 - An empty RefId list yields a `Validation` batch outcome.
-- Batch-size codes `InvoiceQuantityTooLarge` / `XMLTooLong` map to `BatchOrSize`.
+- Batch-size codes `InvoiceQuantityTooLarge` / `XMLTooLong` map to `BatchOrSize`. That includes the client-side check for a `saveDraft` batch of more than 30 invoices, where .NET throws `Validation`. An empty batch throws `Validation` without a `rawErrorCode` (.NET reuses `InvoiceQuantityTooLarge`).
+- `saveDraft` also turns wire-mapping failures (malformed money string, impossible date, date-time without offset) into that invoice's own `ValidationFailed` result. .NET's typed DTOs cannot hold such values.
 - The customer tax code is never logged.
-- Each call logs one completion line; failures are logged at `info` with `outcome: 'Error'` and `errorCategory`.
+- Each call logs one completion line; failures are logged at `info` with `outcome: 'Error'` and `errorCategory`, a caller abort with `outcome: 'Cancelled'`.
 - `changeReason` is logged verbatim (no JSON-fragment redaction) and only when `delete.includeRawErrorMessage` is on.
 - Money strings must be plain decimals (`^-?\d+(\.\d+)?$`); the discount-total consistency check skips amounts with more than 28 fractional or 29 integer digits.
 - Date-times need an explicit offset (`Z` or `+hh:mm` / `-hh:mm`).

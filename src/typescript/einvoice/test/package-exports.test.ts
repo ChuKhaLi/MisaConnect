@@ -25,3 +25,17 @@ describe('public collaborator exports', () => {
     expect(mod.resolveTemplate([], undefined)).toEqual({ kind: 'NoActiveTemplate' });
   });
 });
+
+describe('isMeInvoiceException (dual-package hazard)', () => {
+  it('recognises an exception thrown by the other module format', async () => {
+    const esm = await import('@misaconnect/einvoice');
+    const cjs = createRequire(import.meta.url)('@misaconnect/einvoice') as typeof esm;
+    const fromCjs = new cjs.MeInvoiceException('Validation', { rawErrorCode: 'X' });
+    expect(fromCjs instanceof esm.MeInvoiceException).toBe(false);
+    expect(esm.isMeInvoiceException(fromCjs)).toBe(true);
+    expect(esm.isMeInvoiceException(new esm.MeInvoiceException('MisaUnknown'))).toBe(true);
+    expect(esm.isMeInvoiceException(new Error('x'))).toBe(false);
+    expect(esm.isMeInvoiceException({ name: 'MeInvoiceException' })).toBe(false);
+    expect(esm.isMeInvoiceException(undefined)).toBe(false);
+  });
+});
