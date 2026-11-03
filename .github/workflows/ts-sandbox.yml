@@ -37,6 +37,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build -w @misaconnect/einvoice
+      # The path from GitHub runners (outside Vietnam) to MISA is a path-MTU blackhole: TCP
+      # segments near 1500 B are dropped and the ICMP that would shrink them never arrives, so
+      # any request over ~1.4 KB (every authenticated call: the bearer JWT alone is ~2 KB) hangs
+      # and is reset. Verified 2026-11-03 with curl and node:https; MTU 1280 fixes both.
+      - name: Lower MTU (path-MTU blackhole to MISA)
+        run: sudo ip link set dev eth0 mtu 1280
       # No credentials: shows whether this runner can reach the sandbox at all (DNS/TCP/TLS/HTTP).
       - name: Probe sandbox host
         continue-on-error: true
