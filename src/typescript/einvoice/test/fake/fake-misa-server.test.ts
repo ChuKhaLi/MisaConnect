@@ -78,6 +78,21 @@ describe('fake MISA server', () => {
     expect(fake.state.errors[0]).toBeInstanceOf(Error);
   });
 
+  it('catch-all destroys the socket (no appended body) when headers were already sent', async () => {
+    // Coerces to 200 for writeHead, then throws when the body text is built: a failure after
+    // the status line was committed.
+    const lateFailure = {
+      valueOf: () => 200,
+      toString: () => {
+        throw new Error('failed after headers');
+      },
+    };
+    fake.state.statusQueue.push(lateFailure as unknown as number);
+    await expect(post('webapp/paging', {}).then((r) => r.text())).rejects.toThrow();
+    expect(fake.state.errors).toHaveLength(1);
+    expect((fake.state.errors[0] as Error).message).toBe('failed after headers');
+  });
+
   it('close() is idempotent', async () => {
     const other = await startFakeMisa();
     await other.close();

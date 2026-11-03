@@ -400,7 +400,12 @@ export async function startFakeMisa(): Promise<FakeMisa> {
       handle(state, entry, res);
     })().catch((e: unknown) => {
       state.errors.push(e);
-      if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain' });
+      if (res.headersSent) {
+        // The status line is committed: appending the message would corrupt that response.
+        res.destroy();
+        return;
+      }
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end(e instanceof Error ? e.message : String(e));
     });
   });
