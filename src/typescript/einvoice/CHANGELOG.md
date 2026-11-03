@@ -2,6 +2,12 @@
 
 All notable changes to `@misaconnect/einvoice` are documented here.
 
+## [Unreleased]
+
+### Documentation
+
+- README "Network / TLS": calls from outside Vietnam fail on a path-MTU blackhole in front of MISA (any request above ~1.4 KB, i.e. every authenticated call, hangs and is reset; curl too). Lowering the interface MTU to 1280 fixes it; the 0.1.1 ClientHello reset is one instance of the same problem.
+
 ## [0.1.2] - 2026-11-03
 
 ### Changed
