@@ -62,6 +62,28 @@ describe('formatDateOnly', () => {
   it('rejects other string shapes', () => {
     expect(() => formatDateOnly('03/11/2026')).toThrow(MeInvoiceException);
   });
+
+  it.each(['2026-13-45', '2026-00-10', '2026-02-29', '2026-04-31', '2026-01-00'])(
+    'rejects the impossible date %s with Validation InvalidDate and the field',
+    (text) => {
+      let err: unknown;
+      try {
+        formatDateOnly(text, 'invDate');
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(MeInvoiceException);
+      expect(err).toMatchObject({
+        category: 'Validation',
+        rawErrorCode: 'InvalidDate',
+        field: 'invDate',
+      });
+    },
+  );
+
+  it('accepts a leap day in a leap year', () => {
+    expect(formatDateOnly('2028-02-29')).toBe('2028-02-29');
+  });
 });
 
 describe('fix round 1', () => {

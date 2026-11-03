@@ -172,7 +172,7 @@ function build(
     RefID: refId,
     InvoiceTemplateID: template.ipTemplateID,
     InvSeries: template.invSeries,
-    InvDate: formatDateOnly(dto.invDate),
+    InvDate: formatDateOnly(dto.invDate, 'invDate'),
     CreatedDate: formatOffsetDateTime(dto.createdDate, 'createdDate'),
     ModifiedDate: formatOffsetDateTime(dto.modifiedDate, 'modifiedDate'),
     CurrencyCode: dto.currency,
@@ -228,7 +228,7 @@ export function toWireAmendment(
     orgInvNo: o.orgInvNo,
     orgInvTemplateNo: o.orgInvTemplateNo,
     orgInvSeries: o.orgInvSeries,
-    orgInvDate: formatDateOnly(o.orgInvDate),
+    orgInvDate: formatDateOnly(o.orgInvDate, 'originalRef.orgInvDate'),
     changeReason: dto.changeReason,
   });
 }

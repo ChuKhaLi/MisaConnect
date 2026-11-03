@@ -1,10 +1,11 @@
 import { MeInvoiceException } from '../domain/errors.js';
 import type { Money } from '../domain/dtos.js';
+import { isRealDate } from './wire/datetime.js';
 
 const MONEY_PATTERN = /^-?\d+(\.\d+)?$/;
 // Emitted text: plain decimals, or exponent form produced by JSON.stringify of a number.
 const EMIT_PATTERN = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
-const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /** Branded wrapper; its text is emitted verbatim as a JSON number literal. */
 export interface MoneyLiteral {
@@ -99,15 +100,19 @@ export function serializeRequest(value: unknown): string {
   return write(value, '') ?? 'null';
 }
 
-/** Formats a date as `yyyy-MM-dd` (local calendar fields for `Date`). */
-export function formatDateOnly(v: string | Date): string {
+/** Formats a date as `yyyy-MM-dd` (local calendar fields for `Date`); rejects impossible dates. */
+export function formatDateOnly(v: string | Date, field?: string): string {
   if (typeof v === 'string') {
-    if (!DATE_ONLY_PATTERN.test(v)) {
-      throw invalidDate('Date must be formatted yyyy-MM-dd.');
+    const m = DATE_ONLY_PATTERN.exec(v);
+    if (!m) {
+      throw invalidDate('Date must be formatted yyyy-MM-dd.', field);
+    }
+    if (!isRealDate(Number(m[1]), Number(m[2]), Number(m[3]))) {
+      throw invalidDate(`Date '${v}' is not a real calendar date.`, field);
     }
     return v;
   }
-  if (Number.isNaN(v.getTime())) throw invalidDate('Invalid Date value.');
+  if (Number.isNaN(v.getTime())) throw invalidDate('Invalid Date value.', field);
   const y = String(v.getFullYear()).padStart(4, '0');
   const m = String(v.getMonth() + 1).padStart(2, '0');
   const d = String(v.getDate()).padStart(2, '0');

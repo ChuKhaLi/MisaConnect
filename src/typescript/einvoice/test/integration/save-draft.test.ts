@@ -202,6 +202,19 @@ describe('saveDraft', () => {
     expect(nonToken().some((r) => r.path === '/webapp/insert')).toBe(false);
   });
 
+  it('an impossible invDate fails only that invoice with field invoices[i].invDate', async () => {
+    const results = await client().saveDraft([
+      invoice({ refId: 'r1', invDate: '2026-02-30' }),
+      invoice({ refId: 'r2' }),
+    ]);
+    expect(results[0]).toMatchObject({
+      outcome: 'Error',
+      rawErrorCode: 'ValidationFailed',
+      failures: [expect.objectContaining({ fieldPath: 'invoices[0].invDate' })],
+    });
+    expect(results[1]?.outcome).toBe('Success');
+  });
+
   it('a gateway that returns no outcome for an item yields MisaUnknown NoEchoedResult', async () => {
     const gateway = {
       listTemplates: () =>

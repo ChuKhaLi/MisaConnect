@@ -271,8 +271,8 @@ export function createMeInvoiceGateway(
         Length: request.length,
         // Port LookupDtoMapper.ToDomain: blank Sort defaults to "InvDate".
         Sort: request.sort === undefined || request.sort.trim() === '' ? 'InvDate' : request.sort,
-        FromDate: formatDateOnly(request.fromDate),
-        ToDate: formatDateOnly(request.toDate),
+        FromDate: formatDateOnly(request.fromDate, 'fromDate'),
+        ToDate: formatDateOnly(request.toDate, 'toDate'),
         PublishStatus:
           request.publishStatus !== undefined && request.publishStatus !== null
             ? String(request.publishStatus)
