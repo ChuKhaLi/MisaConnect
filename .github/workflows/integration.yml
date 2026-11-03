@@ -36,6 +36,12 @@ jobs:
       - name: Build
         run: dotnet build MisaConnect.slnx --no-restore --configuration ${{ inputs.configuration || 'Release' }}
 
+      # Path-MTU blackhole from GitHub runners (outside Vietnam) to MISA: requests over ~1.4 KB
+      # (every bearer-authenticated call) hang until HttpClient.Timeout. MTU 1280 fixes it.
+      # Same step as ts-sandbox.yml; see src/typescript/einvoice/README.md "Network / TLS".
+      - name: Lower MTU (path-MTU blackhole to MISA)
+        run: sudo ip link set dev eth0 mtu 1280
+
       - name: Integration tests (EInvoice)
         env:
           Misa__EInvoice__Environment: Sandbox
