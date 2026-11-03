@@ -1,5 +1,5 @@
 import type { InvoiceDto, TemplateDto, TemplateRefDto } from '../domain/dtos.js';
-import type { ValidationFailure } from '../domain/errors.js';
+import type { MeInvoiceErrorCategory, ValidationFailure } from '../domain/errors.js';
 import type { TemplateResolution } from './template-resolver.js';
 
 export interface InvoiceValidator {
@@ -65,6 +65,17 @@ export interface MeInvoiceTransport {
   ): Promise<Envelope<T>>;
 }
 
+/** Per-RefID result of the insert endpoint (port `SaveResult` + `InsertErrorEntryDto`). */
+export type InsertOutcome =
+  | { refId: string; outcome: 'Success' }
+  | {
+      refId: string;
+      outcome: 'Error';
+      errorCategory: MeInvoiceErrorCategory;
+      rawErrorCode: string;
+      message?: string;
+    };
+
 export interface GatewayCallOptions {
   signal?: AbortSignal;
 }
@@ -86,4 +97,14 @@ export interface MeInvoiceGateway {
   ): Promise<Uint8Array>;
   /** PDF bytes of a stored draft; unknown RefID → `ResourceNotFound`. */
   viewDraftPdf(refId: string, withCode: boolean, opts?: GatewayCallOptions): Promise<Uint8Array>;
+  /**
+   * Inserts the drafts in one request; returns one outcome per item in input order.
+   * A RefID MISA does not echo yields `MisaUnknown` / `NoEchoedResult`.
+   */
+  insertInvoices(
+    items: readonly { invoice: InvoiceDto; refId: string }[],
+    template: TemplateDto,
+    withCode: boolean,
+    opts?: GatewayCallOptions,
+  ): Promise<InsertOutcome[]>;
 }

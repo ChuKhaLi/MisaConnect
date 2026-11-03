@@ -1,5 +1,6 @@
 import { getDraftPdf } from './application/use-cases/get-draft-pdf.js';
 import { listActiveTemplates } from './application/use-cases/list-templates.js';
+import { saveDraftInvoices } from './application/use-cases/save-draft.js';
 import { previewInvoice } from './application/use-cases/preview.js';
 import type {
   AdjustmentRequestDto,
@@ -14,7 +15,7 @@ import type {
   TemplateDto,
 } from './domain/dtos.js';
 import type { DeleteDraftOutcome } from './domain/statuses.js';
-import { logCall, type CallLogContext } from './infrastructure/call-logger.js';
+import { logCall, refIdLabel, type CallLogContext } from './infrastructure/call-logger.js';
 import { createMeInvoiceGateway } from './infrastructure/gateway.js';
 import { validateOptions, type MisaEInvoiceOptions } from './infrastructure/options.js';
 import { createTransport } from './infrastructure/transport.js';
@@ -121,7 +122,32 @@ export function createMisaEInvoiceClient(options: MisaEInvoiceOptions): IMisaEIn
         getDraftPdf(gateway, refId, withCode, signalOf(opts)),
       ),
 
-    saveDraft: notImplemented,
+    saveDraft: (invoices, withCode = true, opts) => {
+      const ctx: CallLogContext = {};
+      const label = refIdLabel(
+        (invoices ?? []).map((i) => i?.refId).filter((r): r is string => !!r),
+      );
+      if (label !== undefined) ctx.refId = label;
+      const tpl = invoices?.[0]?.template?.ipTemplateID;
+      if (tpl) ctx.templateId = tpl;
+      return run('SaveDraft', opts, ctx, async () => {
+        const result = await saveDraftInvoices(
+          {
+            gateway,
+            validator: resolved.validator,
+            templateResolver: resolved.templateResolver,
+            refIdGenerator: resolved.refIdGenerator,
+          },
+          invoices,
+          withCode,
+          signalOf(opts),
+        );
+        const sent = refIdLabel(result.results.map((r) => r.refId));
+        if (sent !== undefined) ctx.refId = sent;
+        ctx.templateId = result.template.ipTemplateID;
+        return result.results;
+      });
+    },
     deleteDraft: notImplemented,
     lookupByRefId: notImplemented,
     lookupStandard: notImplemented,

@@ -116,9 +116,8 @@ describe('createMisaEInvoiceClient', () => {
     ).toThrow(MeInvoiceException);
   });
 
-  it('declares the seven later operations as not implemented', async () => {
+  it('declares the later operations as not implemented', async () => {
     const c = client();
-    await expect(c.saveDraft([invoice()])).rejects.toThrow('not implemented');
     await expect(c.deleteDraft('r', true)).rejects.toThrow('not implemented');
   });
 });
