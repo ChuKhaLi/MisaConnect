@@ -16,31 +16,49 @@ export interface EnsureAccessTokenDeps {
 }
 
 /**
- * Returns a cached access token or acquires a new one. Concurrent misses for the same
- * key share one in-flight acquisition. The shared acquisition is not bound to any one
- * caller's signal; each caller's `signal` only abandons its own wait.
+ * Returns a cached access token or acquires a new one. Concurrent calls for the same key
+ * share one in-flight resolution (cache read, then acquisition on a miss), so a slow
+ * distributed cache cannot let a second caller start its own acquisition while the first
+ * is still reading or acquiring. The shared work is not bound to any one caller's signal;
+ * each caller's `signal` only abandons its own wait. `rejectedToken` (the token MISA just
+ * answered 401 to) is never returned: a shared resolution that started before its eviction
+ * is followed by a fresh one.
  */
 export async function ensureAccessToken(
   deps: EnsureAccessTokenDeps,
   signal?: AbortSignal,
+  rejectedToken?: string,
 ): Promise<string> {
   signal?.throwIfAborted();
-  const key = deps.cacheKey;
-  const threshold = deps.clock.now().getTime() + SAFETY_SKEW_MS;
-  const cached = await raceAbort(deps.tokenCache.get(key), signal);
-  if (cached !== undefined && expiryTime(cached.expiresAt) > threshold) return cached.value;
-
-  let pending = deps.inflight.get(key);
-  if (pending === undefined) {
-    const started = acquireAndStore(deps);
-    pending = started;
-    deps.inflight.set(key, started);
-    const clear = (): void => {
-      if (deps.inflight.get(key) === started) deps.inflight.delete(key);
-    };
-    started.then(clear, clear);
+  let token = await raceAbort(shared(deps), signal);
+  if (rejectedToken !== undefined && token.value === rejectedToken) {
+    // The joined resolution was already settled (and cleared), so this starts a new one.
+    token = await raceAbort(shared(deps), signal);
   }
-  return (await raceAbort(pending, signal)).value;
+  return token.value;
+}
+
+/** The key's in-flight resolution, started when there is none. */
+function shared(deps: EnsureAccessTokenDeps): Promise<AccessToken> {
+  const key = deps.cacheKey;
+  const existing = deps.inflight.get(key);
+  if (existing !== undefined) return existing;
+  const started = resolveToken(deps);
+  deps.inflight.set(key, started);
+  const clear = (): void => {
+    if (deps.inflight.get(key) === started) deps.inflight.delete(key);
+  };
+  started.then(clear, clear);
+  return started;
+}
+
+async function resolveToken(deps: EnsureAccessTokenDeps): Promise<AccessToken> {
+  const threshold = deps.clock.now().getTime() + SAFETY_SKEW_MS;
+  const cached = await deps.tokenCache.get(deps.cacheKey);
+  if (cached !== undefined && cached !== null && expiryTime(cached.expiresAt) > threshold) {
+    return cached;
+  }
+  return acquireAndStore(deps);
 }
 
 /**

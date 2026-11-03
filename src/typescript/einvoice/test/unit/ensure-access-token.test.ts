@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AccessToken, Clock } from '../../src/application/ports.js';
+import type { AccessToken, Clock, TokenCache } from '../../src/application/ports.js';
 import {
   ensureAccessToken,
   type EnsureAccessTokenDeps,
@@ -172,5 +172,65 @@ describe('ensureAccessToken with a deserialising token cache', () => {
     });
     expect(await ensureAccessToken(deps)).toBe('fresh');
     expect(counter.calls).toBe(1);
+  });
+});
+
+describe('ensureAccessToken with a slow distributed cache', () => {
+  it('10 concurrent cold calls share one acquisition when get() resolves after a macrotask', async () => {
+    const store = new Map<string, AccessToken>();
+    // Distributed-cache shape: the value is read when the request is sent, the answer arrives later.
+    const slowCache: TokenCache = {
+      get: (key) => {
+        const snapshot = store.get(key);
+        return new Promise((resolve) => setTimeout(() => resolve(snapshot), 0));
+      },
+      set: (key, token) => {
+        store.set(key, token);
+        return Promise.resolve();
+      },
+      delete: (key) => {
+        store.delete(key);
+        return Promise.resolve();
+      },
+    };
+    let calls = 0;
+    const deps: EnsureAccessTokenDeps = {
+      ...makeDeps(() => {
+        calls++;
+        return Promise.resolve({ value: `fresh-${calls}`, expiresAt: new Date(0) });
+      }),
+      tokenCache: slowCache,
+    };
+    const tokens = await Promise.all(Array.from({ length: 10 }, () => ensureAccessToken(deps)));
+    expect(calls).toBe(1);
+    expect(new Set(tokens)).toEqual(new Set(['fresh-1']));
+  });
+
+  it('never hands back the 401-rejected token from a resolution that read before eviction', async () => {
+    const store = new Map<string, AccessToken>();
+    const slowCache: TokenCache = {
+      get: (key) => {
+        const snapshot = store.get(key);
+        return new Promise((resolve) => setTimeout(() => resolve(snapshot), 0));
+      },
+      set: (key, token) => {
+        store.set(key, token);
+        return Promise.resolve();
+      },
+      delete: (key) => {
+        store.delete(key);
+        return Promise.resolve();
+      },
+    };
+    const deps: EnsureAccessTokenDeps = {
+      ...makeDeps(() => Promise.resolve({ value: 'fresh', expiresAt: new Date(0) })),
+      tokenCache: slowCache,
+    };
+    store.set(deps.cacheKey, { value: 'old', expiresAt: new Date(NOW.getTime() + 24 * 60 * MIN) });
+    const earlier = ensureAccessToken(deps); // reads 'old' before the eviction below
+    await slowCache.delete(deps.cacheKey);
+    const refreshed = ensureAccessToken(deps, undefined, 'old');
+    expect(await earlier).toBe('old');
+    expect(await refreshed).toBe('fresh');
   });
 });

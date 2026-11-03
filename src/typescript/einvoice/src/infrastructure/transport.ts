@@ -181,7 +181,7 @@ export function createTransport(
 
     // Only evict the token we used, so concurrent 401s don't discard a fresh refresh.
     await evictIfCurrent(token);
-    const refreshed = await ensureAccessToken(tokenDeps, signal);
+    const refreshed = await ensureAccessToken(tokenDeps, signal, token);
     const second = await sendOnce(method, url, headersFor(body, refreshed), body, signal);
     if (second.status === 401) {
       throw new MeInvoiceException('Authentication', {
