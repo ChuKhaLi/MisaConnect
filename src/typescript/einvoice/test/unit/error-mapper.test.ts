@@ -1,7 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { mapErrorCode } from '../../src/application/error-mapper.js';
+import {
+  EXACT_ERROR_CODES,
+  PREFIX_ERROR_CODES,
+  mapErrorCode,
+} from '../../src/application/error-mapper.js';
 import type { MeInvoiceErrorCategory } from '../../src/domain/errors.js';
 
 // This table was copied from src/dotnet/.../Errors/MeInvoiceErrorMapper.cs (ExactMap). The
@@ -153,5 +157,26 @@ describe.skipIf(!existsSync(dotnetMapper))('drift guard against MeInvoiceErrorMa
   it.each(entries)('maps %s like .NET (%s) except documented deviations', (code, dotnetCat) => {
     const expected = BATCH_OR_SIZE_DEVIATIONS.has(code) ? 'BatchOrSize' : dotnetCat;
     expect(mapErrorCode(code).category).toBe(expected);
+  });
+
+  it('has exactly the .NET ExactMap keys (no TS-only or missing codes)', () => {
+    const dotnetKeys = new Set(entries.map(([code]) => code));
+    const tsKeys = new Set(EXACT_ERROR_CODES.map(([code]) => code));
+    expect(tsKeys.size).toBe(EXACT_ERROR_CODES.length);
+    expect([...tsKeys].filter((k) => !dotnetKeys.has(k))).toEqual([]);
+    expect([...dotnetKeys].filter((k) => !tsKeys.has(k))).toEqual([]);
+    // The only category differences are the documented BatchOrSize deviations.
+    const differing = EXACT_ERROR_CODES.filter(
+      ([code, cat]) => entries.find(([c]) => c === code)?.[1] !== cat,
+    ).map(([code]) => code);
+    expect(new Set(differing)).toEqual(BATCH_OR_SIZE_DEVIATIONS);
+  });
+
+  it('has the .NET PrefixMap entries, in order', () => {
+    const prefixes = [...source.matchAll(/\("(\w+_)",\s*MeInvoiceErrorCategory\.(\w+)\)/g)].map(
+      (m) => [m[1] as string, m[2] as string],
+    );
+    expect(prefixes.length).toBeGreaterThan(0);
+    expect(PREFIX_ERROR_CODES.map(([p, c]) => [p, c])).toEqual(prefixes);
   });
 });

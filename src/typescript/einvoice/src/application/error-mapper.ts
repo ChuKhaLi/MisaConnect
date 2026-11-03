@@ -8,9 +8,9 @@ export interface MappedError {
   component?: string;
 }
 
-// Mirrors .NET MeInvoiceErrorMapper.ExactMap, except InvoiceQuantityTooLarge and
+// Mirrors .NET MeInvoiceErrorMapper.ExactMap (exported for the drift guard test), except InvoiceQuantityTooLarge and
 // XMLTooLong map to BatchOrSize (spec 9.3 deviation).
-const EXACT: ReadonlyArray<readonly [string, MeInvoiceErrorCategory]> = [
+export const EXACT_ERROR_CODES: ReadonlyArray<readonly [string, MeInvoiceErrorCategory]> = [
   ['InvalidAppID', 'Configuration'],
   ['InActiveAppID', 'Configuration'],
   ['InvalidTaxCode', 'Configuration'],
@@ -68,10 +68,10 @@ const EXACT: ReadonlyArray<readonly [string, MeInvoiceErrorCategory]> = [
 ];
 
 const EXACT_MAP: ReadonlyMap<string, MeInvoiceErrorCategory> = new Map(
-  EXACT.map(([code, category]) => [code.toLowerCase(), category]),
+  EXACT_ERROR_CODES.map(([code, category]) => [code.toLowerCase(), category]),
 );
 
-const PREFIX_MAP: ReadonlyArray<readonly [string, MeInvoiceErrorCategory]> = [
+export const PREFIX_ERROR_CODES: ReadonlyArray<readonly [string, MeInvoiceErrorCategory]> = [
   ['InvoiceDetail_', MeInvoiceErrorCategory.Validation],
   ['RequireError_', MeInvoiceErrorCategory.Validation],
   ['StockInTaxCode_NotInfo_', MeInvoiceErrorCategory.OtherWorkflow],
@@ -85,7 +85,7 @@ export function mapErrorCode(raw: string | undefined, message?: string): MappedE
   const exact = EXACT_MAP.get(lower);
   if (exact !== undefined) return withDetail({ category: exact, rawCode: raw }, message);
 
-  for (const [prefix, category] of PREFIX_MAP) {
+  for (const [prefix, category] of PREFIX_ERROR_CODES) {
     if (lower.startsWith(prefix.toLowerCase())) {
       const parts = raw.slice(prefix.length).split('_');
       const result: MappedError = { category, rawCode: raw };
