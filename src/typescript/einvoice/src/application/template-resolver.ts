@@ -1,0 +1,40 @@
+import type { TemplateDto, TemplateRefDto } from '../domain/dtos.js';
+
+export type TemplateResolution =
+  | { kind: 'Resolved'; template: TemplateDto }
+  | { kind: 'AmbiguousTemplate'; candidates: readonly TemplateDto[] }
+  | { kind: 'NoActiveTemplate' }
+  | { kind: 'UnknownTemplate'; key: string };
+
+const eq = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+
+/** Port of TemplateResolver.ResolveAsync over an already-fetched active-template list. */
+export function resolveTemplate(
+  templates: readonly TemplateDto[],
+  ref?: Partial<TemplateRefDto>,
+): TemplateResolution {
+  if (ref === undefined || ref === null) {
+    const [only] = templates;
+    if (templates.length === 0) return { kind: 'NoActiveTemplate' };
+    if (templates.length === 1 && only) return { kind: 'Resolved', template: only };
+    return { kind: 'AmbiguousTemplate', candidates: templates };
+  }
+
+  const id = ref.ipTemplateID ?? '';
+  const series = ref.invSeries ?? '';
+  for (const t of templates) {
+    if ((id === '' || eq(t.ipTemplateID, id)) && (series === '' || eq(t.invSeries, series))) {
+      return { kind: 'Resolved', template: t };
+    }
+  }
+  return { kind: 'UnknownTemplate', key: id !== '' ? id : series };
+}
+
+/** Infers "uses tax-authority code" from the 2nd character of the series: C = with code, K = without. */
+export function inferWithCode(invSeries: string | undefined): boolean | undefined {
+  if (invSeries === undefined || invSeries.length <= 1) return undefined;
+  const c = invSeries.charAt(1).toUpperCase();
+  if (c === 'C') return true;
+  if (c === 'K') return false;
+  return undefined;
+}
