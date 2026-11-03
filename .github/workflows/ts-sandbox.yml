@@ -49,4 +49,6 @@ jobs:
           MISACONNECT_SANDBOX_USERNAME: ${{ secrets.MISA_USERNAME }}
           MISACONNECT_SANDBOX_PASSWORD: ${{ secrets.MISA_PASSWORD }}
           MISACONNECT_SANDBOX_APPID: ${{ secrets.MISA_APP_ID }}
+          # Fail instead of skipping when credentials are missing or the host is unreachable.
+          MISACONNECT_SANDBOX_REQUIRED: '1'
         run: npm run test:sandbox -w @misaconnect/einvoice

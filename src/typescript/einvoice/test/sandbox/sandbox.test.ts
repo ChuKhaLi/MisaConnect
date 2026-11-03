@@ -9,9 +9,12 @@ import {
 
 // Opt-in live-sandbox flows (port of the .NET Sandbox/* tests, minus amendments and the
 // fixture pool). Skipped unless all four credentials are set AND the sandbox host answers.
+// With MISACONNECT_SANDBOX_REQUIRED=1 (CI) a skip is a failure instead, so a green job always
+// means the live tests actually ran.
 const HOST = 'testapi.meinvoice.vn';
 const PORT = 443;
-const PROBE_TIMEOUT_MS = 1500;
+// GitHub runners outside Vietnam take ~1 s just to reach MISA; 1.5 s skipped the suite at random.
+const PROBE_TIMEOUT_MS = 5000;
 const BASE_URL = 'https://testapi.meinvoice.vn/api/integration';
 
 const taxCode = process.env['MISACONNECT_SANDBOX_TAXCODE']?.trim();
@@ -39,7 +42,19 @@ function isReachable(): Promise<boolean> {
 }
 
 // Only probe the network when credentials exist, so the no-credentials path is instant.
-const runnable = hasSandboxEnv && (await isReachable());
+const reachable = hasSandboxEnv && (await isReachable());
+const runnable = hasSandboxEnv && reachable;
+const required = process.env['MISACONNECT_SANDBOX_REQUIRED']?.trim() === '1';
+
+describe.runIf(required && !runnable)('MISA sandbox (required)', () => {
+  it('has credentials and can reach the sandbox', () => {
+    expect.fail(
+      hasSandboxEnv
+        ? `MISACONNECT_SANDBOX_REQUIRED=1 but ${HOST}:${PORT} did not accept a TCP connection within ${PROBE_TIMEOUT_MS} ms.`
+        : 'MISACONNECT_SANDBOX_REQUIRED=1 but one of MISACONNECT_SANDBOX_TAXCODE / _USERNAME / _PASSWORD / _APPID is not set.',
+    );
+  });
+});
 
 function createClient(overridePassword?: string): IMisaEInvoiceClient {
   return createMisaEInvoiceClient({
