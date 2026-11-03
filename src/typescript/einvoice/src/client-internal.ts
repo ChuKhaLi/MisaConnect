@@ -68,7 +68,7 @@ export function createMisaEInvoiceClientInternal(
   ): Promise<AmendmentResultDto> => {
     // Port MeInvoiceCallLogger.WrapAmendment: eInvoiceStatus + orgRefId always, changeReason
     // only with delete.includeRawErrorMessage.
-    const extra: Record<string, unknown> = {
+    const extra: Record<string, string | number | boolean> = {
       eInvoiceStatus: kind === 'replacement' ? '3' : '4',
     };
     const orgRefId = request?.originalRef?.orgRefID;

@@ -11,9 +11,23 @@ export interface CallLogContext {
    * the call is then logged as `Error` with this category.
    */
   failureCategory?: MeInvoiceErrorCategory;
-  /** Operation-specific plain fields (e.g. amendments: eInvoiceStatus, orgRefId), logged after templateId. */
-  extra?: Record<string, unknown>;
+  /**
+   * Operation-specific plain fields (e.g. amendments: eInvoiceStatus, orgRefId), logged after
+   * templateId. A key that names a fixed field (endpoint, outcome, errorCategory, durationMs,
+   * refId, templateId, correlationId) is ignored, so extra can never override them.
+   */
+  extra?: Record<string, string | number | boolean>;
 }
+
+const FIXED_FIELDS: ReadonlySet<string> = new Set([
+  'endpoint',
+  'outcome',
+  'errorCategory',
+  'durationMs',
+  'refId',
+  'templateId',
+  'correlationId',
+]);
 
 const FAILURE_CATEGORY_BY_STATUS: Readonly<Record<string, MeInvoiceErrorCategory>> = {
   AuthFailed: MeInvoiceErrorCategory.Authentication,
@@ -85,7 +99,9 @@ export async function logCall<T>(
     fields['durationMs'] = Math.round(performance.now() - started);
     if (ctx.refId !== undefined) fields['refId'] = ctx.refId;
     if (ctx.templateId !== undefined) fields['templateId'] = ctx.templateId;
-    if (ctx.extra !== undefined) Object.assign(fields, ctx.extra);
+    for (const [key, value] of Object.entries(ctx.extra ?? {})) {
+      if (!FIXED_FIELDS.has(key)) fields[key] = value;
+    }
     fields['correlationId'] = correlationId;
     try {
       logger.info('MeInvoice call completed', scrub(fields));
