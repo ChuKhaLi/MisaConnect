@@ -187,6 +187,39 @@ describe('InvoiceValidator.validate', () => {
     ]);
   });
 
+  it('FR-025 compares exactly (decimal semantics, not doubles)', () => {
+    const run = (header: number | string, ...discounts: Array<number | string>) =>
+      v(
+        invoice({
+          lines: discounts.map((d) => line({ discountAmountOC: d })),
+          totals: totals({ totalDiscountAmountOC: header }),
+        }),
+      );
+    expect(run(1.3, 0.8)).toEqual([]);
+    expect(run('0.1', 0.2)).toEqual([]);
+    expect(run(1.31, 0.8).map((f) => f.ruleId)).toEqual(['FR-025']);
+    expect(run('12345678901234567.25', '12345678901234566.75')).toEqual([]);
+    expect(run('12345678901234567.26', '12345678901234566.75').map((f) => f.ruleId)).toEqual([
+      'FR-025',
+    ]);
+    expect(run(1e-7, 0)).toEqual([]);
+  });
+
+  it('FR-025 missing header totalDiscountAmountOC counts as 0', () => {
+    const inv = invoice({
+      lines: [line({ discountAmountOC: 5 })],
+      totals: totals({ totalDiscountAmountOC: undefined as unknown as number }),
+    });
+    expect(v(inv)).toEqual([
+      {
+        fieldPath: 'totals.totalDiscountAmountOC',
+        message:
+          'Header TotalDiscountAmountOC 0 does not equal sum of goods-line DiscountAmountOC (5).',
+        ruleId: 'FR-025',
+      },
+    ]);
+  });
+
   it('FR-025 counts only goods lines; accepts money strings; skips unparsable strings', () => {
     const lines = [
       line({ discountAmountOC: '10.00' }),

@@ -36,6 +36,41 @@ function toNumber(m: Money | undefined | null): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+interface Decimal {
+  int: bigint;
+  scale: number;
+}
+const ZERO: Decimal = { int: 0n, scale: 0 };
+const DECIMAL_RE = /^([+-]?)(\d+)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
+
+/** Exact decimal of a money value (number via its shortest round-trip string); undefined when not a plain decimal. */
+function parseDecimal(m: Money | undefined | null): Decimal | undefined {
+  if (m === undefined || m === null) return undefined;
+  if (typeof m === 'number' && !Number.isFinite(m)) return undefined;
+  const match = DECIMAL_RE.exec(String(m).trim());
+  if (!match) return undefined;
+  const [, sign, whole = '', frac = '', exp = '0'] = match;
+  let digits = BigInt(whole + frac);
+  let scale = frac.length - Number(exp);
+  if (scale < 0) {
+    digits *= 10n ** BigInt(-scale);
+    scale = 0;
+  }
+  return { int: sign === '-' ? -digits : digits, scale };
+}
+
+function rescale(d: Decimal, scale: number): bigint {
+  return d.int * 10n ** BigInt(scale - d.scale);
+}
+
+function formatDecimal(d: Decimal): string {
+  const neg = d.int < 0n;
+  const abs = (neg ? -d.int : d.int).toString().padStart(d.scale + 1, '0');
+  const whole = abs.slice(0, abs.length - d.scale);
+  const frac = abs.slice(abs.length - d.scale).replace(/0+$/, '');
+  return (neg ? '-' : '') + whole + (frac ? '.' + frac : '');
+}
+
 /** True when the string holds a UTF-16 high surrogate (supplementary-plane code point), like char.IsHighSurrogate. */
 function hasSupplementaryPlane(value: string): boolean {
   for (let i = 0; i < value.length; i++) {
@@ -148,22 +183,31 @@ function validateInvoice(invoice: InvoiceDto): ValidationFailure[] {
       }
     });
 
-    // FR-025: discount reconciliation.
-    let goodsDiscountSum = 0;
-    for (const line of invoice.lines) {
-      if (line.inventoryItemType === GOODS) {
-        goodsDiscountSum += toNumber(line.discountAmountOC) ?? 0;
+    // FR-025: discount reconciliation (exact decimal arithmetic, like .NET decimal).
+    if (invoice.totals) {
+      const headerRaw = invoice.totals.totalDiscountAmountOC;
+      const header = headerRaw === undefined || headerRaw === null ? ZERO : parseDecimal(headerRaw);
+      if (header !== undefined) {
+        const goods: Decimal[] = [];
+        for (const line of invoice.lines) {
+          if (line.inventoryItemType !== GOODS) continue;
+          const d = parseDecimal(line.discountAmountOC);
+          if (d !== undefined) goods.push(d);
+        }
+        const scale = Math.max(header.scale, ...goods.map((g) => g.scale));
+        const sum = goods.reduce((acc, g) => acc + rescale(g, scale), 0n);
+        const diff = rescale(header, scale) - sum;
+        const tolerance = 5n * 10n ** BigInt(scale); // 0.5 scaled by 10^(scale+1)
+        if ((diff < 0n ? -diff : diff) * 10n > tolerance) {
+          failures.push(
+            fail(
+              'totals.totalDiscountAmountOC',
+              `Header TotalDiscountAmountOC ${formatDecimal(header)} does not equal sum of goods-line DiscountAmountOC (${formatDecimal({ int: sum, scale })}).`,
+              'FR-025',
+            ),
+          );
+        }
       }
-    }
-    const header = invoice.totals ? toNumber(invoice.totals.totalDiscountAmountOC) : undefined;
-    if (header !== undefined && Math.abs(header - goodsDiscountSum) > OcTolerance) {
-      failures.push(
-        fail(
-          'totals.totalDiscountAmountOC',
-          `Header TotalDiscountAmountOC ${String(invoice.totals.totalDiscountAmountOC)} does not equal sum of goods-line DiscountAmountOC (${goodsDiscountSum}).`,
-          'FR-025',
-        ),
-      );
     }
   }
 
