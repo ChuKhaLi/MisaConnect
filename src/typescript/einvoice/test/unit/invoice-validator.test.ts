@@ -106,7 +106,7 @@ describe('InvoiceValidator.validate', () => {
   });
 
   it('FR-023 non-VND with exchangeRate undefined fails', () => {
-    expect(v(invoice({ currency: 'USD', exchangeRate: undefined }))).toEqual([
+    expect(v(invoice({ currency: 'USD', exchangeRate: undefined as unknown as number }))).toEqual([
       {
         fieldPath: 'exchangeRate',
         message: 'ExchangeRate must be supplied and > 0 for non-VND invoices.',
