@@ -1,3 +1,4 @@
+import http from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMisaEInvoiceClient, type IMisaEInvoiceClient } from '../../src/client.js';
 import { createMisaEInvoiceClientInternal } from '../../src/client-internal.js';
@@ -32,16 +33,39 @@ afterEach(async () => {
   await fake.close();
 });
 
-describe('default fetch is resolved per call', () => {
-  it('uses a globalThis.fetch installed after the client was created', async () => {
-    const c = client();
-    const original = globalThis.fetch;
-    const stub = vi.fn((input: string | URL | Request, init?: RequestInit) =>
-      original(input, init),
-    );
+describe('default HTTP client', () => {
+  it('is the node:http(s) client, not globalThis.fetch', async () => {
+    const stub = vi.fn(() => Promise.reject(new Error('global fetch must not be used')));
     vi.stubGlobal('fetch', stub);
-    await c.listTemplates();
-    expect(stub).toHaveBeenCalled();
+    const templates = await client().listTemplates();
+    expect(templates.length).toBeGreaterThan(0);
+    expect(stub).not.toHaveBeenCalled();
+  });
+
+  it('honours an http.request interceptor installed after the client was created (MSW, nock)', async () => {
+    const c = client();
+    const spy = vi.spyOn(http, 'request');
+    try {
+      await c.listTemplates();
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('a caller-supplied fetch is used unchanged for every request', async () => {
+    const own = vi.fn((input: string | URL | Request, init?: RequestInit) => fetch(input, init));
+    const spy = vi.spyOn(http, 'request');
+    try {
+      await client({ fetch: own as typeof fetch }).listTemplates();
+      expect(own.mock.calls.map(([u]) => new URL(String(u)).pathname)).toEqual([
+        '/webapp/token',
+        '/webapp/templates',
+      ]);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

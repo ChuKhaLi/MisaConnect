@@ -11,6 +11,7 @@ import { resolveTemplate } from '../application/template-resolver.js';
 import { MeInvoiceException, type ValidationFailure } from '../domain/errors.js';
 import { createInMemoryTokenCache, systemClock, uuidRefIdGenerator } from './defaults.js';
 import { noopLogger, safeLogger } from './logging.js';
+import { createNodeHttpsFetch } from './node-https-fetch.js';
 
 export const SandboxHost = 'testapi.meinvoice.vn';
 export const ProductionHost = 'api.meinvoice.vn';
@@ -125,8 +126,9 @@ export function validateOptions(
     validator: o.validator ?? defaultInvoiceValidator,
     templateResolver: o.templateResolver ?? resolveTemplate,
     logger: o.logger !== undefined ? safeLogger(o.logger) : noopLogger,
-    // Resolved lazily so a fetch mock installed after client creation (MSW, nock) is honoured.
-    fetch: o.fetch ?? ((input, init) => globalThis.fetch(input, init)),
+    // One node:https client per client instance, offering classical ECDH groups only (see
+    // node-https-fetch.ts). It calls http(s).request per call, so MSW / nock interceptors apply.
+    fetch: o.fetch ?? createNodeHttpsFetch(),
     correlationId: o.correlationId ?? (() => crypto.randomUUID()),
   };
 }
