@@ -83,7 +83,7 @@ describe('validateOptions', () => {
     expect(r.validator).toBe(defaultInvoiceValidator);
     expect(r.templateResolver).toBe(resolveTemplate);
     expect(r.logger).toBe(noopLogger);
-    expect(r.fetch).toBe(globalThis.fetch);
+    expect(typeof r.fetch).toBe('function');
     expect(r.clock).toBe(systemClock);
     expect(r.refIdGenerator).toBe(uuidRefIdGenerator);
     expect(r.tokenCache).toBeDefined();

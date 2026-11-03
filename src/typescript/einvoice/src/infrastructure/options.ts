@@ -125,7 +125,8 @@ export function validateOptions(
     validator: o.validator ?? defaultInvoiceValidator,
     templateResolver: o.templateResolver ?? resolveTemplate,
     logger: o.logger ?? noopLogger,
-    fetch: o.fetch ?? globalThis.fetch,
+    // Resolved lazily so a fetch mock installed after client creation (MSW, nock) is honoured.
+    fetch: o.fetch ?? ((input, init) => globalThis.fetch(input, init)),
     correlationId: o.correlationId ?? (() => crypto.randomUUID()),
   };
 }
