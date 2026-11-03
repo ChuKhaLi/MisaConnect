@@ -16,3 +16,12 @@ describe('package exports', () => {
     expect(mod.MeInvoiceErrorCategory.Validation).toBe('Validation');
   });
 });
+
+describe('public collaborator exports', () => {
+  it('exposes the default validator and template resolver for wrapping', async () => {
+    const mod = await import('@misaconnect/einvoice');
+    expect(typeof mod.defaultInvoiceValidator.validate).toBe('function');
+    expect(typeof mod.defaultInvoiceValidator.validateBatch).toBe('function');
+    expect(mod.resolveTemplate([], undefined)).toEqual({ kind: 'NoActiveTemplate' });
+  });
+});

@@ -78,7 +78,7 @@ type InternalOptions = MisaEInvoiceOptions & { __unsafeAllowAnyBaseUrl?: boolean
 const signalOf = (opts?: CallOptions): { signal?: AbortSignal } =>
   opts?.signal !== undefined ? { signal: opts.signal } : {};
 
-/** Validates options (throws `Configuration`) and wires transport → gateway → use cases. */
+/** Validates options (throws `Configuration`) and builds the client. */
 export function createMisaEInvoiceClient(options: MisaEInvoiceOptions): IMisaEInvoiceClient {
   const resolved = validateOptions(options, {
     allowAnyBaseUrl: (options as InternalOptions).__unsafeAllowAnyBaseUrl === true,

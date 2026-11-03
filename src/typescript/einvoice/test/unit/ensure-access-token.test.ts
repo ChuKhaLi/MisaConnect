@@ -131,3 +131,46 @@ describe('ensureAccessToken', () => {
     expect(calls).toBe(2);
   });
 });
+
+describe('ensureAccessToken with a deserialising token cache', () => {
+  const coldAcquire =
+    (counter: { calls: number }): EnsureAccessTokenDeps['acquire'] =>
+    () => {
+      counter.calls++;
+      return Promise.resolve({ value: 'fresh', expiresAt: new Date(0) });
+    };
+
+  it('accepts an ISO-string expiresAt (e.g. from JSON) and reuses a still-valid token', async () => {
+    const counter = { calls: 0 };
+    const deps = makeDeps(coldAcquire(counter));
+    const iso = new Date(NOW.getTime() + 5 * 24 * 60 * MIN).toISOString();
+    await deps.tokenCache.set(deps.cacheKey, {
+      value: 'cached',
+      expiresAt: iso as unknown as Date,
+    });
+    expect(await ensureAccessToken(deps)).toBe('cached');
+    expect(counter.calls).toBe(0);
+  });
+
+  it('accepts an epoch-millis number expiresAt', async () => {
+    const counter = { calls: 0 };
+    const deps = makeDeps(coldAcquire(counter));
+    await deps.tokenCache.set(deps.cacheKey, {
+      value: 'cached',
+      expiresAt: (NOW.getTime() + 5 * 24 * 60 * MIN) as unknown as Date,
+    });
+    expect(await ensureAccessToken(deps)).toBe('cached');
+    expect(counter.calls).toBe(0);
+  });
+
+  it('treats an unparseable expiresAt as expired and re-acquires', async () => {
+    const counter = { calls: 0 };
+    const deps = makeDeps(coldAcquire(counter));
+    await deps.tokenCache.set(deps.cacheKey, {
+      value: 'cached',
+      expiresAt: 'not-a-date' as unknown as Date,
+    });
+    expect(await ensureAccessToken(deps)).toBe('fresh');
+    expect(counter.calls).toBe(1);
+  });
+});

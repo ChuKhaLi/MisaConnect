@@ -28,7 +28,7 @@ export async function ensureAccessToken(
   const key = deps.cacheKey;
   const threshold = deps.clock.now().getTime() + SAFETY_SKEW_MS;
   const cached = await raceAbort(deps.tokenCache.get(key), signal);
-  if (cached !== undefined && cached.expiresAt.getTime() > threshold) return cached.value;
+  if (cached !== undefined && expiryTime(cached.expiresAt) > threshold) return cached.value;
 
   let pending = deps.inflight.get(key);
   if (pending === undefined) {
@@ -41,6 +41,21 @@ export async function ensureAccessToken(
     started.then(clear, clear);
   }
   return (await raceAbort(pending, signal)).value;
+}
+
+/**
+ * Expiry in epoch ms. Custom caches that deserialise JSON may hand back an ISO string or a
+ * number instead of a `Date`; those are converted, and anything unparseable counts as expired.
+ */
+function expiryTime(expiresAt: unknown): number {
+  const date =
+    expiresAt instanceof Date
+      ? expiresAt
+      : typeof expiresAt === 'string' || typeof expiresAt === 'number'
+        ? new Date(expiresAt)
+        : undefined;
+  const ms = date?.getTime();
+  return ms === undefined || Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
 }
 
 async function acquireAndStore(deps: EnsureAccessTokenDeps): Promise<AccessToken> {
