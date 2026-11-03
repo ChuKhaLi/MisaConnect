@@ -33,6 +33,7 @@
     "build": "tsup",
     "pretest": "npm run build",
     "test": "vitest run",
+    "test:sandbox": "vitest run --config vitest.sandbox.config.ts",
     "pretypecheck": "npm run build",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke.mjs && node scripts/smoke.cjs"
