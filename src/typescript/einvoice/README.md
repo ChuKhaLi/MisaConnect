@@ -275,7 +275,7 @@ Dates: `yyyy-MM-dd` strings (a `Date` is also accepted and formatted from its lo
 - Paged-lookup request violations throw `rawErrorCode: 'ValidationFailed'` with the rule id in `failures[0].ruleId` (.NET puts the rule id, e.g. `FR-047`, in `rawErrorCode`). `preview` validation failures likewise carry `ValidationFailed`.
 - Batch-size codes `InvoiceQuantityTooLarge` / `XMLTooLong` map to `BatchOrSize`. That includes the client-side check for a `saveDraft` batch of more than 30 invoices, where .NET throws `Validation`. An empty batch throws `Validation` / `ValidationFailed` (.NET reuses `InvoiceQuantityTooLarge`).
 - `saveDraft` also turns wire-mapping failures (malformed money string, impossible date, date-time without offset) into that invoice's own `ValidationFailed` result. .NET's typed DTOs cannot hold such values.
-- Token-endpoint sign-in failures `INVALID_USER` and `INVALID_TAXCODE` map to `Authentication` and `Configuration` (.NET reports `MisaUnknown`).
+- Token-endpoint sign-in failures `INVALID_USER` and `INVALID_TAXCODE` map to `Authentication` and `Configuration` (.NET reports `MisaUnknown`). MISA answers `INVALID_USER` for a wrong `userName`, `password`, `taxCode` or `appId` alike, so an `Authentication` error at sign-in means any of the four may be wrong.
 - The customer tax code is never logged.
 - Each call logs one completion line; failures are logged at `info` with `outcome: 'Error'` and `errorCategory`, a caller abort with `outcome: 'Cancelled'`.
 - Money strings must be plain decimals (`^-?\d+(\.\d+)?$`); the discount-total consistency check skips amount strings with more than 28 fractional digits and any amount beyond `decimal.MaxValue`.
