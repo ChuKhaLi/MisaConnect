@@ -199,7 +199,7 @@ describe('untyped-JS null inputs never surface a raw TypeError', () => {
     expect((JSON.parse(sent?.bodyText ?? '{}') as Record<string, unknown>)['Sort']).toBe('InvDate');
   });
 
-  it('null template rows and rows without a string InvSeries are skipped', async () => {
+  it('null template rows are skipped; a null InvSeries row is kept as blank', async () => {
     const good = fake.state.templates[0];
     fake.state.templates = any([
       null,
@@ -207,7 +207,8 @@ describe('untyped-JS null inputs never surface a raw TypeError', () => {
       good,
     ]);
     const templates = await client().listTemplates();
-    expect(templates.map((t) => t.ipTemplateID)).toEqual([good?.IPTemplateID]);
+    expect(templates.map((t) => t.ipTemplateID)).toEqual(['no-series', good?.IPTemplateID]);
+    expect(templates[0]?.invSeries).toBe('');
   });
 });
 

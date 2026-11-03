@@ -163,16 +163,18 @@ export function createMeInvoiceGateway(
           message: 'MISA returned a templates payload that is not an array.',
         });
       }
-      // Like lookups, skip malformed rows (null, or no string IPTemplateID / InvSeries).
+      // Skip malformed rows (null / non-object, or no string IPTemplateID). A null InvSeries is kept
+      // as blank, like .NET; the resolver already treats a blank series as unspecified.
       return (data as unknown[])
         .filter(
           (w): w is WireTemplate =>
             typeof w === 'object' &&
             w !== null &&
-            typeof (w as Record<string, unknown>)['IPTemplateID'] === 'string' &&
-            typeof (w as Record<string, unknown>)['InvSeries'] === 'string',
+            typeof (w as Record<string, unknown>)['IPTemplateID'] === 'string',
         )
-        .map((w): TemplateDto => fromWireTemplate(w, withCode));
+        .map((w): TemplateDto =>
+          fromWireTemplate(typeof w.InvSeries === 'string' ? w : { ...w, InvSeries: '' }, withCode),
+        );
     },
 
     async preview(invoice, refId, template, withCode, opts) {

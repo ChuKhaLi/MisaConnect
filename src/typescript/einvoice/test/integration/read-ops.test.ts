@@ -139,6 +139,24 @@ describe('listTemplates', () => {
     });
   });
 
+  it('keeps a row with a null InvSeries (as blank), drops null/non-object rows and rows without a string IPTemplateID', async () => {
+    const good = fake.state.templates[0]!;
+    fake.state.templates.push(
+      null as never,
+      'junk' as never,
+      { ...good, IPTemplateID: 7 } as never,
+      { ...good, IPTemplateID: undefined } as never,
+      { ...good, IPTemplateID: 'ipt-noseries', InvSeries: null } as never,
+    );
+    const templates = await client().listTemplates();
+    expect(templates.map((t) => t.ipTemplateID)).toEqual([
+      'ipt-active-1',
+      'ipt-active-2',
+      'ipt-noseries',
+    ]);
+    expect(templates[2]?.invSeries).toBe('');
+  });
+
   it('sends invoiceWithCode=false when asked', async () => {
     await client().listTemplates(false);
     expect(new URLSearchParams(nonToken()[0]?.query).get('invoiceWithCode')).toBe('false');
