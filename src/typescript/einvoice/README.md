@@ -143,7 +143,7 @@ Dates: `yyyy-MM-dd` strings (a `Date` is also accepted and formatted from its lo
 - The customer tax code is never logged.
 - Each call logs one completion line; failures are logged at `info` with `outcome: 'Error'` and `errorCategory`.
 - `changeReason` is logged verbatim (no JSON-fragment redaction) and only when `delete.includeRawErrorMessage` is on.
-- Money strings must be plain decimals (`^-?\d+(\.\d+)?$`), at most 28 fractional / 29 integer digits for the FR-025 check.
+- Money strings must be plain decimals (`^-?\d+(\.\d+)?$`); the discount-total consistency check skips amounts with more than 28 fractional or 29 integer digits.
 - Date-times need an explicit offset (`Z` or `+hh:mm` / `-hh:mm`).
 
 ## Sandbox tests
