@@ -10,10 +10,16 @@ export type TemplateResolution =
 
 const eq = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 
-/** Port of TemplateResolver.ResolveAsync over an already-fetched active-template list. */
+const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+/**
+ * Port of TemplateResolver.ResolveAsync over an already-fetched active-template list. Same
+ * signature as the `TemplateResolver` port; a missing or non-string ref field (untyped JS)
+ * counts as blank.
+ */
 export function resolveTemplate(
   templates: readonly TemplateDto[],
-  ref?: Partial<TemplateRefDto>,
+  ref?: TemplateRefDto,
 ): TemplateResolution {
   if (ref === undefined || ref === null) {
     const [only] = templates;
@@ -22,8 +28,8 @@ export function resolveTemplate(
     return { kind: 'AmbiguousTemplate', candidates: templates };
   }
 
-  const id = ref.ipTemplateID ?? '';
-  const series = ref.invSeries ?? '';
+  const id = text(ref.ipTemplateID);
+  const series = text(ref.invSeries);
   for (const t of templates) {
     if ((id === '' || eq(t.ipTemplateID, id)) && (series === '' || eq(t.invSeries, series))) {
       return { kind: 'Resolved', template: t };

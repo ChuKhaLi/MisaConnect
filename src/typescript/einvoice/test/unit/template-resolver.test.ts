@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { inferWithCode, resolveTemplate } from '../../src/application/template-resolver.js';
-import type { TemplateDto } from '../../src/domain/dtos.js';
+import type { TemplateDto, TemplateRefDto } from '../../src/domain/dtos.js';
+import type { TemplateResolver } from '../../src/application/ports.js';
 
 const tpl = (id: string, series: string): TemplateDto => ({
   ipTemplateID: id,
@@ -57,5 +58,19 @@ describe('inferWithCode', () => {
     expect(inferWithCode('1X26TAA')).toBeUndefined();
     expect(inferWithCode('1')).toBeUndefined();
     expect(inferWithCode(undefined)).toBeUndefined();
+  });
+});
+
+describe('resolveTemplate signature', () => {
+  it('matches the TemplateResolver port exactly', () => {
+    expectTypeOf(resolveTemplate).parameter(1).toEqualTypeOf<TemplateRefDto | undefined>();
+    expectTypeOf(resolveTemplate).toEqualTypeOf<TemplateResolver>();
+  });
+
+  it('still tolerates missing or non-string ref fields from untyped JS', () => {
+    const partial = { invSeries: '1C26TAA' } as unknown as TemplateRefDto;
+    expect(resolveTemplate([a, b], partial)).toEqual({ kind: 'Resolved', template: a });
+    const junk = { ipTemplateID: 42, invSeries: null } as unknown as TemplateRefDto;
+    expect(resolveTemplate([a], junk)).toEqual({ kind: 'Resolved', template: a });
   });
 });
