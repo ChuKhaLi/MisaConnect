@@ -181,6 +181,32 @@ describe('lookupByRefId', () => {
   });
 });
 
+describe('lookup data shapes', () => {
+  it('stringified-array data is handled for getlist and paging', async () => {
+    fake.state.seedDraft({ RefID: 'r-a' });
+    fake.state.stringifyLookupData = true;
+    const byRef = await client().lookupByRefId(['r-a'], true);
+    expect(byRef.outcomes?.[0]).toMatchObject({ status: 'Found', snapshot: { refId: 'r-a' } });
+    const paged = await client().lookupStandard(range(), true);
+    expect(paged.items.map((i) => i.refId)).toEqual(['r-a']);
+  });
+
+  it('non-object rows are skipped without throwing', async () => {
+    fake.state.rawLookupRows = [
+      null,
+      5,
+      'x',
+      [1],
+      { RefID: 'r-a', EInvoiceStatus: '1', PublishStatus: '0' },
+    ];
+    const byRef = await client().lookupByRefId(['r-a'], true);
+    expect(byRef.outcomes?.[0]?.status).toBe('Found');
+    const paged = await client().lookupCalculating(range(), true);
+    expect(paged.items.map((i) => i.refId)).toEqual(['r-a']);
+    expect(paged.returnedCount).toBe(1);
+  });
+});
+
 describe('lookupStandard / lookupCalculating', () => {
   it('standard posts to webapp/paging with the wire body; maps snapshots', async () => {
     fake.state.seedDraft({ RefID: 's1', InvDate: '2026-05-12' });
@@ -220,7 +246,7 @@ describe('lookupStandard / lookupCalculating', () => {
     expect(body['FromDate']).toBe('2026-05-01');
     expect(body['ToDate']).toBe('2026-05-31');
     expect(body).not.toHaveProperty('PublishStatus');
-    expect(body).not.toHaveProperty('Sort');
+    expect(body['Sort']).toBe('InvDate');
     expect(result.items.map((i) => i.refId)).toEqual(['c1']);
   });
 

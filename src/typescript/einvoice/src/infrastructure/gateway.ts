@@ -53,10 +53,24 @@ function decodeBase64(data: unknown, refId?: string): Uint8Array {
   });
 }
 
-/** Port `DeserializeSnapshots`: `data` is already decoded; anything but an array is empty. */
+/**
+ * Port `DeserializeSnapshots`: `data` is a raw array, or (some sandbox builds) a string the
+ * envelope reader could not pre-parse; unparseable / non-array data is empty, and rows that
+ * are not JSON objects are skipped (.NET returns empty rather than throwing).
+ */
 function toSnapshots(data: unknown): InvoiceSnapshotDto[] {
-  if (!Array.isArray(data)) return [];
-  return (data as WireLookupRow[]).map(fromWireSnapshot);
+  let rows: unknown = data;
+  if (typeof rows === 'string' && rows !== '') {
+    try {
+      rows = JSON.parse(rows) as unknown;
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .filter((r): r is WireLookupRow => typeof r === 'object' && r !== null && !Array.isArray(r))
+    .map(fromWireSnapshot);
 }
 
 /** Port `ThrowFromLookupEnvelope`. */
@@ -205,7 +219,8 @@ export function createMeInvoiceGateway(
       const body = {
         Start: request.start,
         Length: request.length,
-        Sort: request.sort,
+        // Port LookupDtoMapper.ToDomain: blank Sort defaults to "InvDate".
+        Sort: request.sort === undefined || request.sort.trim() === '' ? 'InvDate' : request.sort,
         FromDate: formatDateOnly(request.fromDate),
         ToDate: formatDateOnly(request.toDate),
         PublishStatus:

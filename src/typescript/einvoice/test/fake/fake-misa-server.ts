@@ -92,6 +92,8 @@ export class FakeState {
   /** @internal */ readonly droppedEchoes = new Set<string>();
   /** @internal */ readonly deleteErrors = new Map<string, { code: string; message: string }>();
   /** @internal */ readonly calculatingIds = new Set<string>();
+  /** @internal */ stringifyLookupData = false;
+  /** @internal */ rawLookupRows: unknown[] | undefined;
   /** @internal */ readonly lookupErrors: { code: string; message: string }[] = [];
 
   /** Next lookup request (getlist / paging) answers `success:false` with this error; queued FIFO. */
@@ -181,8 +183,10 @@ function parseJson(text: string): unknown {
 }
 
 /** Lookup envelope: `data` is a raw array. */
-function lookupBody(items: FakeSnapshot[]) {
-  return { success: true, errorCode: null, descriptionErrorCode: null, errors: [], data: items };
+function lookupBody(state: FakeState, items: FakeSnapshot[]) {
+  const rows: unknown[] = state.rawLookupRows ?? items;
+  const data = state.stringifyLookupData ? JSON.stringify(rows) : rows;
+  return { success: true, errorCode: null, descriptionErrorCode: null, errors: [], data };
 }
 
 function sendLookupError(state: FakeState, res: ServerResponse): boolean {
@@ -326,16 +330,23 @@ function handle(state: FakeState, req: FakeRequest, res: ServerResponse): void {
       const wanted = new Set(
         Array.isArray(body) ? body.filter((x): x is string => typeof x === 'string') : [],
       );
-      send(res, 200, lookupBody([...state.drafts.values()].filter((s) => wanted.has(s.RefID))));
+      send(
+        res,
+        200,
+        lookupBody(
+          state,
+          [...state.drafts.values()].filter((s) => wanted.has(s.RefID)),
+        ),
+      );
       return;
     }
     case 'POST /webapp/paging':
       if (sendLookupError(state, res)) return;
-      send(res, 200, lookupBody(paged(state, false, req.bodyText)));
+      send(res, 200, lookupBody(state, paged(state, false, req.bodyText)));
       return;
     case 'POST /webapp/paging/calculating':
       if (sendLookupError(state, res)) return;
-      send(res, 200, lookupBody(paged(state, true, req.bodyText)));
+      send(res, 200, lookupBody(state, paged(state, true, req.bodyText)));
       return;
     default:
       send(res, 404, {
