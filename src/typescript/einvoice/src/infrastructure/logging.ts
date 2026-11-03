@@ -24,6 +24,17 @@ export function scrub(fields: Record<string, unknown>): Record<string, unknown> 
   return out;
 }
 
+const SENSITIVE_JSON_FIELD =
+  /"(password|appid|app_id|app-id|token|taxcode|authorization|bearer)"\s*:\s*"[^"]*"/gi;
+
+/**
+ * Port `MeInvoiceLogScrubber.Redact(string)`: masks the value of sensitive JSON string
+ * fields (`"password":"..."`, `"token":"..."`, ...) embedded anywhere in free text.
+ */
+export function redactText(text: string): string {
+  return text.replace(SENSITIVE_JSON_FIELD, (_match, name: string) => `"${name}":"${MASK}"`);
+}
+
 export const noopLogger: Logger = {
   debug: () => undefined,
   info: () => undefined,

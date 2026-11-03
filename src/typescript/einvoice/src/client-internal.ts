@@ -20,6 +20,7 @@ import {
   type CallLogContext,
 } from './infrastructure/call-logger.js';
 import { createMeInvoiceGateway } from './infrastructure/gateway.js';
+import { redactText } from './infrastructure/logging.js';
 import { validateOptions, type MisaEInvoiceOptions } from './infrastructure/options.js';
 import { createTransport } from './infrastructure/transport.js';
 import type { CallOptions, IMisaEInvoiceClient } from './client.js';
@@ -72,7 +73,10 @@ export function createMisaEInvoiceClientInternal(
     };
     const orgRefId = request?.originalRef?.orgRefID;
     if (orgRefId) extra['orgRefId'] = orgRefId;
-    if (resolved.delete.includeRawErrorMessage) extra['changeReason'] = request?.changeReason ?? '';
+    if (resolved.delete.includeRawErrorMessage) {
+      const reason = request?.changeReason;
+      extra['changeReason'] = typeof reason === 'string' ? redactText(reason) : '';
+    }
     const ctx: CallLogContext = { extra };
     if (request?.invoice?.refId) ctx.refId = request.invoice.refId;
     if (request?.invoice?.template?.ipTemplateID) {

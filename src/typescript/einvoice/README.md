@@ -49,7 +49,7 @@ The quick start, the samples (`samples/typescript/`) and the sandbox tests all r
 | `fetch`                                                                  | Custom `fetch`. Default: the global `fetch`, looked up on every call.          |
 | `tokenCache`, `refIdGenerator`, `clock`, `validator`, `templateResolver` | Swappable collaborators (same ports as the .NET SDK); see below.               |
 
-`delete.includeRawErrorMessage` gates exactly these: the `message` on `deleteDraft` outcomes and on `lookupByRefId` per-RefId outcomes, the MISA-text excerpt in the `ARCH-DEL-001` warning, and logging of an amendment's `changeReason`. `saveDraft` and `issueReplacement` / `issueAdjustment` results always carry MISA's `errorMessage` (as in .NET), and `MeInvoiceException.message` is not gated.
+`delete.includeRawErrorMessage` gates exactly these: the `message` on `deleteDraft` outcomes and on `lookupByRefId` per-RefId outcomes, the MISA-text excerpt in the `ARCH-DEL-001` warning, and logging of an amendment's `changeReason` (with credential-looking JSON fragments such as `"password":"..."` masked, as .NET `MeInvoiceLogScrubber` does). `saveDraft` and `issueReplacement` / `issueAdjustment` results always carry MISA's `errorMessage` (as in .NET), and `MeInvoiceException.message` is not gated.
 
 Because the default `fetch` is resolved per call, a mock installed after the client is created (MSW, nock, `vi.stubGlobal`) is honoured.
 
@@ -245,7 +245,6 @@ Dates: `yyyy-MM-dd` strings (a `Date` is also accepted and formatted from its lo
 - `saveDraft` also turns wire-mapping failures (malformed money string, impossible date, date-time without offset) into that invoice's own `ValidationFailed` result. .NET's typed DTOs cannot hold such values.
 - The customer tax code is never logged.
 - Each call logs one completion line; failures are logged at `info` with `outcome: 'Error'` and `errorCategory`, a caller abort with `outcome: 'Cancelled'`.
-- `changeReason` is logged verbatim (no JSON-fragment redaction) and only when `delete.includeRawErrorMessage` is on.
 - Money strings must be plain decimals (`^-?\d+(\.\d+)?$`); the discount-total consistency check skips amounts with more than 28 fractional or 29 integer digits.
 - Date-times need an explicit offset (`Z` or `+hh:mm` / `-hh:mm`).
 

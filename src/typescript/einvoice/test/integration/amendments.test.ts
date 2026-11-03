@@ -264,6 +264,16 @@ describe('amendment logging', () => {
     });
   });
 
+  it('redacts JSON credential fragments inside changeReason (MeInvoiceLogScrubber parity)', async () => {
+    const reason = 'Customer pasted {"password":"x","token":"y"} by mistake';
+    await client({ delete: { includeRawErrorMessage: true } }).issueAdjustment(
+      request({ changeReason: reason }),
+    );
+    expect(lines.at(-1)?.fields?.['changeReason']).toBe(
+      'Customer pasted {"password":"***","token":"***"} by mistake',
+    );
+  });
+
   it('a returned Error result logs Error with its category', async () => {
     fake.state.failInsertFor('fresh-1', 'InvoiceCannotReplace', 'nope');
     await client().issueReplacement(request());

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fromPino, noopLogger, scrub } from '../../src/infrastructure/logging.js';
+import { fromPino, noopLogger, redactText, scrub } from '../../src/infrastructure/logging.js';
 
 describe('scrub', () => {
   it('masks sensitive keys case-insensitively', () => {
@@ -39,5 +39,26 @@ describe('loggers', () => {
     l.warn('w');
     expect(p.info).toHaveBeenCalledWith({ a: 1 }, 'm');
     expect(p.warn).toHaveBeenCalledWith({}, 'w');
+  });
+});
+
+describe('redactText (port MeInvoiceLogScrubber.Redact(string))', () => {
+  it('masks sensitive JSON string fields embedded in prose', () => {
+    expect(redactText('see {"password":"x","token":"y"} here')).toBe(
+      'see {"password":"***","token":"***"} here',
+    );
+  });
+
+  it('is case-insensitive, tolerates whitespace and keeps the field name as written', () => {
+    expect(redactText('{"AppID" :  "abc", "TaxCode":"0101", "note":"keep"}')).toBe(
+      '{"AppID":"***", "TaxCode":"***", "note":"keep"}',
+    );
+    expect(redactText('"app-id":"1" "app_id":"2" "authorization":"B" "bearer":"t"')).toBe(
+      '"app-id":"***" "app_id":"***" "authorization":"***" "bearer":"***"',
+    );
+  });
+
+  it('leaves text without such fragments unchanged', () => {
+    expect(redactText('password is wrong')).toBe('password is wrong');
   });
 });
