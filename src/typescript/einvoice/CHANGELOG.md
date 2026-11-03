@@ -6,7 +6,7 @@ All notable changes to `@misaconnect/einvoice` are documented here.
 
 ### Documentation
 
-- README "Network / TLS": calls from outside Vietnam fail on a path-MTU blackhole in front of MISA (any request above ~1.4 KB, i.e. every authenticated call, hangs and is reset; curl too). Lowering the interface MTU to 1280 fixes it; the 0.1.1 ClientHello reset is one instance of the same problem.
+- Correction to 0.1.1: the classical-curve pin does **not** make the SDK work from outside Vietnam on its own. The ClientHello reset was one case of a path-MTU blackhole in front of MISA: any request above ~1.4 KB hangs and is reset, curl included. That covers every authenticated call, because the bearer token alone is ~2 KB, so 0.1.1 and 0.1.2 still fail there after sign-in. The fix is on the host, not in the SDK: lower the MTU of the interface that reaches MISA (e.g. `ip link set dev eth0 mtu 1280`). README "Network / TLS" explains it. Hosts in Vietnam are not affected.
 
 ## [0.1.2] - 2026-11-03
 
