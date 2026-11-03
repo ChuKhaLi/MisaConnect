@@ -83,7 +83,7 @@ describe('fake MISA server', () => {
     ).json()) as Env;
     expect(env.success).toBe(false);
     expect(JSON.parse(env.data)).toEqual([{ RefID: 'a' }]);
-    expect(JSON.parse(env.error)).toEqual([
+    expect(JSON.parse(env.error ?? '')).toEqual([
       { RefID: 'b', ErrorCode: 'DuplicateInvoiceRefID', ErrorMessage: 'dup' },
     ]);
     expect([...fake.state.drafts.keys()]).toEqual(['a', 'c']);
