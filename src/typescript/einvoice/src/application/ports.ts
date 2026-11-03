@@ -12,6 +12,10 @@ import type { TemplateResolution } from './template-resolver.js';
 
 export interface InvoiceValidator {
   validate(invoice: InvoiceDto): ValidationFailure[];
+  /**
+   * Whole-batch check: the invoice count plus every invoice's failures under `invoices[i].` paths. Part of the port for .NET parity; `saveDraft`
+   * validates each invoice with `validate` so one bad invoice does not fail the batch.
+   */
   validateBatch(invoices: InvoiceDto[]): ValidationFailure[];
 }
 

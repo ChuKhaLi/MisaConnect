@@ -37,6 +37,11 @@ export interface IMisaEInvoiceClient {
     invoiceWithCode: boolean,
     opts?: CallOptions,
   ): Promise<DeleteDraftOutcome>;
+  /**
+   * Looks up invoices by RefId, one outcome per RefId. An empty list is reported as a
+   * `Validation` batch outcome (a value), whereas a bad individual RefId (empty or longer
+   * than 64 characters) throws `Validation` / `RefIdInvalid`.
+   */
   lookupByRefId(
     refIds: readonly string[],
     withCode: boolean,

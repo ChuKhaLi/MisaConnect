@@ -55,6 +55,8 @@ Because the default `fetch` is resolved per call, a mock installed after the cli
 
 ### Swappable collaborators
 
+`InvoiceValidator` has two methods, `validate` and `validateBatch`. `validateBatch` is part of the port for parity with .NET; `saveDraft` itself validates each invoice with `validate` so that one bad invoice does not fail the others.
+
 The port types are exported: `TokenCache`, `AccessToken`, `Clock`, `RefIdGenerator`, `InvoiceValidator`, `TemplateResolver` and `TemplateResolution`. So are the defaults `defaultInvoiceValidator` and `resolveTemplate`, so you can wrap them instead of reimplementing them.
 
 ```ts
@@ -182,6 +184,8 @@ Every request, inserts included, is retried once after a timeout, network error,
 
 Operations that cannot proceed throw `MeInvoiceException`, which carries `category` (a `MeInvoiceErrorCategory`: `Configuration`, `Authentication`, `Validation`, `BatchOrSize`, `MisaThrottled`, `MisaUnavailable`, `TransportFailed`, `MisaUnknown`, ...), plus `rawErrorCode`, `field`, `refId` and `failures` (`{ fieldPath, message, ruleId? }[]`) when known.
 
+`field` and `component` are also populated (beyond .NET) when the MISA error code names them, e.g. `InvoiceDetail_Quantity_Line3` gives `field: 'Quantity'`, `component: 'Line3'`.
+
 Check errors with `isMeInvoiceException(err)` rather than `err instanceof MeInvoiceException`. If both the ESM and the CommonJS build of this package load in one process (the dual-package hazard, e.g. a dependency `require`s it while your code `import`s it), an exception from one copy is not an `instanceof` the other copy's class; the guard falls back to `err.name === 'MeInvoiceException'`.
 
 A `Validation` error raised from your own input (an invoice, an amendment or paged-lookup request, an empty batch) has `rawErrorCode: 'ValidationFailed'`; the individual problems are in `failures`, with the rule id in `failures[].ruleId` (e.g. `FR-047`). A few checks raise their own code directly: `RefIdInvalid` / `RefIdRequired` for a RefID argument, and `InvalidMoney` / `InvalidDate` / `InvalidNumber` for a value outside an invoice (e.g. a paged lookup's `fromDate`). Inside `saveDraft` those value errors are wrapped into the invoice's `ValidationFailed` result.
@@ -189,7 +193,7 @@ A `Validation` error raised from your own input (an invoice, an amendment or pag
 Some operations report expected business results as **values, not exceptions**:
 
 - `deleteDraft` returns a `DeleteDraftOutcome` with a `status` (`Deleted`, `NotFound`, `NotDeletable`, ...).
-- `lookupByRefId` returns a `LookupBatchOutcomeDto`: batch `status` is `Completed` or `Validation`; each entry has its own `LookupStatus`.
+- `lookupByRefId` returns a `LookupBatchOutcomeDto`: batch `status` is `Completed` or `Validation`; each entry has its own `LookupStatus`. The asymmetry: an empty list comes back as a `Validation` outcome (a value), while an invalid individual RefId (empty or longer than 64 characters) throws `Validation` / `RefIdInvalid`.
 - `saveDraft` returns one `SaveResultDto` per invoice, in input order (`outcome: 'Success' | 'Error'` with `errorCategory`, `rawErrorCode`, and `errorMessage` or `failures`). An invoice that fails validation gets `errorCategory: 'Validation'`, `rawErrorCode: 'ValidationFailed'` and `failures` with paths like `invoices[1].lines[0].unitPrice`. That includes values that cannot be put on the wire: a malformed money string, a non-finite number (`NaN`, `Infinity`), an impossible date, a date-time without offset. Such an invoice is not sent, and the valid invoices still go out in one insert call. An unresolvable template likewise fails only its own invoice. Only the batch itself throws: an empty batch (`Validation`) or more than 30 invoices (`BatchOrSize`, `rawErrorCode: 'InvoiceQuantityTooLarge'`), both with a `$batch.count` failure. `issueReplacement` / `issueAdjustment` return an `AmendmentResultDto` the same way.
 
 ## Cancellation and correlation
