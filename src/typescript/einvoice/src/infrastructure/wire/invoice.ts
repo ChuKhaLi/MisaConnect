@@ -103,7 +103,7 @@ function wireVat(rate: VatRate): { name: string; numeric?: number } {
 
 /** .NET `DateTimeOffset.ToString("O")`: 7 fraction digits, numeric offset (never `Z`). */
 function formatOffsetDateTime(text: string, field: string): string {
-  const p = parseDateTime(text);
+  const p = typeof text === 'string' ? parseDateTime(text) : undefined;
   if (!p || p.offset === undefined) {
     throw new MeInvoiceException('Validation', {
       rawErrorCode: 'InvalidDate',
@@ -117,7 +117,7 @@ function formatOffsetDateTime(text: string, field: string): string {
 function wireLine(l: InvoiceLineDto, i: number): WireInvoiceDetail {
   const f = (name: string) => `lines[${i}].${name}`;
   let vat: { name: string; numeric?: number } | undefined;
-  if (l.vatRateName !== undefined && l.vatRateName !== '') {
+  if (typeof l.vatRateName === 'string' && l.vatRateName !== '') {
     const parsed = parseVatRate(l.vatRateName);
     if (!parsed) {
       throw new MeInvoiceException('Validation', {

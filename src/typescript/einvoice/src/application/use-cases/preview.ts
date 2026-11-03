@@ -34,6 +34,14 @@ export async function previewInvoice(
   withCode: boolean,
   opts?: GatewayCallOptions,
 ): Promise<PreviewResult> {
+  if (typeof invoice !== 'object' || invoice === null) {
+    throw new MeInvoiceException('Validation', {
+      rawErrorCode: 'ValidationFailed',
+      message: 'Invoice is required.',
+      field: 'invoice',
+      failures: [{ fieldPath: 'invoice', message: 'Invoice is required.', ruleId: 'FR-006' }],
+    });
+  }
   const refId = invoice.refId ? invoice.refId : deps.refIdGenerator();
   const working: InvoiceDto = { ...invoice, refId };
 

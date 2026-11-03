@@ -112,6 +112,7 @@ export function formatDateOnly(v: string | Date, field?: string): string {
     }
     return v;
   }
+  if (!(v instanceof Date)) throw invalidDate('Date is required.', field);
   if (Number.isNaN(v.getTime())) throw invalidDate('Invalid Date value.', field);
   const y = String(v.getFullYear()).padStart(4, '0');
   const m = String(v.getMonth() + 1).padStart(2, '0');

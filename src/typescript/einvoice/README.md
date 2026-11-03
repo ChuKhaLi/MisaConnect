@@ -234,6 +234,8 @@ Dates: `yyyy-MM-dd` strings (a `Date` is also accepted and formatted from its lo
 ## Differences from the .NET SDK
 
 - `preview` validates before resolving the template, so an invalid invoice makes no HTTP call. `saveDraft` does the same per invoice: a batch with no valid invoice makes no HTTP call, and an invoice that is both invalid and has an unresolvable template reports `ValidationFailed` (.NET reports the template error).
+- `listTemplates` skips template rows MISA returns as `null` or without a string `IPTemplateID` / `InvSeries` (.NET keeps a row with a null `InvSeries`).
+- Untyped-JS `null` / missing inputs (a `null` invoice, line, buyer, request, date) throw or report `Validation` / `ValidationFailed` instead of a `TypeError`; a `null` optional field such as `vatRateName` or `sort` counts as absent.
 - A getlist response with `success:false` and no error code maps to `MisaUnknown` (.NET reports `NotFound` for every RefID).
 - An empty RefId list yields a `Validation` batch outcome.
 - Batch-size codes `InvoiceQuantityTooLarge` / `XMLTooLong` map to `BatchOrSize`. That includes the client-side check for a `saveDraft` batch of more than 30 invoices, where .NET throws `Validation`. An empty batch throws `Validation` without a `rawErrorCode` (.NET reuses `InvoiceQuantityTooLarge`).

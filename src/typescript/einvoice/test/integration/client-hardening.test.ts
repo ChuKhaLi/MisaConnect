@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMisaEInvoiceClient, type IMisaEInvoiceClient } from '../../src/client.js';
 import { createMisaEInvoiceClientInternal } from '../../src/client-internal.js';
 import type { Logger } from '../../src/application/ports.js';
+import { MeInvoiceException } from '../../src/domain/errors.js';
 import type { MisaEInvoiceOptions } from '../../src/infrastructure/options.js';
 import { startFakeMisa, type FakeMisa } from '../fake/fake-misa-server.js';
 import { invoice } from '../fixtures/readme-invoice.js';
@@ -123,5 +124,89 @@ describe('public factory has no base-URL escape hatch', () => {
     expect(attempt).toThrow(
       expect.objectContaining({ category: 'Configuration', rawErrorCode: 'InvalidOptions' }),
     );
+  });
+});
+
+describe('untyped-JS null inputs never surface a raw TypeError', () => {
+  const any = <T>(v: unknown): T => v as T;
+  const rejection = async (p: Promise<unknown>): Promise<unknown> =>
+    p.then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+  const isValidation = (err: unknown, field?: string): void => {
+    expect(err).toBeInstanceOf(MeInvoiceException);
+    expect(err).toMatchObject({ category: 'Validation', rawErrorCode: 'ValidationFailed' });
+    if (field !== undefined) {
+      expect((err as MeInvoiceException).failures?.map((f) => f.fieldPath)).toContain(field);
+    }
+  };
+
+  it('saveDraft(null) throws Validation', async () => {
+    isValidation(await rejection(client().saveDraft(any(null))), 'invoices');
+  });
+
+  it('saveDraft([null]) reports a per-invoice ValidationFailed at invoices[0]', async () => {
+    const [r] = await client().saveDraft(any([null]));
+    expect(r).toMatchObject({ outcome: 'Error', rawErrorCode: 'ValidationFailed' });
+    expect(r?.failures?.map((f) => f.fieldPath)).toEqual(['invoices[0]']);
+  });
+
+  it('saveDraft with a null line reports invoices[0].lines[0]', async () => {
+    const [r] = await client().saveDraft([{ ...invoice, lines: any([null]) }]);
+    expect(r?.failures?.map((f) => f.fieldPath)).toContain('invoices[0].lines[0]');
+  });
+
+  it('saveDraft with a null buyer or missing dates is a per-invoice ValidationFailed, not sent', async () => {
+    const results = await client().saveDraft([
+      { ...invoice, refId: 'a', buyerType: 2, buyer: any(null) },
+      { ...invoice, refId: 'b', invDate: any(undefined), createdDate: any(null) },
+    ]);
+    expect(results[0]).toMatchObject({ outcome: 'Error', rawErrorCode: 'ValidationFailed' });
+    expect(results[0]?.failures?.map((f) => f.fieldPath)).toContain('invoices[0].buyer');
+    expect(results[1]).toMatchObject({ outcome: 'Error', rawErrorCode: 'ValidationFailed' });
+    expect(results[1]?.failures?.map((f) => f.fieldPath)).toEqual(['invoices[1].invDate']);
+    expect(fake.state.requests.filter((r) => r.path === '/webapp/insert')).toHaveLength(0);
+  });
+
+  it('a null vatRateName is treated as absent', async () => {
+    const line = { ...invoice.lines[0], vatRateName: any(null) };
+    const results = await client().saveDraft([{ ...invoice, lines: [any(line)] }]);
+    expect(results[0]).toMatchObject({ outcome: 'Success' });
+  });
+
+  it('preview(null) throws Validation', async () => {
+    isValidation(await rejection(client().preview(any(null))), 'invoice');
+  });
+
+  it('issueReplacement(null) / issueAdjustment(null) throw Validation', async () => {
+    isValidation(await rejection(client().issueReplacement(any(null))), '$request');
+    isValidation(await rejection(client().issueAdjustment(any(null))), '$request');
+  });
+
+  it('lookupStandard(null) / lookupCalculating(null) throw Validation', async () => {
+    isValidation(await rejection(client().lookupStandard(any(null), true)), 'request');
+    isValidation(await rejection(client().lookupCalculating(any(null), true)), 'request');
+  });
+
+  it('a null sort defaults to InvDate', async () => {
+    const res = await client().lookupStandard(
+      { start: 0, length: 10, sort: any(null), fromDate: '2026-01-01', toDate: '2026-12-31' },
+      true,
+    );
+    expect(res.items).toEqual([]);
+    const sent = fake.state.requests.find((r) => r.path === '/webapp/paging');
+    expect((JSON.parse(sent?.bodyText ?? '{}') as Record<string, unknown>)['Sort']).toBe('InvDate');
+  });
+
+  it('null template rows and rows without a string InvSeries are skipped', async () => {
+    const good = fake.state.templates[0];
+    fake.state.templates = any([
+      null,
+      { ...good, IPTemplateID: 'no-series', InvSeries: null },
+      good,
+    ]);
+    const templates = await client().listTemplates();
+    expect(templates.map((t) => t.ipTemplateID)).toEqual([good?.IPTemplateID]);
   });
 });

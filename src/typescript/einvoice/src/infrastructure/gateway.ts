@@ -161,7 +161,16 @@ export function createMeInvoiceGateway(
           message: 'MISA returned a templates payload that is not an array.',
         });
       }
-      return (data as WireTemplate[]).map((w): TemplateDto => fromWireTemplate(w, withCode));
+      // Like lookups, skip malformed rows (null, or no string IPTemplateID / InvSeries).
+      return (data as unknown[])
+        .filter(
+          (w): w is WireTemplate =>
+            typeof w === 'object' &&
+            w !== null &&
+            typeof (w as Record<string, unknown>)['IPTemplateID'] === 'string' &&
+            typeof (w as Record<string, unknown>)['InvSeries'] === 'string',
+        )
+        .map((w): TemplateDto => fromWireTemplate(w, withCode));
     },
 
     async preview(invoice, refId, template, withCode, opts) {
@@ -270,7 +279,8 @@ export function createMeInvoiceGateway(
         Start: request.start,
         Length: request.length,
         // Port LookupDtoMapper.ToDomain: blank Sort defaults to "InvDate".
-        Sort: request.sort === undefined || request.sort.trim() === '' ? 'InvDate' : request.sort,
+        Sort:
+          typeof request.sort !== 'string' || request.sort.trim() === '' ? 'InvDate' : request.sort,
         FromDate: formatDateOnly(request.fromDate, 'fromDate'),
         ToDate: formatDateOnly(request.toDate, 'toDate'),
         PublishStatus:

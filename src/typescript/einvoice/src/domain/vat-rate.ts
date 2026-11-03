@@ -15,6 +15,7 @@ const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
 
 /** Parses a MISA VAT rate name (port of `VatRate.FromName`); returns undefined when unknown. */
 export function parseVatRate(name: string): VatRate | undefined {
+  if (typeof name !== 'string') return undefined;
   const trimmed = name.trim();
   if (trimmed === '') return undefined;
   const named = NAMED.get(trimmed.toUpperCase());

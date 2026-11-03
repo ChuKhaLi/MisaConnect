@@ -9,6 +9,7 @@ import { previewInvoice } from './application/use-cases/preview.js';
 import type {
   AdjustmentRequestDto,
   AmendmentResultDto,
+  InvoiceDto,
   ReplacementRequestDto,
 } from './domain/dtos.js';
 import {
@@ -132,7 +133,9 @@ export function createMisaEInvoiceClientInternal(
     saveDraft: (invoices, withCode = true, opts) => {
       const ctx: CallLogContext = {};
       const label = refIdLabel(
-        (invoices ?? []).map((i) => i?.refId).filter((r): r is string => !!r),
+        (Array.isArray(invoices) ? invoices : [])
+          .map((i: InvoiceDto | null) => i?.refId)
+          .filter((r): r is string => typeof r === 'string' && r !== ''),
       );
       if (label !== undefined) ctx.refId = label;
       return run('SaveDraft', opts, ctx, async () => {

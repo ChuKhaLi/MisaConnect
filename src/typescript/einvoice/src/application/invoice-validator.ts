@@ -2,6 +2,7 @@ import type {
   AdjustmentRequestDto,
   DateOnlyInput,
   InvoiceDto,
+  InvoiceLineDto,
   Money,
   PagedLookupRequestDto,
   ReplacementRequestDto,
@@ -166,11 +167,14 @@ function validateInvoice(invoice: InvoiceDto): ValidationFailure[] {
     failures.push(fail('paymentMethod', 'PaymentMethod is required.', 'FR-027'));
   }
 
+  if (typeof invoice.buyer !== 'object' || invoice.buyer === null) {
+    failures.push(fail('buyer', 'Buyer is required.', 'FR-006'));
+  }
   checkEmojiFree('buyer.name', invoice.buyer?.name, failures);
   checkEmojiFree('buyer.contactName', invoice.buyer?.contactName, failures);
   checkEmojiFree('buyer.address', invoice.buyer?.address, failures);
 
-  if (!invoice.lines || invoice.lines.length === 0) {
+  if (!Array.isArray(invoice.lines) || invoice.lines.length === 0) {
     failures.push(fail('lines', 'At least one invoice line is required.', 'FR-006'));
   } else {
     if (invoice.lines.length > MaxLinesPerInvoice) {
@@ -183,7 +187,11 @@ function validateInvoice(invoice: InvoiceDto): ValidationFailure[] {
       );
     }
 
-    invoice.lines.forEach((line, i) => {
+    invoice.lines.forEach((line: InvoiceLineDto | null, i) => {
+      if (typeof line !== 'object' || line === null) {
+        failures.push(fail(`lines[${i}]`, 'Invoice line is null.', 'FR-006'));
+        return;
+      }
       checkEmojiFree(`lines[${i}].description`, line.description, failures);
       checkEmojiFree(`lines[${i}].unitName`, line.unitName, failures);
       if (
@@ -208,7 +216,9 @@ function validateInvoice(invoice: InvoiceDto): ValidationFailure[] {
       if (header !== undefined) {
         const goods: Decimal[] = [];
         for (const line of invoice.lines) {
-          if (line.inventoryItemType !== GOODS) continue;
+          if (typeof line !== 'object' || line === null || line.inventoryItemType !== GOODS) {
+            continue;
+          }
           const d = parseDecimal(line.discountAmountOC);
           if (d !== undefined) goods.push(d);
         }
@@ -292,6 +302,9 @@ export function validatePagedLookup(req: PagedLookupRequestDto): ValidationFailu
 export function validateAmendment(
   req: ReplacementRequestDto | AdjustmentRequestDto,
 ): ValidationFailure[] {
+  if (typeof req !== 'object' || req === null) {
+    return [fail('$request', 'Required.', 'FR-058')];
+  }
   const failures: ValidationFailure[] = [];
   const ref = req.originalRef;
   if (ref === undefined || ref === null) {

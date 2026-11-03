@@ -14,10 +14,14 @@ export async function lookupPaged(
   withCode: boolean,
   opts?: GatewayCallOptions,
 ): Promise<PagedLookupResultDto> {
-  if (request === undefined || request === null) {
+  if (typeof request !== 'object' || request === null) {
     throw new MeInvoiceException('Validation', {
-      rawErrorCode: 'RequestRequired',
+      rawErrorCode: 'ValidationFailed',
       message: 'Lookup request is required.',
+      field: 'request',
+      failures: [
+        { fieldPath: 'request', message: 'Lookup request is required.', ruleId: 'FR-047' },
+      ],
     });
   }
   const [failure] = validatePagedLookup(request);

@@ -56,8 +56,15 @@ function assertBatchSize(count: number): void {
   }
 }
 
+/** Prefixes `invoices[i].`; the invoice root (`$` or empty) becomes `invoices[i]`. */
 const indexed = (index: number, failures: readonly ValidationFailure[]): ValidationFailure[] =>
-  failures.map((f) => ({ ...f, fieldPath: `invoices[${index}].${f.fieldPath}` }));
+  failures.map((f) => ({
+    ...f,
+    fieldPath:
+      f.fieldPath === '$' || f.fieldPath === ''
+        ? `invoices[${index}]`
+        : `invoices[${index}].${f.fieldPath}`,
+  }));
 
 /**
  * Port SaveDraftInvoices.cs. Only an empty or oversize batch throws. Each invoice is validated
@@ -72,6 +79,16 @@ export async function saveDraftInvoices(
   withCode: boolean,
   opts?: GatewayCallOptions,
 ): Promise<SaveDraftResult> {
+  if (!Array.isArray(invoices)) {
+    throw new MeInvoiceException('Validation', {
+      rawErrorCode: 'ValidationFailed',
+      message: 'Invoices must be an array.',
+      field: 'invoices',
+      failures: [
+        { fieldPath: 'invoices', message: 'Invoices must be an array.', ruleId: 'FR-006' },
+      ],
+    });
+  }
   assertBatchSize(invoices.length);
 
   const results: (SaveResultDto | undefined)[] = new Array<SaveResultDto | undefined>(
@@ -79,8 +96,14 @@ export async function saveDraftInvoices(
   );
   const valid: { index: number; invoice: InvoiceDto; refId: string }[] = [];
   invoices.forEach((inv, index) => {
-    const refId = inv?.refId ? inv.refId : deps.refIdGenerator();
-    const failures = deps.validator.validate({ ...inv, refId });
+    const isObject = typeof inv === 'object' && inv !== null;
+    const refId =
+      isObject && typeof inv.refId === 'string' && inv.refId !== ''
+        ? inv.refId
+        : deps.refIdGenerator();
+    const failures: readonly ValidationFailure[] = isObject
+      ? deps.validator.validate({ ...inv, refId })
+      : [{ fieldPath: '$', message: 'Invoice is null.', ruleId: 'FR-006' }];
     if (failures.length > 0) {
       results[index] = {
         refId,
