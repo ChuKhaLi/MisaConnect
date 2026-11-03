@@ -3,7 +3,7 @@ import type { Money } from '../domain/dtos.js';
 
 const MONEY_PATTERN = /^-?\d+(\.\d+)?$/;
 // Emitted text: plain decimals, or exponent form produced by JSON.stringify of a number.
-const EMIT_PATTERN = /^-?d+(.d+)?([eE][+-]?d+)?$/;
+const EMIT_PATTERN = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Branded wrapper; its text is emitted verbatim as a JSON number literal. */
