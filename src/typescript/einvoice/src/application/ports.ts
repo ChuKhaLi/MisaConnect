@@ -64,3 +64,26 @@ export interface MeInvoiceTransport {
     opts?: RequestOptions,
   ): Promise<Envelope<T>>;
 }
+
+export interface GatewayCallOptions {
+  signal?: AbortSignal;
+}
+
+/**
+ * Domain-level MISA operations (port `IMeInvoiceClient`). The infrastructure adapter
+ * owns routes, query strings, wire bodies and envelope interpretation.
+ */
+export interface MeInvoiceGateway {
+  /** All templates (active and inactive), mapped. */
+  listTemplates(withCode: boolean, opts?: GatewayCallOptions): Promise<TemplateDto[]>;
+  /** PDF bytes of the rendered preview. */
+  preview(
+    invoice: InvoiceDto,
+    refId: string,
+    template: TemplateDto,
+    withCode: boolean,
+    opts?: GatewayCallOptions,
+  ): Promise<Uint8Array>;
+  /** PDF bytes of a stored draft; unknown RefID → `ResourceNotFound`. */
+  viewDraftPdf(refId: string, withCode: boolean, opts?: GatewayCallOptions): Promise<Uint8Array>;
+}

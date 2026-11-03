@@ -5,3 +5,5 @@ export * from './domain/vat-rate.js';
 export type { MisaEInvoiceOptions } from './infrastructure/options.js';
 export type { Logger } from './application/ports.js';
 export { fromPino } from './infrastructure/logging.js';
+export { createMisaEInvoiceClient } from './client.js';
+export type { CallOptions, IMisaEInvoiceClient } from './client.js';

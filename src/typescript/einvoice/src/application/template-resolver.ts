@@ -1,4 +1,6 @@
 import type { TemplateDto, TemplateRefDto } from '../domain/dtos.js';
+import { MeInvoiceException } from '../domain/errors.js';
+import { mapErrorCode } from './error-mapper.js';
 
 export type TemplateResolution =
   | { kind: 'Resolved'; template: TemplateDto }
@@ -37,4 +39,20 @@ export function inferWithCode(invSeries: string | undefined): boolean | undefine
   if (c === 'C') return true;
   if (c === 'K') return false;
   return undefined;
+}
+
+/** Resolution failure → exception (messages per `PreviewInvoice.cs`, category via the error map). */
+export function templateResolutionError(
+  resolution: Exclude<TemplateResolution, { kind: 'Resolved' }>,
+): MeInvoiceException {
+  const message =
+    resolution.kind === 'AmbiguousTemplate'
+      ? 'Multiple active templates exist; caller must specify.'
+      : resolution.kind === 'NoActiveTemplate'
+        ? 'No active templates configured.'
+        : `Template '${resolution.key}' is not active.`;
+  return new MeInvoiceException(mapErrorCode(resolution.kind).category, {
+    rawErrorCode: resolution.kind,
+    message,
+  });
 }

@@ -6,6 +6,7 @@ describe('package exports', () => {
     const mod = await import('@misaconnect/einvoice');
     expect(mod.MeInvoiceErrorCategory.Validation).toBe('Validation');
     expect(new mod.MeInvoiceException('Validation')).toBeInstanceOf(Error);
+    expect(typeof mod.createMisaEInvoiceClient).toBe('function');
   });
 
   it('loads via CommonJS require', () => {
