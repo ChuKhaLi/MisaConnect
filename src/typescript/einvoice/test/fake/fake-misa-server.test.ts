@@ -25,7 +25,7 @@ describe('fake MISA server', () => {
   it('listens on loopback and serves a stringified access_token envelope', async () => {
     expect(fake.baseUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     const res = await post('webapp/token', { appid: 'a' }, { 'Content-Type': 'application/json' });
-    const env = (await res.json()) as Promise<Env>;
+    const env = (await res.json()) as Env;
     expect(env.success).toBe(true);
     expect(JSON.parse(env.data)).toEqual({ access_token: 'fake-token' });
   });
@@ -33,10 +33,10 @@ describe('fake MISA server', () => {
   it('insert then getlist returns the stored draft', async () => {
     const ins = (await (
       await post('webapp/insert?invoiceWithCode=true', [{ RefID: 'r-1', InvSeries: 'C26TAA' }])
-    ).json()) as Promise<Env>;
+    ).json()) as Env;
     expect(ins.success).toBe(true);
     expect(JSON.parse(ins.data)).toEqual([{ RefID: 'r-1' }]);
-    const list = (await (await post('webapp/getlist', ['r-1', 'nope'])).json()) as Promise<Env>;
+    const list = (await (await post('webapp/getlist', ['r-1', 'nope'])).json()) as Env;
     expect(list.success).toBe(true);
     expect(Array.isArray(list.data)).toBe(true);
     expect(list.data).toHaveLength(1);
@@ -63,7 +63,7 @@ describe('fake MISA server', () => {
   it('lists active and inactive templates and logs requests', async () => {
     const env = (await (
       await post('webapp/templates?invoiceWithCode=true&isTicket=false', {})
-    ).json()) as Promise<Env>;
+    ).json()) as Env;
     const rows = JSON.parse(env.data) as { Inactive: boolean }[];
     expect(rows.filter((r) => !r.Inactive).length).toBeGreaterThanOrEqual(2);
     expect(rows.filter((r) => r.Inactive).length).toBeGreaterThanOrEqual(1);
@@ -80,7 +80,7 @@ describe('fake MISA server', () => {
     fake.state.dropEchoFor('c');
     const env = (await (
       await post('webapp/insert', [{ RefID: 'a' }, { RefID: 'b' }, { RefID: 'c' }])
-    ).json()) as Promise<Env>;
+    ).json()) as Env;
     expect(env.success).toBe(false);
     expect(JSON.parse(env.data)).toEqual([{ RefID: 'a' }]);
     expect(JSON.parse(env.error)).toEqual([
@@ -110,16 +110,16 @@ describe('fake MISA server', () => {
   it('preview and viewrefid return a base64 PDF stub; unknown refid has empty data', async () => {
     const pv = (await (
       await post('webapp/preview?invoiceWithCode=true', { RefID: 'x' })
-    ).json()) as Promise<Env>;
+    ).json()) as Env;
     expect(Buffer.from(pv.data, 'base64').toString('latin1').startsWith('%PDF-1.4')).toBe(true);
     fake.state.seedDraft({ RefID: 'v1' });
     const ok = (await (
       await fetch(`${fake.baseUrl}/webapp/viewrefid?refid=v1`, { headers: AUTH })
-    ).json()) as Promise<Env>;
+    ).json()) as Env;
     expect(Buffer.from(ok.data, 'base64').toString('latin1').startsWith('%PDF-1.4')).toBe(true);
     const miss = (await (
       await fetch(`${fake.baseUrl}/webapp/viewrefid?refid=zz`, { headers: AUTH })
-    ).json()) as Promise<Env>;
+    ).json()) as Env;
     expect(miss.success).toBe(true);
     expect(miss.data).toBeFalsy();
   });
@@ -128,9 +128,7 @@ describe('fake MISA server', () => {
     for (const d of ['01', '02', '03'])
       fake.state.seedDraft({ RefID: `s${d}`, InvDate: `2026-05-${d}` });
     fake.state.seedDraft({ RefID: 'c01', InvDate: '2026-05-01' }, { calculating: true });
-    const std = (await (
-      await post('webapp/paging', { Start: 1, Length: 1 })
-    ).json()) as Promise<Env>;
+    const std = (await (await post('webapp/paging', { Start: 1, Length: 1 })).json()) as Env;
     expect(std.data.map((x: { RefID: string }) => x.RefID)).toEqual(['s02']);
     const calc = (await (
       await post('webapp/paging/calculating', { Start: 0, Length: 10 })
