@@ -194,16 +194,39 @@ describe('issueAdjustment', () => {
     });
     const result = await client().issueAdjustment(request({ invoice: inv }));
     expect(result).toMatchObject({ refId: 'adj-1', outcome: 'Success', orgRefId: 'orig-001' });
+    expect(insertBody()).toMatchObject({
+      EInvoiceStatus: '4',
+      OrgRefID: 'orig-001',
+      ChangeReason: REASON,
+    });
+    const text = inserts()[0]?.bodyText ?? '';
+    expect(text).toContain('"TotalAmountOC":-55000');
+    expect(text).toContain('"TotalAmount":-55000');
   });
 
-  it('HasAdjustmentInvoice → Error / Replacement', async () => {
-    fake.state.failInsertFor('fresh-1', 'HasAdjustmentInvoice', 'dup');
-    const result = await client().issueAdjustment(request());
-    expect(result).toMatchObject({
-      outcome: 'Error',
-      errorCategory: 'Replacement',
-      rawErrorCode: 'HasAdjustmentInvoice',
-    });
+  it.each([
+    ['HasAdjustmentInvoice', 'Replacement'],
+    ['InvoiceCannotReplace', 'Replacement'],
+    ['InvoiceCannotAdjust', 'Replacement'],
+    ['InvoiceCannotReplaceByStatusNew', 'Replacement'],
+    ['DuplicateInvoiceRefID', 'DuplicateOrUniqueness'],
+    ['UnAuthorize', 'Authentication'],
+    ['InvalidAppID', 'Configuration'],
+    ['RefIdNotFound', 'ResourceNotFound'],
+    ['Exception', 'MisaUnavailable'],
+    ['SignatureEmpty', 'Signing'],
+  ])('per-entry %s → Error / %s (both operations)', async (code, category) => {
+    for (const op of ['issueReplacement', 'issueAdjustment'] as const) {
+      fake.state.failInsertFor('fresh-1', code, 'fake error');
+      const result = await client()[op](request());
+      expect(result).toMatchObject({
+        refId: 'fresh-1',
+        outcome: 'Error',
+        errorCategory: category,
+        rawErrorCode: code,
+        orgRefId: 'orig-001',
+      });
+    }
   });
 
   it('missing orgRefID throws Validation, no request', async () => {
