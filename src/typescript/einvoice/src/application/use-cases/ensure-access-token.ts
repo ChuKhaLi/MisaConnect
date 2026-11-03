@@ -22,7 +22,9 @@ export interface EnsureAccessTokenDeps {
  * is still reading or acquiring. The shared work is not bound to any one caller's signal;
  * each caller's `signal` only abandons its own wait. `rejectedToken` (the token MISA just
  * answered 401 to) is never returned: a shared resolution that started before its eviction
- * is followed by a fresh one.
+ * is followed by a fresh one. A `tokenCache.get`/`set` that rejects rejects every joined
+ * waiter with that same error, unwrapped (it is not turned into a MeInvoiceException); the entry
+ * is cleared, so the next call retries the read.
  */
 export async function ensureAccessToken(
   deps: EnsureAccessTokenDeps,

@@ -234,3 +234,71 @@ describe('ensureAccessToken with a slow distributed cache', () => {
     expect(await refreshed).toBe('fresh');
   });
 });
+
+describe('ensureAccessToken when the cache read fails', () => {
+  const failingThenWorking = (
+    boom: Error,
+  ): { cache: TokenCache; reads: () => number; gate: ReturnType<typeof deferred<undefined>> } => {
+    const gate = deferred<undefined>();
+    let reads = 0;
+    const cache: TokenCache = {
+      get: () => {
+        reads++;
+        return reads === 1
+          ? gate.promise.then(() => Promise.reject(boom))
+          : Promise.resolve(undefined);
+      },
+      set: () => Promise.resolve(),
+      delete: () => Promise.resolve(),
+    };
+    return { cache, reads: () => reads, gate };
+  };
+
+  it('every joined waiter gets the raw cache error (unwrapped), the entry is cleared, the next call retries', async () => {
+    const boom = new Error('cache down');
+    const { cache, reads, gate } = failingThenWorking(boom);
+    const deps: EnsureAccessTokenDeps = {
+      ...makeDeps(() => Promise.resolve({ value: 'fresh', expiresAt: new Date(0) })),
+      tokenCache: cache,
+    };
+    const waiters = [ensureAccessToken(deps), ensureAccessToken(deps), ensureAccessToken(deps)];
+    await new Promise((r) => setTimeout(r, 0));
+    expect(deps.inflight.size).toBe(1);
+    gate.resolve(undefined);
+    const results = await Promise.allSettled(waiters);
+    for (const r of results) {
+      expect(r.status).toBe('rejected');
+      expect((r as PromiseRejectedResult).reason).toBe(boom);
+    }
+    expect(reads()).toBe(1);
+    expect(deps.inflight.size).toBe(0);
+    expect(await ensureAccessToken(deps)).toBe('fresh');
+    expect(reads()).toBe(2);
+  });
+
+  it('one waiter aborting during a slow shared cache read rejects alone; the others get the token', async () => {
+    const gate = deferred<AccessToken | undefined>();
+    let reads = 0;
+    const cache: TokenCache = {
+      get: () => {
+        reads++;
+        return gate.promise;
+      },
+      set: () => Promise.resolve(),
+      delete: () => Promise.resolve(),
+    };
+    const deps: EnsureAccessTokenDeps = {
+      ...makeDeps(() => Promise.resolve({ value: 'fresh', expiresAt: new Date(0) })),
+      tokenCache: cache,
+    };
+    const ctrl = new AbortController();
+    const aborting = ensureAccessToken(deps, ctrl.signal);
+    const others = [ensureAccessToken(deps), ensureAccessToken(deps)];
+    await new Promise((r) => setTimeout(r, 0));
+    ctrl.abort();
+    await expect(aborting).rejects.toMatchObject({ name: 'AbortError' });
+    gate.resolve({ value: 'cached', expiresAt: new Date(NOW.getTime() + 24 * 60 * MIN) });
+    expect(await Promise.all(others)).toEqual(['cached', 'cached']);
+    expect(reads).toBe(1);
+  });
+});

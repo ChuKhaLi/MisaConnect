@@ -517,3 +517,33 @@ async function vitestWaitFor(cond: () => boolean): Promise<void> {
   for (let i = 0; i < 200 && !cond(); i++) await new Promise((r) => setTimeout(r, 1));
   if (!cond()) throw new Error('condition not met');
 }
+
+describe('transport: token cache read failure', () => {
+  it('surfaces the cache error as thrown (not wrapped) and sends no request', async () => {
+    const boom = new Error('cache down');
+    const calls: string[] = [];
+    const resolved = validateOptions({
+      baseUrl: BASE,
+      taxCode: '0100000000',
+      userName: 'user',
+      password: 'secret',
+      appId: 'APP',
+      fetch: ((input: string | URL | Request) => {
+        calls.push(String(input));
+        return Promise.resolve(tokenResponse('t1'));
+      }) as typeof fetch,
+      clock: { now: () => NOW },
+      tokenCache: {
+        get: () => Promise.reject(boom),
+        set: () => Promise.resolve(),
+        delete: () => Promise.resolve(),
+      },
+    });
+    const transport = createTransport(resolved, {
+      delay: () => Promise.resolve(),
+      random: () => 0.5,
+    });
+    expect(await rejection(transport.request('POST', 'webapp/insert', {}, []))).toBe(boom);
+    expect(calls).toEqual([]);
+  });
+});
