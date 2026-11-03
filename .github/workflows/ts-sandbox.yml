@@ -27,6 +27,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build -w @misaconnect/einvoice
+      # No credentials: shows whether this runner can reach the sandbox at all (DNS/TCP/TLS/HTTP).
+      - name: Probe sandbox host
+        continue-on-error: true
+        run: |
+          curl -sS -o /dev/null --max-time 20 -w "curl: HTTP %{http_code}, ip %{remote_ip}, tls_verify %{ssl_verify_result}, total %{time_total}s\n" https://testapi.meinvoice.vn/api/integration/ || echo "curl exit $?"
+          node -e "fetch('https://testapi.meinvoice.vn/api/integration/',{signal:AbortSignal.timeout(20000)}).then(r=>console.log('node fetch: HTTP',r.status)).catch(e=>console.log('node fetch error:',e.message,'| cause:',e.cause?.code ?? e.cause?.name,e.cause?.message))"
       - name: Sandbox tests
         env:
           MISACONNECT_SANDBOX_TAXCODE: ${{ secrets.MISA_TAX_CODE }}
