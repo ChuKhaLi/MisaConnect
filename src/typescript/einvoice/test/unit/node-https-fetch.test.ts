@@ -1,11 +1,13 @@
 import http from 'node:http';
 import https from 'node:https';
-import { createServer as createNetServer, type AddressInfo, type Socket } from 'node:net';
+import { createServer as createNetServer, Socket, type AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CLASSICAL_ECDH_CURVES,
   createNodeHttpsFetch,
+  DEFAULT_IDLE_TIMEOUT_MS,
   type NodeHttpsFetch,
+  type NodeHttpsFetchOptions,
 } from '../../src/infrastructure/node-https-fetch.js';
 
 interface Seen {
@@ -59,13 +61,32 @@ async function startHttp(
   return { url: `http://127.0.0.1:${port}`, seen };
 }
 
-/** A port with nothing listening on it. */
-async function closedPort(): Promise<number> {
-  const s = createNetServer();
-  await new Promise<void>((resolve) => s.listen(0, '127.0.0.1', resolve));
-  const { port } = s.address() as AddressInfo;
-  await new Promise<void>((resolve) => s.close(() => resolve()));
-  return port;
+interface Created {
+  protocol: string;
+  options: https.AgentOptions;
+  agent: http.Agent;
+}
+
+/**
+ * Agent factory whose sockets fail with ECONNREFUSED without touching the network
+ * (deterministic, unlike dialling a port that was free a moment ago).
+ */
+function refusingFactory(
+  created: Created[] = [],
+): NonNullable<NodeHttpsFetchOptions['agentFactory']> {
+  return (protocol, options) => {
+    const agent = protocol === 'https:' ? new https.Agent(options) : new http.Agent(options);
+    (agent as unknown as { createConnection: () => Socket }).createConnection = () => {
+      const socket = new Socket();
+      const err = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:1'), {
+        code: 'ECONNREFUSED',
+      });
+      process.nextTick(() => socket.destroy(err));
+      return socket;
+    };
+    created.push({ protocol, options, agent });
+    return agent;
+  };
 }
 
 async function rejection(p: Promise<unknown>): Promise<unknown> {
@@ -179,8 +200,7 @@ describe('createNodeHttpsFetch over http', () => {
   });
 
   it('connection refused rejects with TypeError("fetch failed") carrying the socket error', async () => {
-    const port = await closedPort();
-    const err = await rejection(client()(`http://127.0.0.1:${port}/`));
+    const err = await rejection(client({ agentFactory: refusingFactory() })('http://127.0.0.1:1/'));
     expect(err).toBeInstanceOf(TypeError);
     expect((err as TypeError).message).toBe('fetch failed');
     expect((err as TypeError).cause).toMatchObject({ code: 'ECONNREFUSED' });
@@ -202,6 +222,96 @@ describe('createNodeHttpsFetch over http', () => {
     expect(err).toBeInstanceOf(TypeError);
     expect((err as TypeError).message).toBe('fetch failed');
   });
+
+  it('synchronous failures (bad header value, bad method) reject with TypeError("fetch failed")', async () => {
+    const srv = await startHttp((_req, res) => res.end('x'));
+    const f = client();
+    const badHeader = await rejection(f(srv.url, { headers: { 'x-bad': 'a\u0000b' } }));
+    expect(badHeader).toBeInstanceOf(TypeError);
+    expect((badHeader as TypeError).message).toBe('fetch failed');
+    expect((badHeader as TypeError).cause).toBeInstanceOf(Error);
+    const badMethod = await rejection(f(srv.url, { method: 'BAD METHOD' }));
+    expect(badMethod).toBeInstanceOf(TypeError);
+    expect((badMethod as TypeError).message).toBe('fetch failed');
+    expect((badMethod as TypeError).cause).toMatchObject({ code: 'ERR_INVALID_HTTP_TOKEN' });
+    expect(srv.seen).toHaveLength(0);
+  });
+
+  it('a compressed response rejects with TypeError("fetch failed") instead of returning raw bytes', async () => {
+    const srv = await startHttp((_req, res) => {
+      res.writeHead(200, { 'Content-Encoding': 'gzip', 'Content-Type': 'application/json' });
+      res.end(Buffer.from([0x1f, 0x8b, 0x08, 0x00]));
+    });
+    const err = await rejection(client()(srv.url));
+    expect(err).toBeInstanceOf(TypeError);
+    expect((err as TypeError).message).toBe('fetch failed');
+    expect(((err as TypeError).cause as Error).message).toMatch(
+      /unsupported content-encoding 'gzip'/,
+    );
+  });
+
+  it('an identity content-encoding is accepted', async () => {
+    const srv = await startHttp((_req, res) => {
+      res.writeHead(200, { 'Content-Encoding': 'identity' });
+      res.end('plain');
+    });
+    expect(await (await client()(srv.url)).text()).toBe('plain');
+  });
+});
+
+describe('createNodeHttpsFetch keep-alive agents', () => {
+  const agentOf = async (f: NodeHttpsFetch, url: string): Promise<unknown> => {
+    const spy = vi.spyOn(http, 'request');
+    try {
+      await (await f(url)).text();
+      const options = spy.mock.calls[0]?.[1] as http.RequestOptions | undefined;
+      return options?.agent;
+    } finally {
+      spy.mockRestore();
+    }
+  };
+
+  it('two default clients share one module-level agent with a 4 s idle timeout', async () => {
+    const srv = await startHttp((_req, res) => res.end('x'));
+    const a = await agentOf(client(), srv.url);
+    const b = await agentOf(client(), srv.url);
+    expect(a).toBeInstanceOf(http.Agent);
+    expect(b).toBe(a);
+    expect(DEFAULT_IDLE_TIMEOUT_MS).toBe(4_000);
+    expect((a as http.Agent & { options: http.AgentOptions }).options).toMatchObject({
+      keepAlive: true,
+      timeout: 4_000,
+    });
+  });
+
+  it('close() on a default client leaves the shared agent usable for other clients', async () => {
+    const srv = await startHttp((_req, res) => res.end('x'));
+    const first = client();
+    await (await first(srv.url)).text();
+    first.close();
+    expect(await (await client()(srv.url)).text()).toBe('x');
+  });
+
+  it('closes an idle keep-alive socket after the idle timeout', async () => {
+    const closed: boolean[] = [];
+    const srv = await startHttp((req, res) => {
+      const i = closed.push(false) - 1;
+      req.socket.once('close', () => (closed[i] = true));
+      res.end('x');
+    });
+    const f = client({ idleTimeoutMs: 150 });
+    await (await f(srv.url)).text();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(closed).toEqual([false]); // kept alive right after the response
+    await vi.waitFor(() => expect(closed).toEqual([true]), { timeout: 2_000, interval: 20 });
+  });
+
+  it('the idle timeout does not cut off a slow in-flight response', async () => {
+    const srv = await startHttp((_req, res) => {
+      setTimeout(() => res.end('slow'), 400);
+    });
+    expect(await (await client({ idleTimeoutMs: 100 })(srv.url)).text()).toBe('slow');
+  });
 });
 
 describe('createNodeHttpsFetch TLS settings', () => {
@@ -210,21 +320,18 @@ describe('createNodeHttpsFetch TLS settings', () => {
   });
 
   it('creates one lazy keep-alive https agent with ecdhCurve X25519:P-256:P-384', async () => {
-    const created: { protocol: string; options: https.AgentOptions; agent: http.Agent }[] = [];
-    const f = client({
-      agentFactory: (protocol, options) => {
-        const agent = protocol === 'https:' ? new https.Agent(options) : new http.Agent(options);
-        created.push({ protocol, options, agent });
-        return agent;
-      },
-    });
+    const created: Created[] = [];
+    const f = client({ agentFactory: refusingFactory(created) });
     expect(created).toHaveLength(0);
-    const port = await closedPort();
-    await rejection(f(`https://127.0.0.1:${port}/a`));
-    await rejection(f(`https://127.0.0.1:${port}/b`));
+    await rejection(f('https://misa.invalid/a'));
+    await rejection(f('https://misa.invalid/b'));
     expect(created).toHaveLength(1);
     expect(created[0]?.protocol).toBe('https:');
-    expect(created[0]?.options).toMatchObject({ keepAlive: true, ecdhCurve: 'X25519:P-256:P-384' });
+    expect(created[0]?.options).toEqual({
+      keepAlive: true,
+      timeout: 4_000,
+      ecdhCurve: 'X25519:P-256:P-384',
+    });
     expect((created[0]?.agent as https.Agent).options.ecdhCurve).toBe('X25519:P-256:P-384');
   });
 

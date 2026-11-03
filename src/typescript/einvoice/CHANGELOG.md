@@ -6,11 +6,12 @@ All notable changes to `@misaconnect/einvoice` are documented here.
 
 ### Fixed
 
-- Every call failed with `TransportFailed` / `ConnectionFailed` (`fetch failed`, cause `ECONNRESET`) on Node >= 22 (OpenSSL 3.5) when running outside Vietnam: Node's default TLS ClientHello offers the post-quantum hybrid `X25519MLKEM768` key share, and the resulting larger handshake is reset by the network in front of MISA. Without a `fetch` option the SDK now uses its own `node:https` client (one keep-alive agent per client) that offers only the classical groups `X25519:P-256:P-384`; TLS 1.2 and 1.3 remain allowed and no global TLS setting or dispatcher is changed.
+- Every call failed with `TransportFailed` / `ConnectionFailed` (`fetch failed`, cause `ECONNRESET`) on Node >= 22 built with OpenSSL 3.5 (22.20+ / 24) when running outside Vietnam: Node's default TLS ClientHello offers the post-quantum hybrid `X25519MLKEM768` key share, and the resulting larger handshake is reset by the network in front of MISA. Without a `fetch` option the SDK now uses its own `node:https` client (keep-alive agents shared by all clients, idle sockets closed after 4 s) that offers only the classical groups `X25519:P-256:P-384`; TLS 1.2 and 1.3 remain allowed and no global TLS setting or dispatcher is changed.
 
 ### Changed
 
 - The default HTTP client no longer goes through `globalThis.fetch`, so `vi.stubGlobal('fetch', ...)` no longer reaches it; it calls `http.request` / `https.request` per request, so MSW `setupServer` and nock interceptors still apply. A caller-supplied `fetch` is used unchanged: on Node >= 22 outside Vietnam configure its TLS groups yourself (e.g. an undici `Agent` with `connect: { ecdhCurve: 'X25519:P-256:P-384' }`); see the README section "Network / TLS".
+- Proxies: the old default (`globalThis.fetch`) honoured undici's `setGlobalDispatcher(new ProxyAgent(...))` and `NODE_USE_ENV_PROXY` / `HTTP(S)_PROXY`; the new default client bypasses both and always connects directly. Behind a proxy, pass your own `fetch` (e.g. undici `fetch` with `new ProxyAgent({ uri, requestTls: { ecdhCurve: 'X25519:P-256:P-384' } })`).
 
 ## [0.1.0] - 2026-11-03
 

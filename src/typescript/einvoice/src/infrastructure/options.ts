@@ -126,8 +126,9 @@ export function validateOptions(
     validator: o.validator ?? defaultInvoiceValidator,
     templateResolver: o.templateResolver ?? resolveTemplate,
     logger: o.logger !== undefined ? safeLogger(o.logger) : noopLogger,
-    // One node:https client per client instance, offering classical ECDH groups only (see
-    // node-https-fetch.ts). It calls http(s).request per call, so MSW / nock interceptors apply.
+    // node:https client offering classical ECDH groups only, over keep-alive agents shared by
+    // all default clients (see node-https-fetch.ts). It calls http(s).request per call, so MSW /
+    // nock interceptors apply.
     fetch: o.fetch ?? createNodeHttpsFetch(),
     correlationId: o.correlationId ?? (() => crypto.randomUUID()),
   };

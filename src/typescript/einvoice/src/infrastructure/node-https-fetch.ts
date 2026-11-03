@@ -2,29 +2,53 @@ import http from 'node:http';
 import https from 'node:https';
 
 /**
- * Classical ECDH groups only. OpenSSL >= 3.5 (Node >= 22.20 / 24) also offers the hybrid
- * post-quantum X25519MLKEM768 by default; the much larger ClientHello is reset by a
+ * Classical ECDH groups only. Node >= 22 built with OpenSSL 3.5 (22.20+ / 24) also offers the
+ * hybrid post-quantum X25519MLKEM768 by default; the much larger ClientHello is reset by a
  * middlebox in front of MISA for traffic from outside Vietnam (ECONNRESET).
  */
 export const CLASSICAL_ECDH_CURVES = 'X25519:P-256:P-384';
 
+/**
+ * Idle keep-alive sockets are closed after this long (undici's default keep-alive is 4 s;
+ * IIS in front of MISA would otherwise hold them for ~120 s).
+ */
+export const DEFAULT_IDLE_TIMEOUT_MS = 4_000;
+
+type Protocol = 'http:' | 'https:';
+
 export interface NodeHttpsFetchOptions {
   /** TLS key-exchange groups for https URLs. Default {@link CLASSICAL_ECDH_CURVES}. */
   ecdhCurve?: string;
-  /** Creates the keep-alive agent for a protocol (tests). Called at most once per protocol. */
-  agentFactory?: (protocol: 'http:' | 'https:', options: https.AgentOptions) => http.Agent;
+  /** Idle keep-alive socket lifetime. Default {@link DEFAULT_IDLE_TIMEOUT_MS}. */
+  idleTimeoutMs?: number;
+  /**
+   * Creates a private keep-alive agent for a protocol (tests). Called at most once per protocol
+   * per client. Without it, agents are module-level and shared by every client with the same
+   * settings.
+   */
+  agentFactory?: (protocol: Protocol, options: https.AgentOptions) => http.Agent;
 }
 
-/** A fetch-compatible function owning its keep-alive agents; `close()` destroys them. */
+/**
+ * A fetch-compatible function; `close()` destroys the agents it owns (only those made by an
+ * injected `agentFactory`; the shared module-level agents are left alone).
+ */
 export type NodeHttpsFetch = typeof fetch & { close(): void };
 
-const defaultAgentFactory = (protocol: 'http:' | 'https:', options: https.AgentOptions) =>
+const defaultAgentFactory = (protocol: Protocol, options: https.AgentOptions): http.Agent =>
   protocol === 'https:' ? new https.Agent(options) : new http.Agent(options);
 
-// Statuses whose Response must have a null body (WHATWG fetch).
-const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
+// Module-level (not global) agents, created lazily and shared by every default client so that
+// creating a client per request does not leak keep-alive sockets. Keyed by their settings.
+const sharedAgents = new Map<string, http.Agent>();
+
+// Statuses whose Response must have a null body (WHATWG fetch). 1xx never reach here: Node
+// handles informational responses itself (and `Response` rejects statuses below 200).
+const NULL_BODY_STATUSES = new Set([204, 205, 304]);
 
 const fetchFailed = (cause: unknown): TypeError => new TypeError('fetch failed', { cause });
+
+const terminated = (cause: unknown): TypeError => new TypeError('terminated', { cause });
 
 const abortReason = (signal: AbortSignal): unknown =>
   signal.reason ?? new DOMException('This operation was aborted', 'AbortError');
@@ -32,24 +56,39 @@ const abortReason = (signal: AbortSignal): unknown =>
 /**
  * Minimal `fetch` over `node:https` / `node:http`: method, headers, string / byte body and
  * `signal`; resolves with a fully buffered WHATWG `Response`. Failures mirror undici: an abort
- * rejects with `signal.reason`, any socket/TLS error with `TypeError('fetch failed', { cause })`.
- * Redirects are not followed and bodies are not decompressed (no `Accept-Encoding` is sent).
+ * rejects with `signal.reason`, any other failure (socket/TLS error, synchronous throw) with
+ * `TypeError('fetch failed', { cause })`. Redirects are not followed and bodies are not
+ * decompressed: no `Accept-Encoding` is sent and a non-identity `Content-Encoding` is rejected.
  * `request` is looked up on the module at call time, so http/https interceptors installed
  * later (MSW, nock) apply.
+ *
+ * The agents' `timeout` closes idle keep-alive sockets: Node destroys a socket that times out
+ * while in the agent's free list; on an in-flight request it only emits `'timeout'` (no
+ * listener here), so slow responses are not cut off.
  */
 export function createNodeHttpsFetch(opts: NodeHttpsFetchOptions = {}): NodeHttpsFetch {
   const ecdhCurve = opts.ecdhCurve ?? CLASSICAL_ECDH_CURVES;
-  const agentFactory = opts.agentFactory ?? defaultAgentFactory;
-  const agents = new Map<'http:' | 'https:', http.Agent>();
+  const timeout = opts.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+  const factory = opts.agentFactory;
+  const owned = new Map<Protocol, http.Agent>();
 
-  const agentFor = (protocol: 'http:' | 'https:'): http.Agent => {
-    let agent = agents.get(protocol);
+  const agentOptions = (protocol: Protocol): https.AgentOptions =>
+    protocol === 'https:' ? { keepAlive: true, timeout, ecdhCurve } : { keepAlive: true, timeout };
+
+  const agentFor = (protocol: Protocol): http.Agent => {
+    if (factory !== undefined) {
+      let agent = owned.get(protocol);
+      if (agent === undefined) {
+        agent = factory(protocol, agentOptions(protocol));
+        owned.set(protocol, agent);
+      }
+      return agent;
+    }
+    const key = protocol === 'https:' ? `https:|${timeout}|${ecdhCurve}` : `http:|${timeout}`;
+    let agent = sharedAgents.get(key);
     if (agent === undefined) {
-      agent = agentFactory(
-        protocol,
-        protocol === 'https:' ? { keepAlive: true, ecdhCurve } : { keepAlive: true },
-      );
-      agents.set(protocol, agent);
+      agent = defaultAgentFactory(protocol, agentOptions(protocol));
+      sharedAgents.set(key, agent);
     }
     return agent;
   };
@@ -61,31 +100,9 @@ export function createNodeHttpsFetch(opts: NodeHttpsFetchOptions = {}): NodeHttp
         reject(abortReason(signal));
         return;
       }
-      let url: URL;
-      let body: Buffer | undefined;
-      try {
-        if (typeof input !== 'string' && !(input instanceof URL)) {
-          throw new TypeError('Request objects are not supported; pass a URL string.');
-        }
-        url = new URL(String(input));
-        if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-          throw new TypeError(`URL scheme '${url.protocol}' is not supported.`);
-        }
-        body = toBuffer(init.body);
-      } catch (err) {
-        reject(fetchFailed(err));
-        return;
-      }
-      const protocol = url.protocol as 'http:' | 'https:';
-
-      const headers: Record<string, string> = {};
-      new Headers(init.headers).forEach((value, name) => {
-        headers[name] = value;
-      });
-      headers['accept'] ??= '*/*';
-      if (body !== undefined) headers['content-length'] = String(body.length);
 
       let settled = false;
+      let req: http.ClientRequest | undefined;
       const settle = (fn: () => void): void => {
         if (settled) return;
         settled = true;
@@ -95,37 +112,67 @@ export function createNodeHttpsFetch(opts: NodeHttpsFetchOptions = {}): NodeHttp
       const onAbort = (): void => {
         const reason = signal === undefined ? undefined : abortReason(signal);
         settle(() => reject(reason));
-        req.destroy();
+        req?.destroy();
       };
 
-      const mod = protocol === 'https:' ? https : http;
-      const req = mod.request(
-        url,
-        { method: init.method ?? 'GET', headers, agent: agentFor(protocol) },
-        (res) => {
-          const chunks: Buffer[] = [];
-          res.on('data', (c: Buffer) => chunks.push(c));
-          res.on('error', (err) =>
-            settle(() => reject(new TypeError('terminated', { cause: err }))),
+      const onResponse = (res: http.IncomingMessage): void => {
+        const encoding = (res.headers['content-encoding'] ?? '').trim().toLowerCase();
+        if (encoding !== '' && encoding !== 'identity') {
+          settle(() =>
+            reject(fetchFailed(new Error(`unsupported content-encoding '${encoding}'`))),
           );
-          res.on('aborted', () =>
-            settle(() => reject(new TypeError('terminated', { cause: new Error('aborted') }))),
-          );
-          res.on('end', () => {
-            if (!res.complete) {
-              settle(() => reject(new TypeError('terminated', { cause: new Error('aborted') })));
-              return;
+          res.destroy();
+          return;
+        }
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('error', (err) => settle(() => reject(terminated(err))));
+        res.on('aborted', () => settle(() => reject(terminated(new Error('aborted')))));
+        res.on('end', () => {
+          if (!res.complete) {
+            settle(() => reject(terminated(new Error('aborted'))));
+            return;
+          }
+          settle(() => {
+            try {
+              resolve(toResponse(res, Buffer.concat(chunks)));
+            } catch (err) {
+              reject(fetchFailed(err));
             }
-            settle(() => {
-              try {
-                resolve(toResponse(res, Buffer.concat(chunks)));
-              } catch (err) {
-                reject(fetchFailed(err));
-              }
-            });
           });
-        },
-      );
+        });
+      };
+
+      let body: Buffer | undefined;
+      try {
+        if (typeof input !== 'string' && !(input instanceof URL)) {
+          throw new TypeError('Request objects are not supported; pass a URL string.');
+        }
+        const url = new URL(String(input));
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+          throw new TypeError(`URL scheme '${url.protocol}' is not supported.`);
+        }
+        const protocol: Protocol = url.protocol;
+        body = toBuffer(init.body);
+
+        const headers: Record<string, string> = {};
+        new Headers(init.headers).forEach((value, name) => {
+          headers[name] = value;
+        });
+        headers['accept'] ??= '*/*';
+        if (body !== undefined) headers['content-length'] = String(body.length);
+
+        const mod = protocol === 'https:' ? https : http;
+        req = mod.request(
+          url,
+          { method: init.method ?? 'GET', headers, agent: agentFor(protocol) },
+          onResponse,
+        );
+      } catch (err) {
+        reject(fetchFailed(err));
+        return;
+      }
+
       req.on('error', (err) => settle(() => reject(fetchFailed(err))));
       signal?.addEventListener('abort', onAbort, { once: true });
       req.end(body);
@@ -133,8 +180,8 @@ export function createNodeHttpsFetch(opts: NodeHttpsFetchOptions = {}): NodeHttp
 
   return Object.assign(nodeFetch as typeof fetch, {
     close: (): void => {
-      for (const agent of agents.values()) agent.destroy();
-      agents.clear();
+      for (const agent of owned.values()) agent.destroy();
+      owned.clear();
     },
   });
 }

@@ -209,14 +209,19 @@ Aborting rejects with the native `AbortError` (or the reason you passed to `abor
 
 ## Network / TLS
 
-Without a `fetch` option, each client uses its own small `fetch`-compatible client over `node:https` with a keep-alive agent whose TLS key-exchange groups are pinned to the classical `X25519:P-256:P-384` (TLS 1.2 and 1.3 both allowed). Node >= 22 built with OpenSSL 3.5 otherwise also offers the post-quantum hybrid `X25519MLKEM768`; the larger TLS ClientHello is reset by the network in front of MISA for traffic from outside Vietnam, so every call failed with `TransportFailed` / `ConnectionFailed` (`fetch failed`, `ECONNRESET`). No global setting (`tls.DEFAULT_ECDH_CURVE`, the global undici dispatcher) is changed.
+Without a `fetch` option, the SDK uses a small `fetch`-compatible client over `node:https`. Its keep-alive agents are shared by every client (idle sockets close after 4 s) and pin the TLS key-exchange groups to the classical `X25519:P-256:P-384` (TLS 1.2 and 1.3 both allowed). Node >= 22 built with OpenSSL 3.5 (22.20+ / 24) otherwise also offers the post-quantum hybrid `X25519MLKEM768`; the larger TLS ClientHello is reset by the network in front of MISA for traffic from outside Vietnam, so every call failed with `TransportFailed` / `ConnectionFailed` (`fetch failed`, `ECONNRESET`). No global setting (`tls.DEFAULT_ECDH_CURVE`, the global undici dispatcher) is changed.
+
+**Proxies:** the built-in client always connects directly. It ignores undici's `setGlobalDispatcher(new ProxyAgent(...))` and `NODE_USE_ENV_PROXY` / `HTTP(S)_PROXY`, which the global `fetch` used before 0.1.1 honoured. Behind a proxy, pass your own `fetch` as below.
 
 If you pass your own `fetch` (for a proxy, custom CA, tracing...), it is used unchanged and the SDK cannot set TLS options for it. On Node >= 22 outside Vietnam configure the groups yourself, for example with undici:
 
 ```ts
-import { Agent, fetch as undiciFetch } from 'undici';
+import { Agent, ProxyAgent, fetch as undiciFetch } from 'undici';
 
-const dispatcher = new Agent({ connect: { ecdhCurve: 'X25519:P-256:P-384' } });
+const tls = { ecdhCurve: 'X25519:P-256:P-384' };
+const dispatcher = process.env.HTTPS_PROXY
+  ? new ProxyAgent({ uri: process.env.HTTPS_PROXY, requestTls: tls }) // TLS to MISA through the tunnel
+  : new Agent({ connect: tls });
 const client = createMisaEInvoiceClient({
   /* ... */
   fetch: ((input, init) => undiciFetch(input, { ...init, dispatcher })) as typeof fetch,
