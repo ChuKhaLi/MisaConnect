@@ -1,6 +1,6 @@
 # @misaconnect/einvoice
 
-TypeScript SDK for **MISA meInvoice** — a port of the .NET `MisaConnect.EInvoice` package. Zero runtime dependencies; uses the platform `fetch`. ESM and CommonJS builds, full type declarations.
+TypeScript SDK for **MISA meInvoice** — a port of the .NET `MisaConnect.EInvoice` package. Zero runtime dependencies; HTTP goes through Node's built-in `node:https` (or a `fetch` you supply). ESM and CommonJS builds, full type declarations.
 
 Requires **Node.js >= 20**.
 
@@ -39,19 +39,19 @@ The quick start, the samples (`samples/typescript/`) and the sandbox tests all r
 
 ### Options (`MisaEInvoiceOptions`)
 
-| Option                                                                   | Notes                                                                          |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| `environment`                                                            | `'sandbox'` (default) or `'production'`.                                       |
-| `baseUrl`, `taxCode`, `userName`, `password`, `appId`                    | Required.                                                                      |
-| `delete.includeRawErrorMessage`                                          | Opt in to raw MISA error text (default `false`); see below.                    |
-| `logger`                                                                 | `{ debug, info, warn, error }(message, fields?)`. Default is a no-op.          |
-| `correlationId`                                                          | `() => string` producing the id logged per call (default `crypto.randomUUID`). |
-| `fetch`                                                                  | Custom `fetch`. Default: the global `fetch`, looked up on every call.          |
-| `tokenCache`, `refIdGenerator`, `clock`, `validator`, `templateResolver` | Swappable collaborators (same ports as the .NET SDK); see below.               |
+| Option                                                                   | Notes                                                                                        |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `environment`                                                            | `'sandbox'` (default) or `'production'`.                                                     |
+| `baseUrl`, `taxCode`, `userName`, `password`, `appId`                    | Required.                                                                                    |
+| `delete.includeRawErrorMessage`                                          | Opt in to raw MISA error text (default `false`); see below.                                  |
+| `logger`                                                                 | `{ debug, info, warn, error }(message, fields?)`. Default is a no-op.                        |
+| `correlationId`                                                          | `() => string` producing the id logged per call (default `crypto.randomUUID`).               |
+| `fetch`                                                                  | Custom `fetch`. Default: a built-in `node:https` client; see [Network / TLS](#network--tls). |
+| `tokenCache`, `refIdGenerator`, `clock`, `validator`, `templateResolver` | Swappable collaborators (same ports as the .NET SDK); see below.                             |
 
 `delete.includeRawErrorMessage` gates exactly these: the `message` on `deleteDraft` outcomes and on `lookupByRefId` per-RefId outcomes, the MISA-text excerpt in the `ARCH-DEL-001` warning, and logging of an amendment's `changeReason` (with credential-looking JSON fragments such as `"password":"..."` masked, as .NET `MeInvoiceLogScrubber` does). `saveDraft` and `issueReplacement` / `issueAdjustment` results always carry MISA's `errorMessage` (as in .NET), and `MeInvoiceException.message` is not gated.
 
-Because the default `fetch` is resolved per call, a mock installed after the client is created (MSW, nock, `vi.stubGlobal`) is honoured.
+The default HTTP client calls `http.request` / `https.request` on every request, so an interceptor installed after the client is created (MSW `setupServer`, nock) is honoured. It does not go through `globalThis.fetch`, so `vi.stubGlobal('fetch', ...)` does not reach it: pass `fetch` in the options instead.
 
 ### Swappable collaborators
 
@@ -206,6 +206,26 @@ const templates = await client.listTemplates(true, { signal: ac.signal, correlat
 ```
 
 Aborting rejects with the native `AbortError` (or the reason you passed to `abort()`): never wrapped, never retried, also during retry backoff. The call's log line then has `outcome: 'Cancelled'` and no `errorCategory`.
+
+## Network / TLS
+
+Without a `fetch` option, each client uses its own small `fetch`-compatible client over `node:https` with a keep-alive agent whose TLS key-exchange groups are pinned to the classical `X25519:P-256:P-384` (TLS 1.2 and 1.3 both allowed). Node >= 22 built with OpenSSL 3.5 otherwise also offers the post-quantum hybrid `X25519MLKEM768`; the larger TLS ClientHello is reset by the network in front of MISA for traffic from outside Vietnam, so every call failed with `TransportFailed` / `ConnectionFailed` (`fetch failed`, `ECONNRESET`). No global setting (`tls.DEFAULT_ECDH_CURVE`, the global undici dispatcher) is changed.
+
+If you pass your own `fetch` (for a proxy, custom CA, tracing...), it is used unchanged and the SDK cannot set TLS options for it. On Node >= 22 outside Vietnam configure the groups yourself, for example with undici:
+
+```ts
+import { Agent, fetch as undiciFetch } from 'undici';
+
+const dispatcher = new Agent({ connect: { ecdhCurve: 'X25519:P-256:P-384' } });
+const client = createMisaEInvoiceClient({
+  /* ... */
+  fetch: ((input, init) => undiciFetch(input, { ...init, dispatcher })) as typeof fetch,
+});
+```
+
+Alternatively set `tls.DEFAULT_ECDH_CURVE = 'X25519:P-256:P-384'` once at application startup; that changes every TLS connection in the process, which is why the SDK does not do it for you.
+
+The built-in client does not follow redirects or request compressed responses; MISA's API needs neither.
 
 ## Logging
 
