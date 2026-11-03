@@ -202,7 +202,7 @@
 
 **Interfaces — Produces:** `startFakeMisa(): Promise<{ baseUrl: string; state: FakeState; close(): Promise<void> }>` on `127.0.0.1:0` via `node:http`. Routes and scripted behaviours ported from `tests/dotnet/MisaConnect.EInvoice.IntegrationTests/MisaFake/FakeMisaServer.cs` (token, templates, delete, getlist, paging, paging/calculating, insert) **plus** `POST /webapp/preview` and `GET /webapp/viewrefid` (base64 PDF `%PDF-1.4` stub). `state` lets tests script: next status codes (`state.queueStatus(503)`), error codes per RefID, stored drafts, request log (method, path, query, headers, body text).
 
-> The integration client points at the fake through `baseUrl` + `fetch`; options validation would reject `http://127.0.0.1`, so `createMisaEInvoiceClient` accepts an internal `__unsafeAllowAnyBaseUrl` flag **not exported from `index.ts`** and used only by tests. *(Plan ruling: the .NET tests override the HttpClient base address the same way.)*
+> The integration client points at the fake through `baseUrl` + `fetch`; options validation would reject `http://127.0.0.1`, so `createMisaEInvoiceClient` accepts an internal `__unsafeAllowAnyBaseUrl` flag **not exported from `index.ts`** and used only by tests. *(Plan ruling: the .NET tests override the HttpClient base address the same way.)* (Superseded: the flag was removed from the public factory; tests use the internal `createMisaEInvoiceClientInternal` in src/client-internal.ts.)
 
 - [ ] **Step 1: Failing test** — starts, `POST /webapp/token` returns envelope with stringified `{access_token}`; insert then getlist returns the stored draft; queued 503 is served once.
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement.** **Step 4: Run** → PASS.
