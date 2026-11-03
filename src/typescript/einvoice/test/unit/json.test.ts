@@ -134,3 +134,21 @@ describe('fix round 1', () => {
     expect(serializeRequest({ a: money('1.5') })).toBe('{"a":1.5}');
   });
 });
+
+describe('money() numbers are emitted as plain decimal text', () => {
+  const emit = (n: number): string => serializeRequest({ a: money(n) });
+  it('expands large exponent form exactly', () => {
+    expect(emit(1e21)).toBe('{"a":1000000000000000000000}');
+    expect(emit(1.5e21)).toBe('{"a":1500000000000000000000}');
+    expect(emit(-1.2345e25)).toBe('{"a":-12345000000000000000000000}');
+  });
+  it('expands small exponent form exactly', () => {
+    expect(emit(1e-7)).toBe('{"a":0.0000001}');
+    expect(emit(-1.25e-8)).toBe('{"a":-0.0000000125}');
+  });
+  it('keeps ordinary numbers unchanged', () => {
+    expect(emit(0.1)).toBe('{"a":0.1}');
+    expect(emit(123456.789)).toBe('{"a":123456.789}');
+    expect(emit(-0)).toBe('{"a":0}');
+  });
+});

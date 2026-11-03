@@ -3,8 +3,6 @@ import type { Money } from '../domain/dtos.js';
 import { isRealDate } from './wire/datetime.js';
 
 const MONEY_PATTERN = /^-?\d+(\.\d+)?$/;
-// Emitted text: plain decimals, or exponent form produced by JSON.stringify of a number.
-const EMIT_PATTERN = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /** Branded wrapper; its text is emitted verbatim as a JSON number literal. */
@@ -31,6 +29,22 @@ function invalidDate(message: string, field?: string): MeInvoiceException {
   });
 }
 
+/**
+ * Finite number → plain decimal text (no exponent), digit-exact to its shortest round-trip
+ * string: `1e21` → `1000000000000000000000`, `1e-7` → `0.0000001`.
+ */
+function plainDecimal(value: number): string {
+  const s = String(value === 0 ? 0 : value);
+  const m = /^(-?)(\d+)(?:\.(\d+))?e([+-]\d+)$/.exec(s);
+  if (!m) return s;
+  const sign = m[1] ?? '';
+  const digits = (m[2] ?? '') + (m[3] ?? '');
+  const point = (m[2] ?? '').length + Number(m[4]);
+  if (point <= 0) return `${sign}0.${'0'.repeat(-point)}${digits}`;
+  if (point >= digits.length) return sign + digits + '0'.repeat(point - digits.length);
+  return `${sign}${digits.slice(0, point)}.${digits.slice(point)}`;
+}
+
 /** Validates a money value and wraps it so `serializeRequest` writes it verbatim. */
 export function money(value: Money, field?: string): MoneyLiteral {
   let text: string;
@@ -38,7 +52,7 @@ export function money(value: Money, field?: string): MoneyLiteral {
     if (!Number.isFinite(value)) {
       throw invalidMoney('Money amount must be a finite number.', field);
     }
-    text = JSON.stringify(value);
+    text = plainDecimal(value);
   } else if (typeof value === 'string' && MONEY_PATTERN.test(value)) {
     text = value;
   } else {
@@ -74,7 +88,7 @@ function write(v: unknown, path: string): string | undefined {
   }
   if (issuedMoney.has(v as object)) {
     const text = (v as MoneyLiteral).__money;
-    if (!EMIT_PATTERN.test(text)) {
+    if (!MONEY_PATTERN.test(text)) {
       throw invalidMoney('Money amount must be a plain decimal number.', path);
     }
     return text;
