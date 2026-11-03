@@ -10,7 +10,7 @@ import type {
 import { resolveTemplate } from '../application/template-resolver.js';
 import { MeInvoiceException, type ValidationFailure } from '../domain/errors.js';
 import { createInMemoryTokenCache, systemClock, uuidRefIdGenerator } from './defaults.js';
-import { noopLogger } from './logging.js';
+import { noopLogger, safeLogger } from './logging.js';
 
 export const SandboxHost = 'testapi.meinvoice.vn';
 export const ProductionHost = 'api.meinvoice.vn';
@@ -124,7 +124,7 @@ export function validateOptions(
     clock: o.clock ?? systemClock,
     validator: o.validator ?? defaultInvoiceValidator,
     templateResolver: o.templateResolver ?? resolveTemplate,
-    logger: o.logger ?? noopLogger,
+    logger: o.logger !== undefined ? safeLogger(o.logger) : noopLogger,
     // Resolved lazily so a fetch mock installed after client creation (MSW, nock) is honoured.
     fetch: o.fetch ?? ((input, init) => globalThis.fetch(input, init)),
     correlationId: o.correlationId ?? (() => crypto.randomUUID()),

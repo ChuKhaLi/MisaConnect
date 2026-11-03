@@ -31,6 +31,23 @@ export const noopLogger: Logger = {
   error: () => undefined,
 };
 
+/**
+ * Wraps a caller-supplied logger so a throwing method is swallowed: logging must never turn a
+ * completed MISA call (e.g. a saved draft) into a failure, which would invite duplicate retries.
+ */
+export function safeLogger(logger: Logger): Logger {
+  const guard =
+    (level: keyof Logger) =>
+    (message: string, fields?: Record<string, unknown>): void => {
+      try {
+        logger[level](message, fields);
+      } catch {
+        // Logger failures are deliberately ignored.
+      }
+    };
+  return { debug: guard('debug'), info: guard('info'), warn: guard('warn'), error: guard('error') };
+}
+
 type PinoMethod = (obj: Record<string, unknown>, msg: string) => void;
 
 export interface PinoLike {

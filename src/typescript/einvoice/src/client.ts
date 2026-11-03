@@ -97,6 +97,7 @@ export function createMisaEInvoiceClient(options: MisaEInvoiceOptions): IMisaEIn
       opts?.correlationId ?? resolved.correlationId(),
       ctx,
       action,
+      opts?.signal,
     );
 
   const amend = (

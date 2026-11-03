@@ -52,9 +52,18 @@ export function refIdLabel(refIds: readonly string[]): string | undefined {
   return refIds.length === 1 ? first : `${first}+${refIds.length - 1}-more`;
 }
 
+/** The caller's own abort: the native `AbortError`, or whatever reason the caller aborted with. */
+function isCallerAbort(err: unknown, signal: AbortSignal | undefined): boolean {
+  if (signal?.aborted === true && err === signal.reason) return true;
+  return (
+    typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'AbortError'
+  );
+}
+
 /**
  * Runs `action` and emits one `info` line `MeInvoice call completed` with
- * `{ endpoint, outcome, errorCategory?, durationMs, refId?, templateId?, correlationId }`.
+ * `{ endpoint, outcome, errorCategory?, durationMs, refId?, templateId?, correlationId }`;
+ * `outcome` is `Success`, `Error` or `Cancelled` (the caller aborted; no `errorCategory`).
  * Deliberately never logs the customer tax code (spec §9.2), buyer data, amounts or
  * error messages. Only plain primitives are passed to the logger.
  */
@@ -64,9 +73,13 @@ export async function logCall<T>(
   correlationId: string,
   ctx: CallLogContext,
   action: () => Promise<T>,
+  signal?: AbortSignal,
 ): Promise<T> {
   const started = performance.now();
-  const emit = (outcome: 'Success' | 'Error', errorCategory?: MeInvoiceErrorCategory): void => {
+  const emit = (
+    outcome: 'Success' | 'Error' | 'Cancelled',
+    errorCategory?: MeInvoiceErrorCategory,
+  ): void => {
     const fields: Record<string, unknown> = { endpoint, outcome };
     if (errorCategory !== undefined) fields['errorCategory'] = errorCategory;
     fields['durationMs'] = Math.round(performance.now() - started);
@@ -74,7 +87,11 @@ export async function logCall<T>(
     if (ctx.templateId !== undefined) fields['templateId'] = ctx.templateId;
     if (ctx.extra !== undefined) Object.assign(fields, ctx.extra);
     fields['correlationId'] = correlationId;
-    logger.info('MeInvoice call completed', scrub(fields));
+    try {
+      logger.info('MeInvoice call completed', scrub(fields));
+    } catch {
+      // A throwing logger must never change the operation's result.
+    }
   };
   try {
     const result = await action();
@@ -82,7 +99,9 @@ export async function logCall<T>(
     else emit('Success');
     return result;
   } catch (err) {
-    if (err instanceof MeInvoiceException) {
+    if (isCallerAbort(err, signal)) {
+      emit('Cancelled');
+    } else if (err instanceof MeInvoiceException) {
       if (ctx.refId === undefined && err.refId !== undefined) ctx.refId = err.refId;
       emit('Error', err.category);
     } else {
