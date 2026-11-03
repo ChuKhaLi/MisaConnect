@@ -35,3 +35,32 @@ export interface Logger {
   warn(message: string, fields?: Record<string, unknown>): void;
   error(message: string, fields?: Record<string, unknown>): void;
 }
+
+export type HttpMethod = 'GET' | 'POST' | 'DELETE';
+
+/**
+ * MISA response envelope `{success, data, error, errorCode}`. `data` is already decoded:
+ * stringified JSON objects/arrays are parsed, raw arrays kept, other strings (base64 PDF)
+ * kept verbatim, null/empty → undefined. `error` / `errorCode` are passed through raw.
+ */
+export interface Envelope<T> {
+  success: boolean;
+  data: T | undefined;
+  error: unknown;
+  errorCode: unknown;
+}
+
+export interface RequestOptions {
+  signal?: AbortSignal;
+  correlationId?: string;
+}
+
+export interface MeInvoiceTransport {
+  request<T>(
+    method: HttpMethod,
+    path: string,
+    query: Record<string, string>,
+    body?: unknown,
+    opts?: RequestOptions,
+  ): Promise<Envelope<T>>;
+}
