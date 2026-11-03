@@ -3,6 +3,7 @@ import { getDraftPdf } from './application/use-cases/get-draft-pdf.js';
 import { listActiveTemplates } from './application/use-cases/list-templates.js';
 import { lookupByRefIds } from './application/use-cases/lookup-by-ref-ids.js';
 import { lookupPaged } from './application/use-cases/lookup-paged.js';
+import { issueAmendment } from './application/use-cases/issue-amendment.js';
 import { saveDraftInvoices } from './application/use-cases/save-draft.js';
 import { previewInvoice } from './application/use-cases/preview.js';
 import type {
@@ -74,8 +75,6 @@ export interface IMisaEInvoiceClient {
 /** Test-only escape hatch (fake server on http://127.0.0.1); not part of the public type. */
 type InternalOptions = MisaEInvoiceOptions & { __unsafeAllowAnyBaseUrl?: boolean };
 
-const notImplemented = (): Promise<never> => Promise.reject(new Error('not implemented'));
-
 const signalOf = (opts?: CallOptions): { signal?: AbortSignal } =>
   opts?.signal !== undefined ? { signal: opts.signal } : {};
 
@@ -99,6 +98,46 @@ export function createMisaEInvoiceClient(options: MisaEInvoiceOptions): IMisaEIn
       ctx,
       action,
     );
+
+  const amend = (
+    endpoint: 'IssueReplacement' | 'IssueAdjustment',
+    kind: 'replacement' | 'adjustment',
+    request: ReplacementRequestDto | AdjustmentRequestDto,
+    opts: CallOptions | undefined,
+  ): Promise<AmendmentResultDto> => {
+    // Port MeInvoiceCallLogger.WrapAmendment: eInvoiceStatus + orgRefId always, changeReason
+    // only with delete.includeRawErrorMessage.
+    const extra: Record<string, unknown> = {
+      eInvoiceStatus: kind === 'replacement' ? '3' : '4',
+    };
+    const orgRefId = request?.originalRef?.orgRefID;
+    if (orgRefId) extra['orgRefId'] = orgRefId;
+    if (resolved.delete.includeRawErrorMessage) extra['changeReason'] = request?.changeReason ?? '';
+    const ctx: CallLogContext = { extra };
+    if (request?.invoice?.refId) ctx.refId = request.invoice.refId;
+    if (request?.invoice?.template?.ipTemplateID) {
+      ctx.templateId = request.invoice.template.ipTemplateID;
+    }
+    return run(endpoint, opts, ctx, async () => {
+      const { result, templateId } = await issueAmendment(
+        {
+          gateway,
+          validator: resolved.validator,
+          templateResolver: resolved.templateResolver,
+          refIdGenerator: resolved.refIdGenerator,
+        },
+        kind,
+        request,
+        signalOf(opts),
+      );
+      ctx.refId = result.refId;
+      if (templateId !== undefined) ctx.templateId = templateId;
+      if (result.outcome === 'Error' && result.errorCategory !== undefined) {
+        ctx.failureCategory = result.errorCategory;
+      }
+      return result;
+    });
+  };
 
   return {
     listTemplates: (withCode = true, opts) =>
@@ -206,7 +245,7 @@ export function createMisaEInvoiceClient(options: MisaEInvoiceOptions): IMisaEIn
         lookupPaged(gateway, 'calculating', request, withCode, signalOf(opts)),
       ),
 
-    issueReplacement: notImplemented,
-    issueAdjustment: notImplemented,
+    issueReplacement: (request, opts) => amend('IssueReplacement', 'replacement', request, opts),
+    issueAdjustment: (request, opts) => amend('IssueAdjustment', 'adjustment', request, opts),
   };
 }

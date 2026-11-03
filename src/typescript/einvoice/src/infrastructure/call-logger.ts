@@ -11,6 +11,8 @@ export interface CallLogContext {
    * the call is then logged as `Error` with this category.
    */
   failureCategory?: MeInvoiceErrorCategory;
+  /** Operation-specific plain fields (e.g. amendments: eInvoiceStatus, orgRefId), logged after templateId. */
+  extra?: Record<string, unknown>;
 }
 
 const FAILURE_CATEGORY_BY_STATUS: Readonly<Record<string, MeInvoiceErrorCategory>> = {
@@ -70,6 +72,7 @@ export async function logCall<T>(
     fields['durationMs'] = Math.round(performance.now() - started);
     if (ctx.refId !== undefined) fields['refId'] = ctx.refId;
     if (ctx.templateId !== undefined) fields['templateId'] = ctx.templateId;
+    if (ctx.extra !== undefined) Object.assign(fields, ctx.extra);
     fields['correlationId'] = correlationId;
     logger.info('MeInvoice call completed', scrub(fields));
   };

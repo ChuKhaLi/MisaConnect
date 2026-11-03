@@ -115,11 +115,6 @@ describe('createMisaEInvoiceClient', () => {
       }),
     ).toThrow(MeInvoiceException);
   });
-
-  it('declares the later operations as not implemented', async () => {
-    const c = client();
-    await expect(c.issueReplacement({} as never)).rejects.toThrow('not implemented');
-  });
 });
 
 describe('listTemplates', () => {

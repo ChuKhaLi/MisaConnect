@@ -1,7 +1,9 @@
 import type {
+  AdjustmentRequestDto,
   InvoiceDto,
   InvoiceSnapshotDto,
   PagedLookupRequestDto,
+  ReplacementRequestDto,
   TemplateDto,
   TemplateRefDto,
 } from '../domain/dtos.js';
@@ -158,4 +160,16 @@ export interface MeInvoiceGateway {
     withCode: boolean,
     opts?: GatewayCallOptions,
   ): Promise<InsertOutcome[]>;
+  /**
+   * Inserts one replacement (`EInvoiceStatus "3"`) or adjustment (`"4"`) invoice; MISA-level
+   * rejections come back as an `Error` outcome, transport / auth problems throw.
+   */
+  insertAmendment(
+    kind: 'replacement' | 'adjustment',
+    request: ReplacementRequestDto | AdjustmentRequestDto,
+    refId: string,
+    template: TemplateDto,
+    withCode: boolean,
+    opts?: GatewayCallOptions,
+  ): Promise<InsertOutcome>;
 }

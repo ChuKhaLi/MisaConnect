@@ -17,7 +17,7 @@ import type { ResolvedOptions } from './options.js';
 import { formatDateOnly } from './json.js';
 import { wireTaxCode } from './transport.js';
 import { fromWireSnapshot, type WireLookupRow } from './wire/lookup.js';
-import { toWireInvoice } from './wire/invoice.js';
+import { toWireAmendment, toWireInvoice } from './wire/invoice.js';
 import { fromWireTemplate, type WireTemplate } from './wire/templates.js';
 
 /** Port `MeInvoiceHttpRoutes`. */
@@ -84,6 +84,55 @@ function throwFromLookupEnvelope(envelope: Envelope<unknown>): never {
   });
 }
 
+/**
+ * Port `PostInsertAsync` envelope interpretation: one outcome per requested RefID, in order.
+ * A RefID MISA does not echo yields `MisaUnknown` / `NoEchoedResult`; an envelope failure
+ * with neither echoes nor per-entry errors throws.
+ */
+function interpretInsertEnvelope(
+  envelope: Envelope<unknown>,
+  refIds: readonly string[],
+): InsertOutcome[] {
+  const successes = new Set<string>();
+  if (Array.isArray(envelope.data)) {
+    for (const entry of envelope.data as unknown[]) {
+      const id =
+        typeof entry === 'object' && entry !== null
+          ? (entry as Record<string, unknown>)['RefID']
+          : undefined;
+      if (typeof id === 'string' && id !== '') successes.add(id);
+    }
+  }
+  const errorEntries = parseInsertErrors(envelope.error);
+  if (!envelope.success && successes.size === 0 && errorEntries.length === 0) {
+    throwFromEnvelope(envelope);
+  }
+
+  const results = new Map<string, InsertOutcome>();
+  for (const id of successes) results.set(id, { refId: id, outcome: 'Success' });
+  for (const e of errorEntries) {
+    if (e.refID === undefined || e.refID === '') continue;
+    const code = mapErrorCode(e.errorCode, e.errorMessage);
+    results.set(e.refID, {
+      refId: e.refID,
+      outcome: 'Error',
+      errorCategory: code.category,
+      rawErrorCode: code.rawCode,
+      ...(code.detail !== undefined ? { message: code.detail } : {}),
+    });
+  }
+
+  return refIds.map(
+    (refId): InsertOutcome =>
+      results.get(refId) ?? {
+        refId,
+        outcome: 'Error',
+        errorCategory: 'MisaUnknown',
+        rawErrorCode: 'NoEchoedResult',
+      },
+  );
+}
+
 /** Port of `MeInvoiceClient` (templates, preview, viewrefid). */
 export function createMeInvoiceGateway(
   transport: MeInvoiceTransport,
@@ -135,45 +184,22 @@ export function createMeInvoiceGateway(
         items.map((i) => toWireInvoice(i.invoice, i.refId, i.template)),
         opts,
       );
-
-      const successes = new Set<string>();
-      if (Array.isArray(envelope.data)) {
-        for (const entry of envelope.data as unknown[]) {
-          const id =
-            typeof entry === 'object' && entry !== null
-              ? (entry as Record<string, unknown>)['RefID']
-              : undefined;
-          if (typeof id === 'string' && id !== '') successes.add(id);
-        }
-      }
-      const errorEntries = parseInsertErrors(envelope.error);
-      if (!envelope.success && successes.size === 0 && errorEntries.length === 0) {
-        throwFromEnvelope(envelope);
-      }
-
-      const results = new Map<string, InsertOutcome>();
-      for (const id of successes) results.set(id, { refId: id, outcome: 'Success' });
-      for (const e of errorEntries) {
-        if (e.refID === undefined || e.refID === '') continue;
-        const code = mapErrorCode(e.errorCode, e.errorMessage);
-        results.set(e.refID, {
-          refId: e.refID,
-          outcome: 'Error',
-          errorCategory: code.category,
-          rawErrorCode: code.rawCode,
-          ...(code.detail !== undefined ? { message: code.detail } : {}),
-        });
-      }
-
-      return items.map(
-        (i): InsertOutcome =>
-          results.get(i.refId) ?? {
-            refId: i.refId,
-            outcome: 'Error',
-            errorCategory: 'MisaUnknown',
-            rawErrorCode: 'NoEchoedResult',
-          },
+      return interpretInsertEnvelope(
+        envelope,
+        items.map((i) => i.refId),
       );
+    },
+
+    async insertAmendment(kind, request, refId, template, withCode, opts) {
+      const envelope = await transport.request<unknown>(
+        'POST',
+        Routes.Insert,
+        { invoiceWithCode: flag(withCode) },
+        [toWireAmendment(request, kind, refId, template)],
+        opts,
+      );
+      const [outcome] = interpretInsertEnvelope(envelope, [refId]);
+      return outcome as InsertOutcome;
     },
 
     async deleteDraft(refId, withCode, opts) {
