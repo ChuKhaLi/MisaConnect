@@ -47,3 +47,22 @@ jobs:
           curl -sS --max-time 30 -o /dev/null -w "curl templates no-bearer: HTTP %{http_code}, %{size_download} B, %{time_total}s\n" -X POST "$B/webapp/templates?invoiceWithCode=true&isTicket=false" -H 'Content-Type: application/json' -H "taxcode: $W" -d "$TB" || echo "curl templates no-bearer exit $?"
       - name: node:https probes
         run: node .github/diag/sandbox-diag.mjs
+      # Hypothesis: path-MTU blackhole (segments > path MTU dropped, ICMP filtered). Single change:
+      # lower the interface MTU so every TCP segment fits, then repeat the same probes.
+      - name: Lower MTU to 1280
+        run: |
+          sudo ip link set dev eth0 mtu 1280
+          ip link show eth0 | grep -o "mtu [0-9]*"
+      - name: curl after MTU 1280
+        continue-on-error: true
+        run: |
+          B=https://testapi.meinvoice.vn/api/integration
+          W="${MISACONNECT_SANDBOX_TAXCODE}-${MISACONNECT_SANDBOX_APPID}"
+          BODY=$(jq -nc --arg t "$W" --arg u "$MISACONNECT_SANDBOX_USERNAME" --arg p "$MISACONNECT_SANDBOX_PASSWORD" '{taxcode:$t,username:$u,password:$p}')
+          TOKEN=$(curl -sS --max-time 30 -X POST "$B/webapp/token" -H 'Content-Type: application/json' -d "$BODY" | jq -r '.data | fromjson | .access_token' 2>/dev/null || true)
+          [ -n "$TOKEN" ] && echo "::add-mask::$TOKEN" && echo "curl token obtained (${#TOKEN} chars)" || { echo "no token"; exit 0; }
+          TB=$(jq -nc --arg t "$W" --arg u "$MISACONNECT_SANDBOX_USERNAME" --arg p "$MISACONNECT_SANDBOX_PASSWORD" '{TaxCode:$t,UserName:$u,Password:$p}')
+          curl -sS --max-time 30 -o /dev/null -w "curl templates bearer (mtu 1280): HTTP %{http_code}, %{size_download} B, %{time_total}s
+" -X POST "$B/webapp/templates?invoiceWithCode=true&isTicket=false" -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN" -H "taxcode: $W" -d "$TB" || echo "curl templates exit $?"
+      - name: node:https probes after MTU 1280
+        run: node .github/diag/sandbox-diag.mjs
