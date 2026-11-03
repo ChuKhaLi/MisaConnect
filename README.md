@@ -17,6 +17,7 @@ Community .NET SDK for MISA cloud APIs. Two independent NuGet packages ship from
 | --- | --- | --- |
 | **[`MisaConnect.EInvoice`](https://www.nuget.org/packages/MisaConnect.EInvoice)** | MISA MeInvoice — token acquisition, template lookup, invoice preview / save / PDF / delete, lookup, replacement & adjustment invoices. | [docs/einvoice/](docs/einvoice/) |
 | **[`MisaConnect.ESign`](https://www.nuget.org/packages/MisaConnect.ESign)** | MISA eSign RemoteSigning — PDF / XML / Word / Excel signing, 2FA / OTP (explicit + transparent), webhook-mode (non-blocking) signing, optional per-call credentials via `IMisaCredentialsAccessor`. | [docs/esign/](docs/esign/) |
+| **[`@misaconnect/einvoice`](https://www.npmjs.com/package/@misaconnect/einvoice)** (TypeScript / npm) | Same ten MeInvoice operations as the .NET package — templates, preview, save / PDF / delete draft, lookups, replacement & adjustment invoices. Node >= 20, ESM + CJS. | [src/typescript/einvoice/README.md](src/typescript/einvoice/README.md) |
 
 Both packages target **.NET 8** and share the same layered architecture, options-pattern configuration, swappable ports, and wire-format fidelity with MISA's published APIs.
 

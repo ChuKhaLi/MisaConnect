@@ -1,9 +1,29 @@
 {
   "name": "@misaconnect/einvoice",
-  "version": "0.0.0",
-  "private": true,
-  "description": "TypeScript SDK for MISA meInvoice (work in progress).",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for MISA meInvoice.",
   "license": "MIT",
+  "homepage": "https://github.com/ChuKhaLi/MisaConnect/tree/main/src/typescript/einvoice#readme",
+  "bugs": {
+    "url": "https://github.com/ChuKhaLi/MisaConnect/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChuKhaLi/MisaConnect.git",
+    "directory": "src/typescript/einvoice"
+  },
+  "keywords": [
+    "misa",
+    "meinvoice",
+    "einvoice",
+    "e-invoice",
+    "vietnam",
+    "sdk"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "type": "module",
   "sideEffects": false,
   "engines": {
@@ -27,7 +47,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsup",
