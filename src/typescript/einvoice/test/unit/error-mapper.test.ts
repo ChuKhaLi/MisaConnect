@@ -108,3 +108,13 @@ describe('mapErrorCode', () => {
     expect(mapErrorCode('')).toMatchObject({ category: 'MisaUnknown', rawCode: '' });
   });
 });
+
+describe('mapErrorCode detail', () => {
+  it('treats an empty message like no message', () => {
+    expect(mapErrorCode('InvalidTaxCode', '')).not.toHaveProperty('detail');
+    expect(mapErrorCode('', '')).not.toHaveProperty('detail');
+    expect(mapErrorCode('InvoiceDetail_Qty_X', '')).not.toHaveProperty('detail');
+    expect(mapErrorCode('Unknown', '')).not.toHaveProperty('detail');
+    expect(mapErrorCode('InvalidTaxCode', 'x').detail).toBe('x');
+  });
+});

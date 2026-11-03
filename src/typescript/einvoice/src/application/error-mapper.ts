@@ -98,6 +98,6 @@ export function mapErrorCode(raw: string | undefined, message?: string): MappedE
 }
 
 function withDetail(result: MappedError, message: string | undefined): MappedError {
-  if (message !== undefined) result.detail = message;
+  if (message !== undefined && message !== '') result.detail = message;
   return result;
 }
