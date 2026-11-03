@@ -161,7 +161,8 @@ describe('InvoiceValidator.validate', () => {
     expect(v(invoice({ lines: [line({ vatRateName: 'KHAC:0%' })] }))).toEqual([
       {
         fieldPath: 'lines[0].vatRateName',
-        message: "VATRateName 'KHAC:0%' is not in the accepted set.",
+        message:
+          "VATRateName 'KHAC:0%' is not in the accepted set: the KHAC rate must be a positive percentage (> 0).",
         ruleId: 'FR-029',
       },
     ]);
@@ -169,6 +170,13 @@ describe('InvoiceValidator.validate', () => {
       expect(v(invoice({ lines: [line({ vatRateName: ok })] }))).toEqual([]);
     }
     expect(v(invoice({ lines: [line({ vatRateName: '7%' })] }))[0]?.ruleId).toBe('FR-029');
+    expect(v(invoice({ lines: [line({ vatRateName: 'KHAC:-2.5%' })] }))[0]?.message).toContain(
+      'must be a positive percentage (> 0)',
+    );
+    // Thousands separators (accepted by .NET NumberStyles.Number) stay rejected, plainly.
+    expect(v(invoice({ lines: [line({ vatRateName: 'KHAC:1,000%' })] }))[0]?.message).toBe(
+      "VATRateName 'KHAC:1,000%' is not in the accepted set.",
+    );
   });
 
   it('FR-025 discount reconciliation tolerance is 0.5 (inclusive)', () => {

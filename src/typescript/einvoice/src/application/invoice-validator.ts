@@ -131,6 +131,13 @@ function checkEmojiFree(
   }
 }
 
+/** `KHAC:<decimal>%` whose rate is <= 0 (.NET `VatRate.Other` rejects it: must be positive). */
+function isNonPositiveKhac(name: unknown): boolean {
+  if (typeof name !== 'string' || !name.toUpperCase().startsWith('KHAC:')) return false;
+  const tail = name.slice('KHAC:'.length).replace(/%+$/, '').trim();
+  return /^[+-]?(\d+(\.\d*)?|\.\d+)$/.test(tail) && Number(tail) <= 0;
+}
+
 /** yyyy-MM-dd for comparison, or undefined when missing/invalid. */
 function toDateKey(d: DateOnlyInput | undefined | null): string | undefined {
   if (d === undefined || d === null) return undefined;
@@ -218,7 +225,11 @@ function validateInvoice(invoice: InvoiceDto): ValidationFailure[] {
         failures.push(
           fail(
             `lines[${i}].vatRateName`,
-            `VATRateName '${line.vatRateName}' is not in the accepted set.`,
+            `VATRateName '${line.vatRateName}' is not in the accepted set${
+              isNonPositiveKhac(line.vatRateName)
+                ? ': the KHAC rate must be a positive percentage (> 0)'
+                : ''
+            }.`,
             'FR-029',
           ),
         );

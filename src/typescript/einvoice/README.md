@@ -246,6 +246,7 @@ Dates: `yyyy-MM-dd` strings (a `Date` is also accepted and formatted from its lo
 - The customer tax code is never logged.
 - Each call logs one completion line; failures are logged at `info` with `outcome: 'Error'` and `errorCategory`, a caller abort with `outcome: 'Cancelled'`.
 - Money strings must be plain decimals (`^-?\d+(\.\d+)?$`); the discount-total consistency check skips amounts with more than 28 fractional or 29 integer digits.
+- `KHAC:<rate>%` VAT names take a plain decimal rate (`KHAC:3.5%`); thousands separators, which .NET's `NumberStyles.Number` accepts (`KHAC:1,000%`), are rejected (FR-029), as is a rate <= 0 (the message says the rate must be positive).
 - Date-times need an explicit offset (`Z` or `+hh:mm` / `-hh:mm`).
 
 ## Sandbox tests
