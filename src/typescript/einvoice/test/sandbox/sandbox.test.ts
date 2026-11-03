@@ -134,11 +134,11 @@ describe.skipIf(!runnable)('MISA sandbox (live)', () => {
     const bad = createClient('wrong-password-on-purpose');
     const err = await bad.listTemplates().catch((e: unknown) => e);
     expect(err).toBeInstanceOf(MeInvoiceException);
-    // MISA normally answers a JSON Authentication error, but some sandbox builds reply with
-    // a non-JSON body; accept those mapped categories too rather than pin one gateway behaviour.
-    expect(['Authentication', 'TransportFailed', 'MisaUnknown']).toContain(
-      (err as MeInvoiceException).category,
-    );
+    // MISA answers a JSON Authentication error; TransportFailed covers an unreachable/failing
+    // gateway. MisaUnknown is deliberately not accepted: no documented sandbox response for a
+    // wrong password maps to it (the .NET sandbox test only asserts the exception type), so
+    // seeing it means the error mapping regressed.
+    expect(['Authentication', 'TransportFailed']).toContain((err as MeInvoiceException).category);
   });
 
   it('listTemplates returns active templates with ids and series', async () => {
