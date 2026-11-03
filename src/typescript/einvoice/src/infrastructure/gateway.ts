@@ -1,6 +1,11 @@
-import type { InsertOutcome, MeInvoiceGateway, MeInvoiceTransport } from '../application/ports.js';
+import type {
+  Envelope,
+  InsertOutcome,
+  MeInvoiceGateway,
+  MeInvoiceTransport,
+} from '../application/ports.js';
 import { mapErrorCode } from '../application/error-mapper.js';
-import type { TemplateDto } from '../domain/dtos.js';
+import type { InvoiceSnapshotDto, TemplateDto } from '../domain/dtos.js';
 import { MeInvoiceException } from '../domain/errors.js';
 import {
   extractErrorCode,
@@ -9,7 +14,9 @@ import {
   throwFromEnvelope,
 } from './envelope.js';
 import type { ResolvedOptions } from './options.js';
+import { formatDateOnly } from './json.js';
 import { wireTaxCode } from './transport.js';
+import { fromWireSnapshot, type WireLookupRow } from './wire/lookup.js';
 import { toWireInvoice } from './wire/invoice.js';
 import { fromWireTemplate, type WireTemplate } from './wire/templates.js';
 
@@ -20,6 +27,9 @@ export const Routes = Object.freeze({
   ViewRefId: 'webapp/viewrefid',
   Insert: 'webapp/insert',
   DeleteDraft: 'webapp/delete',
+  LookupByRefId: 'webapp/getlist',
+  LookupStandardPaging: 'webapp/paging',
+  LookupCalculatingPaging: 'webapp/paging/calculating',
 });
 
 const flag = (b: boolean): string => (b ? 'true' : 'false');
@@ -40,6 +50,23 @@ function decodeBase64(data: unknown, refId?: string): Uint8Array {
     rawErrorCode: 'InvalidResponse',
     message: 'MISA returned data that is not base64 content.',
     ...(refId !== undefined ? { refId } : {}),
+  });
+}
+
+/** Port `DeserializeSnapshots`: `data` is already decoded; anything but an array is empty. */
+function toSnapshots(data: unknown): InvoiceSnapshotDto[] {
+  if (!Array.isArray(data)) return [];
+  return (data as WireLookupRow[]).map(fromWireSnapshot);
+}
+
+/** Port `ThrowFromLookupEnvelope`. */
+function throwFromLookupEnvelope(envelope: Envelope<unknown>): never {
+  const msg = extractErrorMessage(envelope);
+  const code = mapErrorCode(extractErrorCode(envelope), msg);
+  const message = code.detail ?? msg;
+  throw new MeInvoiceException(code.category, {
+    rawErrorCode: code.rawCode,
+    ...(message !== undefined ? { message } : {}),
   });
 }
 
@@ -150,6 +177,51 @@ export function createMeInvoiceGateway(
         ...(errorCode !== undefined ? { errorCode } : {}),
         ...(envelope.errorMessage !== undefined ? { errorMessage: envelope.errorMessage } : {}),
       };
+    },
+
+    async lookupByRefIdsChunk(refIds, withCode, opts) {
+      const envelope = await transport.request<unknown>(
+        'POST',
+        Routes.LookupByRefId,
+        { invoiceWithCode: flag(withCode) },
+        [...refIds],
+        opts,
+      );
+      if (!envelope.success) {
+        // Deviation: a failure envelope without an error code still counts as an error
+        // (.NET treats an empty code as success and would report every RefID NotFound).
+        const code = extractErrorCode(envelope);
+        const message = extractErrorMessage(envelope);
+        return {
+          snapshots: [],
+          errorCode: code !== undefined && code !== '' ? code : 'UnknownError',
+          ...(message !== undefined ? { errorMessage: message } : {}),
+        };
+      }
+      return { snapshots: toSnapshots(envelope.data) };
+    },
+
+    async lookupPaged(kind, request, withCode, opts) {
+      const body = {
+        Start: request.start,
+        Length: request.length,
+        Sort: request.sort,
+        FromDate: formatDateOnly(request.fromDate),
+        ToDate: formatDateOnly(request.toDate),
+        PublishStatus:
+          request.publishStatus !== undefined && request.publishStatus !== null
+            ? String(request.publishStatus)
+            : undefined,
+      };
+      const envelope = await transport.request<unknown>(
+        'POST',
+        kind === 'standard' ? Routes.LookupStandardPaging : Routes.LookupCalculatingPaging,
+        { invoiceWithCode: flag(withCode) },
+        body,
+        opts,
+      );
+      if (!envelope.success) throwFromLookupEnvelope(envelope);
+      return toSnapshots(envelope.data);
     },
 
     async viewDraftPdf(refId, withCode, opts) {

@@ -1,4 +1,10 @@
-import type { InvoiceDto, TemplateDto, TemplateRefDto } from '../domain/dtos.js';
+import type {
+  InvoiceDto,
+  InvoiceSnapshotDto,
+  PagedLookupRequestDto,
+  TemplateDto,
+  TemplateRefDto,
+} from '../domain/dtos.js';
 import type { MeInvoiceErrorCategory, ValidationFailure } from '../domain/errors.js';
 import type { TemplateResolution } from './template-resolver.js';
 
@@ -85,6 +91,18 @@ export interface DeleteResponse {
   errorMessage?: string;
 }
 
+/**
+ * Result of one `webapp/getlist` chunk call (port `LookupByRefIdChunkResult`). A non-empty
+ * `errorCode` means MISA answered `success:false`; the use case spreads it over the chunk.
+ */
+export interface LookupChunkResult {
+  snapshots: InvoiceSnapshotDto[];
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+export type PagedLookupKind = 'standard' | 'calculating';
+
 export interface GatewayCallOptions {
   signal?: AbortSignal;
 }
@@ -115,6 +133,22 @@ export interface MeInvoiceGateway {
     invoiceWithCode: boolean,
     opts?: GatewayCallOptions,
   ): Promise<DeleteResponse>;
+  /**
+   * One `webapp/getlist` call for up to 50 RefIDs. Envelope-level MISA errors come back in
+   * the result; transport and auth problems throw `MeInvoiceException`.
+   */
+  lookupByRefIdsChunk(
+    refIds: readonly string[],
+    withCode: boolean,
+    opts?: GatewayCallOptions,
+  ): Promise<LookupChunkResult>;
+  /** Paged lookup (`webapp/paging` or `webapp/paging/calculating`); any MISA error throws. */
+  lookupPaged(
+    kind: PagedLookupKind,
+    request: PagedLookupRequestDto,
+    withCode: boolean,
+    opts?: GatewayCallOptions,
+  ): Promise<InvoiceSnapshotDto[]>;
   /**
    * Inserts the drafts in one request; returns one outcome per item in input order.
    * A RefID MISA does not echo yields `MisaUnknown` / `NoEchoedResult`.

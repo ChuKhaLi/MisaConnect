@@ -6,6 +6,41 @@ import { scrub } from './logging.js';
 export interface CallLogContext {
   refId?: string;
   templateId?: string;
+  /**
+   * Set by an outcome-returning action whose result is a failure status (it does not throw);
+   * the call is then logged as `Error` with this category.
+   */
+  failureCategory?: MeInvoiceErrorCategory;
+}
+
+const FAILURE_CATEGORY_BY_STATUS: Readonly<Record<string, MeInvoiceErrorCategory>> = {
+  AuthFailed: MeInvoiceErrorCategory.Authentication,
+  Configuration: MeInvoiceErrorCategory.Configuration,
+  MisaThrottled: MeInvoiceErrorCategory.MisaThrottled,
+  MisaUnavailable: MeInvoiceErrorCategory.MisaUnavailable,
+  TransportFailed: MeInvoiceErrorCategory.TransportFailed,
+  MisaUnknown: MeInvoiceErrorCategory.MisaUnknown,
+  Validation: MeInvoiceErrorCategory.Validation,
+};
+
+/**
+ * Rule for outcome-returning operations: a status is a failure (category returned) when it
+ * is a transport / auth / config / MISA / validation problem. Business results — `Found`,
+ * `NotFound`, `Deleted`, `NotDeletable` — are not, so they stay logged as `Success`.
+ */
+export function failureCategoryOfStatus(status: string): MeInvoiceErrorCategory | undefined {
+  return FAILURE_CATEGORY_BY_STATUS[status];
+}
+
+/** First failure category among the statuses, in order; `undefined` when none failed. */
+export function firstFailureCategory(
+  statuses: Iterable<string>,
+): MeInvoiceErrorCategory | undefined {
+  for (const status of statuses) {
+    const category = failureCategoryOfStatus(status);
+    if (category !== undefined) return category;
+  }
+  return undefined;
 }
 
 /** Port `MeInvoiceCallLogger` batch label: one id as-is, more as `"{first}+N-more"`. */
@@ -40,7 +75,8 @@ export async function logCall<T>(
   };
   try {
     const result = await action();
-    emit('Success');
+    if (ctx.failureCategory !== undefined) emit('Error', ctx.failureCategory);
+    else emit('Success');
     return result;
   } catch (err) {
     if (err instanceof MeInvoiceException) {

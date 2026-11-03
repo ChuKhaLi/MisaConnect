@@ -92,6 +92,12 @@ export class FakeState {
   /** @internal */ readonly droppedEchoes = new Set<string>();
   /** @internal */ readonly deleteErrors = new Map<string, { code: string; message: string }>();
   /** @internal */ readonly calculatingIds = new Set<string>();
+  /** @internal */ readonly lookupErrors: { code: string; message: string }[] = [];
+
+  /** Next lookup request (getlist / paging) answers `success:false` with this error; queued FIFO. */
+  failNextLookup(errorCode: string, message: string): void {
+    this.lookupErrors.push({ code: errorCode, message });
+  }
 
   /** Next `times` non-token requests are answered with `status` and a non-JSON body. */
   queueStatus(status: number, times = 1): void {
@@ -177,6 +183,18 @@ function parseJson(text: string): unknown {
 /** Lookup envelope: `data` is a raw array. */
 function lookupBody(items: FakeSnapshot[]) {
   return { success: true, errorCode: null, descriptionErrorCode: null, errors: [], data: items };
+}
+
+function sendLookupError(state: FakeState, res: ServerResponse): boolean {
+  const scripted = state.lookupErrors.shift();
+  if (scripted === undefined) return false;
+  send(res, 200, {
+    success: false,
+    data: null,
+    error: scripted.message,
+    errorCode: scripted.code,
+  });
+  return true;
 }
 
 function paged(state: FakeState, calculating: boolean, bodyText: string): FakeSnapshot[] {
@@ -303,6 +321,7 @@ function handle(state: FakeState, req: FakeRequest, res: ServerResponse): void {
       return;
     }
     case 'POST /webapp/getlist': {
+      if (sendLookupError(state, res)) return;
       const body = parseJson(req.bodyText);
       const wanted = new Set(
         Array.isArray(body) ? body.filter((x): x is string => typeof x === 'string') : [],
@@ -311,9 +330,11 @@ function handle(state: FakeState, req: FakeRequest, res: ServerResponse): void {
       return;
     }
     case 'POST /webapp/paging':
+      if (sendLookupError(state, res)) return;
       send(res, 200, lookupBody(paged(state, false, req.bodyText)));
       return;
     case 'POST /webapp/paging/calculating':
+      if (sendLookupError(state, res)) return;
       send(res, 200, lookupBody(paged(state, true, req.bodyText)));
       return;
     default:

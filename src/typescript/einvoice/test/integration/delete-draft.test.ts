@@ -131,7 +131,11 @@ describe('deleteDraft', () => {
     expect(outcome.status).toBe('MisaUnavailable');
     expect(outcome.refId).toBe('r1');
     const info = logs.find((l) => l.level === 'info');
-    expect(info?.fields).toMatchObject({ endpoint: 'DeleteDraft', outcome: 'Success' });
+    expect(info?.fields).toMatchObject({
+      endpoint: 'DeleteDraft',
+      outcome: 'Error',
+      errorCategory: 'MisaUnavailable',
+    });
   });
 
   it('persistent 401 → AuthFailed status, no throw', async () => {

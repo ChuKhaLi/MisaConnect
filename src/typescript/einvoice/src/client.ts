@@ -1,6 +1,8 @@
 import { deleteDraftInvoice } from './application/use-cases/delete-draft.js';
 import { getDraftPdf } from './application/use-cases/get-draft-pdf.js';
 import { listActiveTemplates } from './application/use-cases/list-templates.js';
+import { lookupByRefIds } from './application/use-cases/lookup-by-ref-ids.js';
+import { lookupPaged } from './application/use-cases/lookup-paged.js';
 import { saveDraftInvoices } from './application/use-cases/save-draft.js';
 import { previewInvoice } from './application/use-cases/preview.js';
 import type {
@@ -16,7 +18,13 @@ import type {
   TemplateDto,
 } from './domain/dtos.js';
 import type { DeleteDraftOutcome } from './domain/statuses.js';
-import { logCall, refIdLabel, type CallLogContext } from './infrastructure/call-logger.js';
+import {
+  failureCategoryOfStatus,
+  firstFailureCategory,
+  logCall,
+  refIdLabel,
+  type CallLogContext,
+} from './infrastructure/call-logger.js';
 import { createMeInvoiceGateway } from './infrastructure/gateway.js';
 import { validateOptions, type MisaEInvoiceOptions } from './infrastructure/options.js';
 import { createTransport } from './infrastructure/transport.js';
@@ -148,9 +156,10 @@ export function createMisaEInvoiceClient(options: MisaEInvoiceOptions): IMisaEIn
       });
     },
 
-    deleteDraft: (refId, invoiceWithCode, opts) =>
-      run('DeleteDraft', opts, refId ? { refId } : {}, () =>
-        deleteDraftInvoice(
+    deleteDraft: (refId, invoiceWithCode, opts) => {
+      const ctx: CallLogContext = refId ? { refId } : {};
+      return run('DeleteDraft', opts, ctx, async () => {
+        const outcome = await deleteDraftInvoice(
           {
             gateway,
             logger: resolved.logger,
@@ -159,12 +168,44 @@ export function createMisaEInvoiceClient(options: MisaEInvoiceOptions): IMisaEIn
           refId,
           invoiceWithCode,
           signalOf(opts),
-        ),
+        );
+        const failure = failureCategoryOfStatus(outcome.status);
+        if (failure !== undefined) ctx.failureCategory = failure;
+        return outcome;
+      });
+    },
+
+    lookupByRefId: (refIds, withCode, opts) => {
+      const ctx: CallLogContext = {};
+      const label = refIdLabel(Array.isArray(refIds) ? refIds.filter((r) => !!r) : []);
+      if (label !== undefined) ctx.refId = label;
+      return run('LookupByRefId', opts, ctx, async () => {
+        const result = await lookupByRefIds(
+          { gateway, includeRawErrorMessage: resolved.delete.includeRawErrorMessage },
+          refIds,
+          withCode,
+          signalOf(opts),
+        );
+        // Failure rule: batch Validation, else the first per-RefID transport/auth/config/MISA failure.
+        const failure =
+          result.status === 'Validation'
+            ? 'Validation'
+            : firstFailureCategory((result.outcomes ?? []).map((o) => o.status));
+        if (failure !== undefined) ctx.failureCategory = failure;
+        return result;
+      });
+    },
+
+    lookupStandard: (request, withCode, opts) =>
+      run('LookupStandard', opts, {}, () =>
+        lookupPaged(gateway, 'standard', request, withCode, signalOf(opts)),
       ),
 
-    lookupByRefId: notImplemented,
-    lookupStandard: notImplemented,
-    lookupCalculating: notImplemented,
+    lookupCalculating: (request, withCode, opts) =>
+      run('LookupCalculating', opts, {}, () =>
+        lookupPaged(gateway, 'calculating', request, withCode, signalOf(opts)),
+      ),
+
     issueReplacement: notImplemented,
     issueAdjustment: notImplemented,
   };

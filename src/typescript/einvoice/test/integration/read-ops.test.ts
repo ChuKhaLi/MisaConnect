@@ -118,7 +118,7 @@ describe('createMisaEInvoiceClient', () => {
 
   it('declares the later operations as not implemented', async () => {
     const c = client();
-    await expect(c.lookupByRefId(['r'], true)).rejects.toThrow('not implemented');
+    await expect(c.issueReplacement({} as never)).rejects.toThrow('not implemented');
   });
 });
 
