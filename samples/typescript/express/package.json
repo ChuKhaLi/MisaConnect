@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "start": "node --experimental-strip-types server.ts"
+    "start": "tsc --noEmit && node server.ts"
   },
   "dependencies": {
     "@misaconnect/einvoice": "*",

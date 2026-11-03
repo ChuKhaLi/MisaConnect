@@ -4,6 +4,7 @@ import { MISA_EINVOICE } from './misa.module.js';
 
 @Injectable()
 export class TemplatesService {
+  // `@Inject` is needed because `emitDecoratorMetadata` is off (see tsconfig.json).
   constructor(@Inject(MISA_EINVOICE) private readonly misa: IMisaEInvoiceClient) {}
 
   list(signal?: AbortSignal): Promise<TemplateDto[]> {

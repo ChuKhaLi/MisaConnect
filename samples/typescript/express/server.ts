@@ -22,7 +22,10 @@ app.use(express.json());
 
 app.get('/templates', async (req, res) => {
   const ac = new AbortController();
-  req.on('close', () => ac.abort());
+  // 'close' also fires after a normal response; abort only if the client left before we finished.
+  res.on('close', () => {
+    if (!res.writableFinished) ac.abort();
+  });
   try {
     res.json(await client.listTemplates(true, { signal: ac.signal }));
   } catch (e) {
