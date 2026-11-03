@@ -227,7 +227,12 @@ export function toWireInvoice(dto: InvoiceDto, refId: string, template: Template
   return build(dto, refId, template, '1');
 }
 
-/** Port of the replacement/adjustment bodies (`EInvoiceStatus "3"` / `"4"` + `Org*` + `ChangeReason`). */
+/**
+ * Port of the replacement/adjustment bodies (`EInvoiceStatus "3"` / `"4"` + `Org*` + `ChangeReason`).
+ * `kind` alone decides the status: `ReplacementRequestDto` and `AdjustmentRequestDto` are
+ * structurally identical (no discriminator field, as in .NET where the use case, not the DTO,
+ * picks the status), so the DTO cannot be checked against `kind`.
+ */
 export function toWireAmendment(
   dto: ReplacementRequestDto | AdjustmentRequestDto,
   kind: 'replacement' | 'adjustment',
