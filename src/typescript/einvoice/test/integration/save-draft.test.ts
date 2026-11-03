@@ -172,6 +172,12 @@ describe('saveDraft', () => {
     expect(body.map((b) => b.RefID)).toEqual(['r1', 'r3']);
   });
 
+  it('a batch with no valid invoice makes no HTTP call at all', async () => {
+    const results = await client().saveDraft([invoice({ refId: 'r1', lines: [] })]);
+    expect(results[0]).toMatchObject({ outcome: 'Error', rawErrorCode: 'ValidationFailed' });
+    expect(fake.state.requests).toHaveLength(0);
+  });
+
   it('a bad money string on invoice 2 fails only invoice 2 with an indexed field path', async () => {
     const bad = invoice({ refId: 'r2' });
     bad.lines = bad.lines.map((l) => ({ ...l, unitPrice: '1e3' }));

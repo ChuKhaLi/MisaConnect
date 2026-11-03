@@ -60,10 +60,11 @@ const indexed = (index: number, failures: readonly ValidationFailure[]): Validat
   failures.map((f) => ({ ...f, fieldPath: `invoices[${index}].${f.fieldPath}` }));
 
 /**
- * Port SaveDraftInvoices.cs. Only an empty or oversize batch throws. Templates are fetched
- * once; each invoice is resolved, then validated, and an unresolvable or invalid invoice
- * becomes its own `Error` result (`ValidationFailed` with `invoices[i].`-prefixed failures)
- * while the rest go out in one insert call. Results follow input order.
+ * Port SaveDraftInvoices.cs. Only an empty or oversize batch throws. Each invoice is validated
+ * first (deviation: .NET resolves the template first), so a batch with no valid invoice makes no
+ * HTTP call; templates are then fetched once and each valid invoice resolved. An invalid or
+ * unresolvable invoice becomes its own `Error` result (`ValidationFailed` with
+ * `invoices[i].`-prefixed failures) while the rest go out in one insert call, in input order.
  */
 export async function saveDraftInvoices(
   deps: SaveDraftDeps,
@@ -73,26 +74,12 @@ export async function saveDraftInvoices(
 ): Promise<SaveDraftResult> {
   assertBatchSize(invoices.length);
 
-  const active = await listActiveTemplates(deps.gateway, withCode, opts);
   const results: (SaveResultDto | undefined)[] = new Array<SaveResultDto | undefined>(
     invoices.length,
   );
-  const toSubmit: { index: number; invoice: InvoiceDto; refId: string; template: TemplateDto }[] =
-    [];
+  const valid: { index: number; invoice: InvoiceDto; refId: string }[] = [];
   invoices.forEach((inv, index) => {
     const refId = inv?.refId ? inv.refId : deps.refIdGenerator();
-    const resolution = deps.templateResolver(active, inv?.template);
-    if (resolution.kind !== 'Resolved') {
-      const ex = templateResolutionError(resolution);
-      results[index] = {
-        refId,
-        outcome: 'Error',
-        errorCategory: ex.category,
-        rawErrorCode: resolution.kind,
-        errorMessage: ex.message,
-      };
-      return;
-    }
     const failures = deps.validator.validate({ ...inv, refId });
     if (failures.length > 0) {
       results[index] = {
@@ -104,8 +91,29 @@ export async function saveDraftInvoices(
       };
       return;
     }
-    toSubmit.push({ index, invoice: inv, refId, template: resolution.template });
+    valid.push({ index, invoice: inv, refId });
   });
+
+  const toSubmit: { index: number; invoice: InvoiceDto; refId: string; template: TemplateDto }[] =
+    [];
+  if (valid.length > 0) {
+    const active = await listActiveTemplates(deps.gateway, withCode, opts);
+    for (const v of valid) {
+      const resolution = deps.templateResolver(active, v.invoice.template);
+      if (resolution.kind === 'Resolved') {
+        toSubmit.push({ ...v, template: resolution.template });
+        continue;
+      }
+      const ex = templateResolutionError(resolution);
+      results[v.index] = {
+        refId: v.refId,
+        outcome: 'Error',
+        errorCategory: ex.category,
+        rawErrorCode: resolution.kind,
+        errorMessage: ex.message,
+      };
+    }
+  }
 
   if (toSubmit.length > 0) {
     const outcomes = await deps.gateway.insertInvoices(toSubmit, withCode, opts);
