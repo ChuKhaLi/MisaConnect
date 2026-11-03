@@ -10,12 +10,50 @@ import {
   TOKEN_LIFETIME_MS,
   type EnsureAccessTokenDeps,
 } from '../application/use-cases/ensure-access-token.js';
-import { MeInvoiceException } from '../domain/errors.js';
+import { MeInvoiceErrorCategory, MeInvoiceException } from '../domain/errors.js';
 import { readEnvelope, throwFromEnvelope } from './envelope.js';
 import { serializeRequest } from './json.js';
 import type { ResolvedOptions } from './options.js';
 
 export const TOKEN_ROUTE = 'webapp/token';
+
+/**
+ * OAuth-style string codes that only the token endpoint returns, in the `error` field with an
+ * empty `errorCode` array (verified against the sandbox 2026-11-03). MISA answers INVALID_USER
+ * for a wrong user, password, tax code or AppID; INVALID_TAXCODE for a malformed wire tax code
+ * (e.g. `taxCode` already carrying the `-<appId>` suffix). .NET maps both to MisaUnknown.
+ */
+const TOKEN_ERRORS: ReadonlyMap<string, { category: MeInvoiceErrorCategory; message: string }> =
+  new Map([
+    [
+      'INVALID_USER',
+      {
+        category: MeInvoiceErrorCategory.Authentication,
+        message: 'MISA rejected the sign-in (wrong userName, password, taxCode or appId).',
+      },
+    ],
+    [
+      'INVALID_TAXCODE',
+      {
+        category: MeInvoiceErrorCategory.Configuration,
+        message:
+          'MISA rejected the tax code format. Pass the bare tax code as taxCode and the AppID separately as appId.',
+      },
+    ],
+  ]);
+
+function throwIfTokenError(envelope: Envelope<unknown>): void {
+  if (Array.isArray(envelope.errorCode) ? envelope.errorCode.length > 0 : envelope.errorCode)
+    return;
+  if (typeof envelope.error !== 'string') return;
+  const known = TOKEN_ERRORS.get(envelope.error.trim().toUpperCase());
+  if (known === undefined) return;
+  throw new MeInvoiceException(known.category, {
+    rawErrorCode: envelope.error.trim().toUpperCase(),
+    message: known.message,
+  });
+}
+
 /** Parity with the .NET `HttpClient.Timeout` default. */
 export const DEFAULT_TIMEOUT_MS = 100_000;
 const BACKOFF_BASE_MS = 1250;
@@ -246,7 +284,10 @@ export function createTransport(
       { taxcode: wire, username: resolved.userName, password: resolved.password },
       signal,
     );
-    if (!envelope.success || envelope.data === undefined) throwFromEnvelope(envelope);
+    if (!envelope.success || envelope.data === undefined) {
+      throwIfTokenError(envelope);
+      throwFromEnvelope(envelope);
+    }
     const inner = envelope.data;
     if (typeof inner !== 'object' || inner === null || Array.isArray(inner)) {
       throw new MeInvoiceException('MisaUnknown', {

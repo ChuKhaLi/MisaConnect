@@ -35,6 +35,8 @@ try {
 
 The quick start, the samples (`samples/typescript/`) and the sandbox tests all read the same `MISACONNECT_SANDBOX_*` variables (the names the .NET SDK uses).
 
+`taxCode` is the bare tax code, without the AppID: when MISA gives you a "Mã số thuế" such as `6868686868-267`, that is `<taxCode>-<appId>`, so use `taxCode: '6868686868'` and `appId: '267'`. The SDK sends `<taxCode>-<appId>` itself; passing the combined value makes MISA answer `INVALID_TAXCODE` (category `Configuration`).
+
 `baseUrl` must be an `https` URL whose host matches the chosen `environment` (`testapi.meinvoice.vn` for sandbox, `api.meinvoice.vn` for production). Invalid options throw a `MeInvoiceException` with category `Configuration`.
 
 ### Options (`MisaEInvoiceOptions`)
@@ -273,6 +275,7 @@ Dates: `yyyy-MM-dd` strings (a `Date` is also accepted and formatted from its lo
 - Paged-lookup request violations throw `rawErrorCode: 'ValidationFailed'` with the rule id in `failures[0].ruleId` (.NET puts the rule id, e.g. `FR-047`, in `rawErrorCode`). `preview` validation failures likewise carry `ValidationFailed`.
 - Batch-size codes `InvoiceQuantityTooLarge` / `XMLTooLong` map to `BatchOrSize`. That includes the client-side check for a `saveDraft` batch of more than 30 invoices, where .NET throws `Validation`. An empty batch throws `Validation` / `ValidationFailed` (.NET reuses `InvoiceQuantityTooLarge`).
 - `saveDraft` also turns wire-mapping failures (malformed money string, impossible date, date-time without offset) into that invoice's own `ValidationFailed` result. .NET's typed DTOs cannot hold such values.
+- Token-endpoint sign-in failures `INVALID_USER` and `INVALID_TAXCODE` map to `Authentication` and `Configuration` (.NET reports `MisaUnknown`).
 - The customer tax code is never logged.
 - Each call logs one completion line; failures are logged at `info` with `outcome: 'Error'` and `errorCategory`, a caller abort with `outcome: 'Cancelled'`.
 - Money strings must be plain decimals (`^-?\d+(\.\d+)?$`); the discount-total consistency check skips amount strings with more than 28 fractional digits and any amount beyond `decimal.MaxValue`.

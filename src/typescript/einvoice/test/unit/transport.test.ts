@@ -4,6 +4,7 @@ import {
   extractErrorCode,
   parseInsertErrors,
   readEnvelope,
+  throwFromEnvelope,
 } from '../../src/infrastructure/envelope.js';
 import { money } from '../../src/infrastructure/json.js';
 import { validateOptions } from '../../src/infrastructure/options.js';
@@ -188,6 +189,46 @@ describe('transport: token and headers', () => {
     });
     const err = await rejection(s.transport.request('POST', 'webapp/insert', {}, []));
     expect(err).toMatchObject({ category: 'Configuration', rawErrorCode: 'InvalidAppID' });
+  });
+
+  // Live sandbox shape (2026-11-03): the code sits in the `error` string, `errorCode` is [].
+  const tokenRejection = (code: string) => () =>
+    envelope({
+      success: false,
+      data: '',
+      error: code,
+      error_description: 'Thông tin đăng nhập không đúng',
+      errorCode: [],
+    });
+
+  it.each([
+    ['INVALID_USER', 'Authentication'],
+    ['INVALID_TAXCODE', 'Configuration'],
+  ])('token endpoint %s → %s', async (code, category) => {
+    const s = setup([ok], { token: tokenRejection(code) });
+    const err = await rejection(s.transport.request('POST', 'webapp/insert', {}, []));
+    expect(err).toBeInstanceOf(MeInvoiceException);
+    expect(err).toMatchObject({ category, rawErrorCode: code });
+    expect((err as MeInvoiceException).message).not.toContain('Thông tin');
+    expect(s.apiCalls()).toHaveLength(0);
+  });
+
+  it('token-only codes are not recognised outside the token endpoint', async () => {
+    const s = setup([tokenRejection('INVALID_USER')]);
+    const env = await s.transport.request('POST', 'webapp/insert', {}, []);
+    let err: unknown;
+    try {
+      throwFromEnvelope(env);
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toMatchObject({ category: 'MisaUnknown' });
+  });
+
+  it('unknown token-endpoint string error stays MisaUnknown', async () => {
+    const s = setup([ok], { token: tokenRejection('SOMETHING_NEW') });
+    const err = await rejection(s.transport.request('POST', 'webapp/insert', {}, []));
+    expect(err).toMatchObject({ category: 'MisaUnknown' });
   });
 });
 

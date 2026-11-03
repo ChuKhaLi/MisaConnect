@@ -2,6 +2,16 @@
 
 All notable changes to `@misaconnect/einvoice` are documented here.
 
+## [0.1.2] - 2026-11-03
+
+### Changed
+
+- Sign-in failures from the token endpoint no longer surface as `MisaUnknown`. MISA returns them as a string in `error` with an empty `errorCode` array: `INVALID_USER` (wrong user name, password, tax code or AppID) now throws `Authentication`, and `INVALID_TAXCODE` (a malformed tax code, typically one that already carries the `-<appId>` suffix) throws `Configuration`, both with `rawErrorCode` set to the MISA code and an English message. The .NET SDK still reports `MisaUnknown` for both.
+
+### Documentation
+
+- README: `taxCode` is the bare tax code. MISA often hands out sandbox credentials as `<taxCode>-<appId>` (e.g. `6868686868-267`); split it into `taxCode` and `appId`, because the SDK appends `-<appId>` itself.
+
 ## [0.1.1] - 2026-11-03
 
 ### Fixed
