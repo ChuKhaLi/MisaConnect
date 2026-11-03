@@ -174,3 +174,53 @@ describe('money() numbers are emitted as plain decimal text', () => {
     expect(emit(-0)).toBe('{"a":0}');
   });
 });
+
+describe('money range (.NET decimal limits: 29 integer / 28 fractional digits)', () => {
+  const code = (fn: () => unknown): { code?: string; field?: string } => {
+    try {
+      fn();
+    } catch (e) {
+      return {
+        ...((e as MeInvoiceException).rawErrorCode !== undefined
+          ? { code: (e as MeInvoiceException).rawErrorCode }
+          : {}),
+        ...((e as MeInvoiceException).field !== undefined
+          ? { field: (e as MeInvoiceException).field }
+          : {}),
+      };
+    }
+    return {};
+  };
+
+  it('rejects Number.MAX_VALUE and 5e-324 with InvalidMoney and the field', () => {
+    expect(code(() => money(Number.MAX_VALUE, 'f'))).toEqual({ code: 'InvalidMoney', field: 'f' });
+    expect(code(() => money(5e-324, 'f'))).toEqual({ code: 'InvalidMoney', field: 'f' });
+  });
+
+  it('rejects a 30-integer-digit and a 29-fractional-digit string; accepts the limits', () => {
+    expect(code(() => money('1' + '0'.repeat(29), 'f')).code).toBe('InvalidMoney');
+    expect(code(() => money('0.' + '1'.repeat(29), 'f')).code).toBe('InvalidMoney');
+    expect(() => money('9'.repeat(29))).not.toThrow();
+    expect(() => money('0.' + '1'.repeat(28))).not.toThrow();
+    expect(() => money('000' + '9'.repeat(29))).not.toThrow();
+  });
+
+  it('still accepts 1e21 and 1e-7', () => {
+    expect(serializeRequest({ a: money(1e21) })).toBe('{"a":1000000000000000000000}');
+    expect(serializeRequest({ a: money(1e-7) })).toBe('{"a":0.0000001}');
+  });
+});
+
+describe('serializeRequest rejects bigint', () => {
+  it('throws Validation / InvalidNumber with the field path', () => {
+    try {
+      serializeRequest({ a: { b: 1n } });
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toBeInstanceOf(MeInvoiceException);
+      expect((e as MeInvoiceException).category).toBe('Validation');
+      expect((e as MeInvoiceException).rawErrorCode).toBe('InvalidNumber');
+      expect((e as MeInvoiceException).field).toBe('a.b');
+    }
+  });
+});

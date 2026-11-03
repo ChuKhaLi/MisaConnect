@@ -140,7 +140,7 @@ describe('listTemplates', () => {
   });
 
   it('keeps a row with a null InvSeries (as blank), drops null/non-object rows and rows without a string IPTemplateID', async () => {
-    const good = fake.state.templates[0]!;
+    const good = fake.state.templates[0];
     fake.state.templates.push(
       null as never,
       'junk' as never,

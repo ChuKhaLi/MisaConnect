@@ -45,6 +45,20 @@ function plainDecimal(value: number): string {
   return `${sign}${digits.slice(0, point)}.${digits.slice(point)}`;
 }
 
+const MAX_INTEGER_DIGITS = 29;
+const MAX_FRACTION_DIGITS = 28;
+
+/** .NET `decimal` range: at most 29 integer and 28 fractional digits (leading zeros ignored). */
+function assertDecimalRange(text: string, field: string | undefined): void {
+  const [int = '', frac = ''] = text.replace(/^-/, '').split('.');
+  if (int.replace(/^0+/, '').length > MAX_INTEGER_DIGITS || frac.length > MAX_FRACTION_DIGITS) {
+    throw invalidMoney(
+      `Money amount exceeds the supported range (${MAX_INTEGER_DIGITS} integer / ${MAX_FRACTION_DIGITS} fractional digits).`,
+      field,
+    );
+  }
+}
+
 /** Validates a money value and wraps it so `serializeRequest` writes it verbatim. */
 export function money(value: Money, field?: string): MoneyLiteral {
   let text: string;
@@ -53,7 +67,9 @@ export function money(value: Money, field?: string): MoneyLiteral {
       throw invalidMoney('Money amount must be a finite number.', field);
     }
     text = plainDecimal(value);
+    assertDecimalRange(text, field);
   } else if (typeof value === 'string' && MONEY_PATTERN.test(value)) {
+    assertDecimalRange(value, field);
     text = value;
   } else {
     throw invalidMoney('Money amount must be a plain decimal number.', field);
@@ -84,7 +100,11 @@ function write(v: unknown, path: string): string | undefined {
       }
       return JSON.stringify(v);
     case 'bigint':
-      return v.toString();
+      throw new MeInvoiceException('Validation', {
+        rawErrorCode: 'InvalidNumber',
+        message: 'bigint is not a JSON type and cannot be serialized.',
+        field: path,
+      });
   }
   if (issuedMoney.has(v as object)) {
     const text = (v as MoneyLiteral).__money;
