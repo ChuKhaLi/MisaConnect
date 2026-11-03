@@ -1,3 +1,10 @@
+import {
+  MAX_DECIMAL,
+  MAX_SCALE,
+  decimalFromNumber,
+  decimalFromPlainString,
+  formatDecimal,
+} from '../application/decimal.js';
 import { MeInvoiceException } from '../domain/errors.js';
 import type { Money } from '../domain/dtos.js';
 import { isRealDate } from './wire/datetime.js';
@@ -29,47 +36,24 @@ function invalidDate(message: string, field?: string): MeInvoiceException {
   });
 }
 
+const RANGE_MESSAGE = `Money amount exceeds the .NET decimal range (|x| <= ${MAX_DECIMAL}, <= ${MAX_SCALE} fractional digits).`;
+
 /**
- * Finite number → plain decimal text (no exponent), digit-exact to its shortest round-trip
- * string: `1e21` → `1000000000000000000000`, `1e-7` → `0.0000001`.
+ * Validates a money value and wraps it so `serializeRequest` writes it verbatim. Strings are
+ * written as given (they must already fit .NET `decimal`); numbers are written as plain text,
+ * rounded half-to-even to 28 fractional digits as .NET's decimal parser rounds their literal.
  */
-function plainDecimal(value: number): string {
-  const s = String(value === 0 ? 0 : value);
-  const m = /^(-?)(\d+)(?:\.(\d+))?e([+-]\d+)$/.exec(s);
-  if (!m) return s;
-  const sign = m[1] ?? '';
-  const digits = (m[2] ?? '') + (m[3] ?? '');
-  const point = (m[2] ?? '').length + Number(m[4]);
-  if (point <= 0) return `${sign}0.${'0'.repeat(-point)}${digits}`;
-  if (point >= digits.length) return sign + digits + '0'.repeat(point - digits.length);
-  return `${sign}${digits.slice(0, point)}.${digits.slice(point)}`;
-}
-
-const MAX_INTEGER_DIGITS = 29;
-const MAX_FRACTION_DIGITS = 28;
-
-/** .NET `decimal` range: at most 29 integer and 28 fractional digits (leading zeros ignored). */
-function assertDecimalRange(text: string, field: string | undefined): void {
-  const [int = '', frac = ''] = text.replace(/^-/, '').split('.');
-  if (int.replace(/^0+/, '').length > MAX_INTEGER_DIGITS || frac.length > MAX_FRACTION_DIGITS) {
-    throw invalidMoney(
-      `Money amount exceeds the supported range (${MAX_INTEGER_DIGITS} integer / ${MAX_FRACTION_DIGITS} fractional digits).`,
-      field,
-    );
-  }
-}
-
-/** Validates a money value and wraps it so `serializeRequest` writes it verbatim. */
 export function money(value: Money, field?: string): MoneyLiteral {
   let text: string;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {
       throw invalidMoney('Money amount must be a finite number.', field);
     }
-    text = plainDecimal(value);
-    assertDecimalRange(text, field);
+    const d = decimalFromNumber(value);
+    if (d === undefined) throw invalidMoney(RANGE_MESSAGE, field);
+    text = formatDecimal(d);
   } else if (typeof value === 'string' && MONEY_PATTERN.test(value)) {
-    assertDecimalRange(value, field);
+    if (decimalFromPlainString(value) === undefined) throw invalidMoney(RANGE_MESSAGE, field);
     text = value;
   } else {
     throw invalidMoney('Money amount must be a plain decimal number.', field);

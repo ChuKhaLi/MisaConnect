@@ -218,7 +218,7 @@ Any object with `debug/info/warn/error(message, fields?)` works. An exception th
 
 ## Money
 
-`Money = number | string`. A string must be a plain decimal (`^-?\d+(\.\d+)?$`) and is written to the JSON body **verbatim as a number literal**, so no precision is lost. Amounts are limited to the .NET `decimal` range, 29 integer and 28 fractional digits (leading zeros ignored); a string or number beyond it (e.g. `Number.MAX_VALUE`, `5e-324`) is rejected with `InvalidMoney`. Surrounding whitespace is rejected rather than trimmed: .NET money fields are typed `decimal`, so there is no .NET string form whose parsing rules to copy, and rejecting is the safer default. A `number` is written as plain decimal text, never in exponent form (`1e21` → `1000000000000000000000`, `1e-7` → `0.0000001`). JavaScript `number` is a binary double: for foreign-currency amounts, exchange rates and anything that must be exact, compute with a decimal library (decimal.js, big.js, ...) and pass `value.toFixed()` strings. Amounts in responses are `number`.
+`Money = number | string`. A string must be a plain decimal (`^-?\d+(\.\d+)?$`) and is written to the JSON body **verbatim as a number literal**, so no precision is lost. Amounts must be within the .NET decimal range (|x| ≤ 79,228,162,514,264,337,593,543,950,335, ≤ 28 fractional digits). A string beyond it is rejected with `InvalidMoney`, as is a number above `decimal.MaxValue` (e.g. `Number.MAX_VALUE`). A number with more than 28 fractional digits is rounded half-to-even to 28, as .NET's decimal parser rounds the same JSON literal: `0.1 + 0.2 - 0.3` (`5.551115123125783e-17`) → `0.0000000000000000555111512313`, `5e-324` → `0`. The validator's discount-total check uses the same rounded value. Surrounding whitespace is rejected rather than trimmed: .NET money fields are typed `decimal`, so there is no .NET string form whose parsing rules to copy, and rejecting is the safer default. A `number` is written as plain decimal text, never in exponent form (`1e21` → `1000000000000000000000`, `1e-7` → `0.0000001`). JavaScript `number` is a binary double: for foreign-currency amounts, exchange rates and anything that must be exact, compute with a decimal library (decimal.js, big.js, ...) and pass `value.toFixed()` strings. Amounts in responses are `number`.
 
 ## Property names
 
@@ -248,7 +248,7 @@ Dates: `yyyy-MM-dd` strings (a `Date` is also accepted and formatted from its lo
 - `saveDraft` also turns wire-mapping failures (malformed money string, impossible date, date-time without offset) into that invoice's own `ValidationFailed` result. .NET's typed DTOs cannot hold such values.
 - The customer tax code is never logged.
 - Each call logs one completion line; failures are logged at `info` with `outcome: 'Error'` and `errorCategory`, a caller abort with `outcome: 'Cancelled'`.
-- Money strings must be plain decimals (`^-?\d+(\.\d+)?$`); the discount-total consistency check skips amounts with more than 28 fractional or 29 integer digits.
+- Money strings must be plain decimals (`^-?\d+(\.\d+)?$`); the discount-total consistency check skips amount strings with more than 28 fractional digits and any amount beyond `decimal.MaxValue`.
 - `KHAC:<rate>%` VAT names take a plain decimal rate (`KHAC:3.5%`); thousands separators, which .NET's `NumberStyles.Number` accepts (`KHAC:1,000%`), are rejected (FR-029), as is a rate <= 0 (the message says the rate must be positive).
 - Date-times need an explicit offset (`Z` or `+hh:mm` / `-hh:mm`).
 

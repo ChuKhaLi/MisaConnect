@@ -175,7 +175,7 @@ describe('money() numbers are emitted as plain decimal text', () => {
   });
 });
 
-describe('money range (.NET decimal limits: 29 integer / 28 fractional digits)', () => {
+describe('money range (.NET decimal: |x| <= decimal.MaxValue, <= 28 fractional digits)', () => {
   const code = (fn: () => unknown): { code?: string; field?: string } => {
     try {
       fn();
@@ -191,18 +191,67 @@ describe('money range (.NET decimal limits: 29 integer / 28 fractional digits)',
     }
     return {};
   };
+  const emitMoney = (v: number | string): string => serializeRequest({ a: money(v) });
 
-  it('rejects Number.MAX_VALUE and 5e-324 with InvalidMoney and the field', () => {
+  it('rejects Number.MAX_VALUE and numbers above decimal.MaxValue with InvalidMoney and the field', () => {
     expect(code(() => money(Number.MAX_VALUE, 'f'))).toEqual({ code: 'InvalidMoney', field: 'f' });
-    expect(code(() => money(5e-324, 'f'))).toEqual({ code: 'InvalidMoney', field: 'f' });
+    // 7.922816251426434e28 is exactly 79228162514264340000000000000 > decimal.MaxValue.
+    expect(code(() => money(7.922816251426434e28, 'f'))).toEqual({
+      code: 'InvalidMoney',
+      field: 'f',
+    });
+    expect(code(() => money(-7.922816251426434e28, 'f')).code).toBe('InvalidMoney');
+    expect(emitMoney(7.922816251426433e28)).toBe('{"a":79228162514264330000000000000}');
   });
 
-  it('rejects a 30-integer-digit and a 29-fractional-digit string; accepts the limits', () => {
+  it('rounds number residues to 28 fractional digits, as .NET decimal parsing of the literal does', () => {
+    // .NET 10: JsonSerializer.Deserialize<decimal>("5.551115123125783e-17") == 0.0000000000000000555111512313
+    expect(emitMoney(0.1 + 0.2 - 0.3)).toBe('{"a":0.0000000000000000555111512313}');
+    expect(emitMoney(-(0.1 + 0.2 - 0.3))).toBe('{"a":-0.0000000000000000555111512313}');
+    expect(emitMoney(5e-324)).toBe('{"a":0}');
+    expect(emitMoney(-5e-324)).toBe('{"a":0}');
+    expect(emitMoney(1e-29)).toBe('{"a":0}');
+    expect(emitMoney(1e-28)).toBe('{"a":0.0000000000000000000000000001}');
+  });
+
+  it('breaks exact ties to even (bankers rounding), like .NET decimal parsing', () => {
+    // .NET 10: 2.5e-28 -> 2e-28, 1.5e-28 -> 2e-28, 3.5e-28 -> 4e-28, 5e-29 -> 0.
+    expect(emitMoney(2.5e-28)).toBe('{"a":0.0000000000000000000000000002}');
+    expect(emitMoney(1.5e-28)).toBe('{"a":0.0000000000000000000000000002}');
+    expect(emitMoney(3.5e-28)).toBe('{"a":0.0000000000000000000000000004}');
+    expect(emitMoney(-3.5e-28)).toBe('{"a":-0.0000000000000000000000000004}');
+    expect(emitMoney(5e-29)).toBe('{"a":0}');
+    expect(emitMoney(5.000001e-29)).toBe('{"a":0.0000000000000000000000000001}');
+  });
+
+  it('keeps every digit of the shortest round-trip text (no 15-significant-digit rounding)', () => {
+    expect(emitMoney(0.30000000000000004)).toBe('{"a":0.30000000000000004}');
+    expect(emitMoney(123456789.12345679)).toBe('{"a":123456789.12345679}');
+  });
+
+  it('strings: rejects > 28 fractional digits and |x| > decimal.MaxValue; accepts the limits', () => {
+    expect(code(() => money('0.' + '1'.repeat(29), 'f'))).toEqual({
+      code: 'InvalidMoney',
+      field: 'f',
+    });
     expect(code(() => money('1' + '0'.repeat(29), 'f')).code).toBe('InvalidMoney');
-    expect(code(() => money('0.' + '1'.repeat(29), 'f')).code).toBe('InvalidMoney');
-    expect(() => money('9'.repeat(29))).not.toThrow();
+    expect(code(() => money('9'.repeat(29), 'f')).code).toBe('InvalidMoney');
+    expect(code(() => money('79228162514264337593543950336', 'f')).code).toBe('InvalidMoney');
+    expect(code(() => money('-79228162514264337593543950336', 'f')).code).toBe('InvalidMoney');
+    expect(code(() => money('79228162514264337593543950335.1', 'f')).code).toBe('InvalidMoney');
+    expect(emitMoney('79228162514264337593543950335')).toBe('{"a":79228162514264337593543950335}');
+    expect(emitMoney('-79228162514264337593543950335.0')).toBe(
+      '{"a":-79228162514264337593543950335.0}',
+    );
     expect(() => money('0.' + '1'.repeat(28))).not.toThrow();
-    expect(() => money('000' + '9'.repeat(29))).not.toThrow();
+    expect(() => money('000' + '79228162514264337593543950335')).not.toThrow();
+  });
+
+  it('bounds huge strings before any BigInt work', () => {
+    const start = Date.now();
+    expect(code(() => money('1'.repeat(1_000_000))).code).toBe('InvalidMoney');
+    expect(code(() => money('0.' + '1'.repeat(1_000_000))).code).toBe('InvalidMoney');
+    expect(Date.now() - start).toBeLessThan(500);
   });
 
   it('still accepts 1e21 and 1e-7', () => {

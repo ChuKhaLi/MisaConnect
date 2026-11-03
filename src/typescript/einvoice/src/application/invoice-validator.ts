@@ -9,6 +9,12 @@ import type {
 } from '../domain/dtos.js';
 import type { ValidationFailure } from '../domain/errors.js';
 import { parseVatRate } from '../domain/vat-rate.js';
+import {
+  decimalFromNumber,
+  decimalFromPlainString,
+  formatDecimal,
+  type ExactDecimal,
+} from './decimal.js';
 import { indexFailures } from './failure-paths.js';
 import type { InvoiceValidator } from './ports.js';
 
@@ -38,55 +44,19 @@ function toNumber(m: Money | undefined | null): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-interface Decimal {
-  int: bigint;
-  scale: number;
-}
+type Decimal = ExactDecimal;
 const ZERO: Decimal = { int: 0n, scale: 0 };
-const PLAIN_DECIMAL_RE = /^(-?)(\d+)(?:\.(\d+))?$/;
-const NUMBER_RE = /^(-?)(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/;
-/** .NET decimal limits: at most 28 fractional and 29 integer digits. */
-const MAX_SCALE = 28;
-const MAX_INT_DIGITS = 29;
 
 /**
- * Exact decimal of a money value, or undefined when unparsable or beyond .NET decimal precision.
- * Strings must be plain decimals (^-?\d+(\.\d+)?$) once trimmed; exponent form is accepted only
- * for numbers.
+ * Exact decimal of a money value, or undefined when unparsable or beyond the .NET decimal range.
+ * Numbers are rounded to 28 fractional digits exactly as the serializer writes them; strings must
+ * be plain decimals (^-?\d+(\.\d+)?$) once trimmed, with at most 28 fractional digits.
  */
 function parseDecimal(m: Money | undefined | null): Decimal | undefined {
-  if (m === undefined || m === null) return undefined;
-  let match: RegExpExecArray | null;
-  if (typeof m === 'number') {
-    if (!Number.isFinite(m)) return undefined;
-    match = NUMBER_RE.exec(String(m));
-  } else if (typeof m === 'string') {
-    // Surrounding whitespace is tolerated here, as `Number()` (toNumber) does.
-    match = PLAIN_DECIMAL_RE.exec(m.trim());
-  } else {
-    return undefined;
-  }
-  if (!match) return undefined;
-  const sign = match[1];
-  const whole = match[2] ?? '';
-  const frac = match[3] ?? '';
-  const exp = Number(match[4] ?? '0');
-  // Bound sizes before any BigInt work.
-  if (Math.abs(exp) > 400) return undefined;
-  const scale = frac.length - exp;
-  if (scale > MAX_SCALE || integerDigits(whole, frac, exp) > MAX_INT_DIGITS) return undefined;
-  let digits = BigInt(whole + frac);
-  if (scale < 0) digits *= 10n ** BigInt(-scale);
-  return { int: sign === '-' ? -digits : digits, scale: Math.max(scale, 0) };
-}
-
-/** Exact count of integer digits of `whole.frac × 10^exp` (no BigInt; inputs may be huge). */
-function integerDigits(whole: string, frac: string, exp: number): number {
-  const w = whole.replace(/^0+/, '');
-  if (w !== '') return Math.max(0, w.length + exp);
-  const rest = frac.replace(/^0+/, '');
-  if (rest === '') return 0;
-  return Math.max(0, exp - (frac.length - rest.length));
+  if (typeof m === 'number') return decimalFromNumber(m);
+  // Surrounding whitespace is tolerated here, as `Number()` (toNumber) does.
+  if (typeof m === 'string') return decimalFromPlainString(m.trim());
+  return undefined;
 }
 
 const TOLERANCE: Decimal = (() => {
@@ -97,14 +67,6 @@ const TOLERANCE: Decimal = (() => {
 
 function rescale(d: Decimal, scale: number): bigint {
   return d.int * 10n ** BigInt(scale - d.scale);
-}
-
-function formatDecimal(d: Decimal): string {
-  const neg = d.int < 0n;
-  const abs = (neg ? -d.int : d.int).toString().padStart(d.scale + 1, '0');
-  const whole = abs.slice(0, abs.length - d.scale);
-  const frac = abs.slice(abs.length - d.scale).replace(/0+$/, '');
-  return (neg ? '-' : '') + whole + (frac ? '.' + frac : '');
 }
 
 /** True when the string holds a UTF-16 high surrogate (supplementary-plane code point), like char.IsHighSurrogate. */

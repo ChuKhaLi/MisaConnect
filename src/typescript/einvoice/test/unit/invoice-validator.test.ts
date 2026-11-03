@@ -248,7 +248,7 @@ describe('InvoiceValidator.validate', () => {
     expect(Date.now() - start).toBeLessThan(500);
   });
 
-  it('FR-025 skips amounts beyond .NET decimal precision (28 fraction / 29 integer digits)', () => {
+  it('FR-025 skips amounts beyond .NET decimal precision (28 fraction digits, decimal.MaxValue)', () => {
     const start = Date.now();
     const huge = '0.' + '1'.repeat(1_000_000);
     const mk = (d: string, header: string | number) =>
@@ -271,9 +271,42 @@ describe('InvoiceValidator.validate', () => {
         lines: [line({ discountAmountOC: 0 })],
         totals: totals({ totalDiscountAmountOC: header }),
       });
-    // 1.2345e28 has 29 integer digits (in range); 1.2345e29 has 30 (beyond .NET decimal).
+    // 1.2345e28 is within decimal.MaxValue; 1.2345e29 is beyond it.
     expect(v(mk(1.2345e28)).map((f) => f.ruleId)).toEqual(['FR-025']);
     expect(v(mk(1.2345e29))).toEqual([]);
+  });
+
+  it('FR-025 rounds number residues to 28 fractional digits, as the serializer does', () => {
+    const inv = invoice({
+      lines: [line({ discountAmountOC: 0.1 + 0.2 - 0.3 })],
+      totals: totals({ totalDiscountAmountOC: 1 }),
+    });
+    expect(v(inv)).toEqual([
+      {
+        fieldPath: 'totals.totalDiscountAmountOC',
+        message:
+          'Header TotalDiscountAmountOC 1 does not equal sum of goods-line DiscountAmountOC (0.0000000000000000555111512313).',
+        ruleId: 'FR-025',
+      },
+    ]);
+    const tiny = invoice({
+      lines: [line({ discountAmountOC: 5e-324 })],
+      totals: totals({ totalDiscountAmountOC: 7 }),
+    });
+    expect(v(tiny)[0]?.message).toContain('DiscountAmountOC (0)');
+  });
+
+  it('FR-025 bounds the integer part by decimal.MaxValue', () => {
+    const mk = (header: string | number) =>
+      invoice({
+        lines: [line({ discountAmountOC: 0 })],
+        totals: totals({ totalDiscountAmountOC: header }),
+      });
+    expect(v(mk('9'.repeat(29)))).toEqual([]);
+    expect(v(mk('79228162514264337593543950336'))).toEqual([]);
+    expect(v(mk('79228162514264337593543950335')).map((f) => f.ruleId)).toEqual(['FR-025']);
+    expect(v(mk(7.922816251426434e28))).toEqual([]);
+    expect(v(mk(7.922816251426433e28)).map((f) => f.ruleId)).toEqual(['FR-025']);
   });
 
   it('FR-025 trims surrounding whitespace on money strings', () => {
