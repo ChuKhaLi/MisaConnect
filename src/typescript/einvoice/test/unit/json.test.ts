@@ -1,0 +1,65 @@
+import { describe, it, expect } from 'vitest';
+import { formatDateOnly, money, serializeRequest } from '../../src/infrastructure/json.js';
+import { MeInvoiceException } from '../../src/domain/errors.js';
+
+describe('serializeRequest', () => {
+  it('writes money strings byte-for-byte as number literals', () => {
+    expect(serializeRequest({ a: money('12345678901234567890.123456') })).toBe(
+      '{"a":12345678901234567890.123456}',
+    );
+  });
+
+  it('writes numeric money', () => {
+    expect(serializeRequest({ a: money(1.5) })).toBe('{"a":1.5}');
+  });
+
+  it('drops null and undefined object members', () => {
+    expect(serializeRequest({ a: null, b: undefined, c: 1 })).toBe('{"c":1}');
+  });
+
+  it('keeps array order and drops nothing', () => {
+    expect(serializeRequest([3, 'x', { a: 1 }, null])).toBe('[3,"x",{"a":1},null]');
+  });
+
+  it('serializes nested structures and escapes strings', () => {
+    expect(
+      serializeRequest({ s: 'a"b\n☕', n: { m: money('-0.50') }, l: [money('2')], t: true }),
+    ).toBe('{"s":"a\\"b\\n☕","n":{"m":-0.50},"l":[2],"t":true}');
+  });
+
+  it('rejects malformed money strings with InvalidMoney', () => {
+    for (const bad of ['1e5', '', '1.', '.5', ' 1', '1,5', '+1']) {
+      try {
+        money(bad);
+        expect.unreachable(`should have thrown for "${bad}"`);
+      } catch (e) {
+        expect(e).toBeInstanceOf(MeInvoiceException);
+        expect((e as MeInvoiceException).category).toBe('Validation');
+        expect((e as MeInvoiceException).rawErrorCode).toBe('InvalidMoney');
+      }
+    }
+  });
+
+  it('rejects non-finite money numbers', () => {
+    expect(() => money(NaN)).toThrow(MeInvoiceException);
+    expect(() => money(Infinity)).toThrow(MeInvoiceException);
+  });
+
+  it('rejects non-finite plain numbers', () => {
+    expect(() => serializeRequest({ a: NaN })).toThrow(MeInvoiceException);
+  });
+});
+
+describe('formatDateOnly', () => {
+  it('formats a Date from local calendar fields', () => {
+    expect(formatDateOnly(new Date(2026, 10, 3))).toBe('2026-11-03');
+  });
+
+  it('passes yyyy-MM-dd strings through', () => {
+    expect(formatDateOnly('2026-11-03')).toBe('2026-11-03');
+  });
+
+  it('rejects other string shapes', () => {
+    expect(() => formatDateOnly('03/11/2026')).toThrow(MeInvoiceException);
+  });
+});
