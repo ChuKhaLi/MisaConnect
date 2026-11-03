@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createMisaEInvoiceClient, type IMisaEInvoiceClient } from '../../src/client.js';
 import type { Logger } from '../../src/application/ports.js';
 import type { InvoiceDto } from '../../src/domain/dtos.js';
+import { createMeInvoiceGateway } from '../../src/infrastructure/gateway.js';
+import type { ResolvedOptions } from '../../src/infrastructure/options.js';
+import type { MeInvoiceTransport } from '../../src/application/ports.js';
 import { MeInvoiceException } from '../../src/domain/errors.js';
 import type { MisaEInvoiceOptions } from '../../src/infrastructure/options.js';
 import { startFakeMisa, type FakeMisa } from '../fake/fake-misa-server.js';
@@ -172,5 +175,104 @@ describe('saveDraft', () => {
     const text = JSON.stringify(lines);
     expect(text).not.toContain(BUYER);
     expect(text).not.toContain('0312345678');
+  });
+});
+
+describe('saveDraft per-invoice template resolution', () => {
+  const tpl = (id: string): Partial<InvoiceDto> => ({
+    template: { ipTemplateID: id, invSeries: '' },
+  });
+
+  it('sends one insert with each invoice under its own template', async () => {
+    const results = await client().saveDraft([
+      invoice({ refId: 'a', ...tpl('ipt-active-1') }),
+      invoice({ refId: 'b', ...tpl('ipt-active-2') }),
+    ]);
+    expect(results.map((r) => r.outcome)).toEqual(['Success', 'Success']);
+    const reqs = nonToken().filter((r) => r.path === '/webapp/insert');
+    expect(reqs).toHaveLength(1);
+    const body = JSON.parse(reqs[0]?.bodyText ?? '') as { InvoiceTemplateID: string }[];
+    expect(body.map((b) => b.InvoiceTemplateID)).toEqual(['ipt-active-1', 'ipt-active-2']);
+  });
+
+  it('an unknown template fails only that item (TemplateState); the rest are sent', async () => {
+    const results = await client().saveDraft([
+      invoice({ refId: 'a', ...tpl('ipt-active-1') }),
+      invoice({ refId: 'b', ...tpl('ipt-inactive-1') }),
+      invoice({ refId: 'c', ...tpl('ipt-active-2') }),
+    ]);
+    expect(results.map((r) => [r.refId, r.outcome])).toEqual([
+      ['a', 'Success'],
+      ['b', 'Error'],
+      ['c', 'Success'],
+    ]);
+    expect(results[1]).toMatchObject({
+      errorCategory: 'TemplateState',
+      rawErrorCode: 'UnknownTemplate',
+    });
+    const req = nonToken().find((r) => r.path === '/webapp/insert');
+    const body = JSON.parse(req?.bodyText ?? '') as { RefID: string }[];
+    expect(body.map((b) => b.RefID)).toEqual(['a', 'c']);
+  });
+
+  it('a missing template ref with two active templates is an Ambiguous (Configuration) item', async () => {
+    const noTpl = invoice({ refId: 'a' });
+    delete noTpl.template;
+    const results = await client().saveDraft([noTpl, invoice({ refId: 'b' })]);
+    expect(results[0]).toMatchObject({
+      outcome: 'Error',
+      errorCategory: 'Configuration',
+      rawErrorCode: 'AmbiguousTemplate',
+    });
+    expect(results[1]?.outcome).toBe('Success');
+  });
+
+  it('all unresolvable: no insert request, every item Error, no templateId logged', async () => {
+    const results = await client().saveDraft([
+      invoice({ refId: 'a', ...tpl('nope-1') }),
+      invoice({ refId: 'b', ...tpl('nope-2') }),
+    ]);
+    expect(results.map((r) => r.outcome)).toEqual(['Error', 'Error']);
+    expect(nonToken().some((r) => r.path === '/webapp/insert')).toBe(false);
+    expect(lines[0]?.fields).not.toHaveProperty('templateId');
+  });
+
+  it('empty batch throws Validation with $batch.count and sends nothing', async () => {
+    const err = await client()
+      .saveDraft([])
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(MeInvoiceException);
+    expect((err as MeInvoiceException).failures?.some((f) => f.fieldPath === '$batch.count')).toBe(
+      true,
+    );
+    expect(fake.state.requests).toHaveLength(0);
+  });
+
+  it('results follow input order even when MISA echoes in reverse', async () => {
+    const transport: MeInvoiceTransport = {
+      request: () =>
+        Promise.resolve({
+          success: true,
+          data: [{ RefID: 'b' }, { RefID: 'a' }],
+          error: undefined,
+          errorCode: undefined,
+        }) as never,
+    };
+    const gw = createMeInvoiceGateway(transport, {} as ResolvedOptions);
+    const out = await gw.insertInvoices(
+      [
+        { invoice: invoice(), refId: 'a', template: { ipTemplateID: 't' } as never },
+        { invoice: invoice(), refId: 'b', template: { ipTemplateID: 't' } as never },
+      ],
+      true,
+    );
+    expect(out.map((o) => o.refId)).toEqual(['a', 'b']);
+  });
+
+  it('a failed item errorMessage never reaches the log lines', async () => {
+    fake.state.failInsertFor('b', 'InvalidInvoiceData', 'SECRET-MISA-TEXT');
+    const results = await client().saveDraft([invoice({ refId: 'a' }), invoice({ refId: 'b' })]);
+    expect(results[1]?.errorMessage).toBe('SECRET-MISA-TEXT');
+    expect(JSON.stringify(lines)).not.toContain('SECRET-MISA-TEXT');
   });
 });

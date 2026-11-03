@@ -19,13 +19,15 @@ export interface SaveDraftDeps {
 
 export interface SaveDraftResult {
   results: SaveResultDto[];
-  template: TemplateDto;
+  /** Id of the first resolved template, if any (for logging). */
+  templateId?: string;
 }
 
 /**
- * Port `SaveDraftInvoices.cs`. Deviation (as in preview): the whole batch is validated
- * first and any failure throws `Validation` before any HTTP call. The template is
- * resolved once, from the first invoice's template reference.
+ * Port SaveDraftInvoices.cs. Deviation: the whole batch is validated first and any
+ * failure throws Validation before any HTTP call. Templates are fetched once and each
+ * invoice is resolved against them; unresolvable invoices become their own Error result
+ * while the rest go out in one insert call.
  */
 export async function saveDraftInvoices(
   deps: SaveDraftDeps,
@@ -46,20 +48,47 @@ export async function saveDraftInvoices(
   }
 
   const active = await listActiveTemplates(deps.gateway, withCode, opts);
-  const resolution = deps.templateResolver(active, invoices[0]?.template);
-  if (resolution.kind !== 'Resolved') throw templateResolutionError(resolution);
-  const template = resolution.template;
-
-  const outcomes = await deps.gateway.insertInvoices(working, template, withCode, opts);
-  const results = outcomes.map((o): SaveResultDto => {
-    if (o.outcome === 'Success') return { refId: o.refId, outcome: 'Success' };
-    return {
-      refId: o.refId,
+  const results: (SaveResultDto | undefined)[] = new Array<SaveResultDto | undefined>(
+    working.length,
+  );
+  const toSubmit: { index: number; invoice: InvoiceDto; refId: string; template: TemplateDto }[] =
+    [];
+  working.forEach((w, index) => {
+    const resolution = deps.templateResolver(active, w.invoice.template);
+    if (resolution.kind === 'Resolved') {
+      toSubmit.push({ index, ...w, template: resolution.template });
+      return;
+    }
+    const ex = templateResolutionError(resolution);
+    results[index] = {
+      refId: w.refId,
       outcome: 'Error',
-      errorCategory: o.errorCategory,
-      rawErrorCode: o.rawErrorCode,
-      ...(o.message !== undefined ? { errorMessage: o.message } : {}),
+      errorCategory: ex.category,
+      rawErrorCode: resolution.kind,
+      errorMessage: ex.message,
     };
   });
-  return { results, template };
+
+  if (toSubmit.length > 0) {
+    const outcomes = await deps.gateway.insertInvoices(toSubmit, withCode, opts);
+    toSubmit.forEach((item, k) => {
+      const o = outcomes[k];
+      results[item.index] =
+        o === undefined || o.outcome === 'Success'
+          ? { refId: item.refId, outcome: 'Success' }
+          : {
+              refId: item.refId,
+              outcome: 'Error',
+              errorCategory: o.errorCategory,
+              rawErrorCode: o.rawErrorCode,
+              ...(o.message !== undefined ? { errorMessage: o.message } : {}),
+            };
+    });
+  }
+
+  const first = toSubmit[0]?.template.ipTemplateID;
+  return {
+    results: results as SaveResultDto[],
+    ...(first !== undefined ? { templateId: first } : {}),
+  };
 }

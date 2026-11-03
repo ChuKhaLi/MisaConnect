@@ -1,1 +1,43 @@
-{"RefID":"22222222-2222-2222-2222-222222222222","InvoiceTemplateID":"TPL-1","InvSeries":"1C26TAA","InvDate":"2026-05-11","CreatedDate":"2026-05-11T00:00:00.0000000\u002B00:00","ModifiedDate":"2026-05-11T00:00:00.0000000\u002B00:00","CurrencyCode":"VND","ExchangeRate":1,"PaymentMethod":"TM","AccountObjectName":"Kh\u00E1ch h\u00E0ng c\u00E1 nh\u00E2n","TotalSaleAmountOC":100000,"TotalSaleAmount":100000,"TotalDiscountAmountOC":0,"TotalDiscountAmount":0,"TotalAmountWithoutVATOC":100000,"TotalAmountWithoutVAT":100000,"TotalVATAmountOC":0,"TotalVATAmount":0,"TotalAmountOC":100000,"TotalAmount":100000,"TotalAmountInWords":"M\u1ED9t tr\u0103m ngh\u00ECn \u0111\u1ED3ng ch\u1EB5n","EInvoiceStatus":"1","InvoiceDetails":[{"InventoryItemType":0,"SortOrder":1,"SortOrderView":1,"Description":"H\u00E0ng h\u00F3a c\u00E1 nh\u00E2n","UnitName":"C\u00E1i","Quantity":1,"UnitPrice":100000,"AmountOC":100000,"Amount":100000,"AmountWithoutVATOC":100000,"AmountWithoutVAT":100000,"VATAmountOC":0,"VATAmount":0,"VATRateName":"0%","VATRate":0}]}
+{
+  "RefID": "22222222-2222-2222-2222-222222222222",
+  "InvoiceTemplateID": "TPL-1",
+  "InvSeries": "1C26TAA",
+  "InvDate": "2026-05-11",
+  "CreatedDate": "2026-05-11T00:00:00.0000000\u002B00:00",
+  "ModifiedDate": "2026-05-11T00:00:00.0000000\u002B00:00",
+  "CurrencyCode": "VND",
+  "ExchangeRate": 1,
+  "PaymentMethod": "TM",
+  "AccountObjectName": "Kh\u00E1ch h\u00E0ng c\u00E1 nh\u00E2n",
+  "TotalSaleAmountOC": 100000,
+  "TotalSaleAmount": 100000,
+  "TotalDiscountAmountOC": 0,
+  "TotalDiscountAmount": 0,
+  "TotalAmountWithoutVATOC": 100000,
+  "TotalAmountWithoutVAT": 100000,
+  "TotalVATAmountOC": 0,
+  "TotalVATAmount": 0,
+  "TotalAmountOC": 100000,
+  "TotalAmount": 100000,
+  "TotalAmountInWords": "M\u1ED9t tr\u0103m ngh\u00ECn \u0111\u1ED3ng ch\u1EB5n",
+  "EInvoiceStatus": "1",
+  "InvoiceDetails": [
+    {
+      "InventoryItemType": 0,
+      "SortOrder": 1,
+      "SortOrderView": 1,
+      "Description": "H\u00E0ng h\u00F3a c\u00E1 nh\u00E2n",
+      "UnitName": "C\u00E1i",
+      "Quantity": 1,
+      "UnitPrice": 100000,
+      "AmountOC": 100000,
+      "Amount": 100000,
+      "AmountWithoutVATOC": 100000,
+      "AmountWithoutVAT": 100000,
+      "VATAmountOC": 0,
+      "VATAmount": 0,
+      "VATRateName": "0%",
+      "VATRate": 0
+    }
+  ]
+}

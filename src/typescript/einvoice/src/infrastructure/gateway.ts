@@ -85,12 +85,12 @@ export function createMeInvoiceGateway(
       return decodeBase64(envelope.data, refId);
     },
 
-    async insertInvoices(items, template, withCode, opts) {
+    async insertInvoices(items, withCode, opts) {
       const envelope = await transport.request<unknown>(
         'POST',
         Routes.Insert,
         { invoiceWithCode: flag(withCode) },
-        items.map((i) => toWireInvoice(i.invoice, i.refId, template)),
+        items.map((i) => toWireInvoice(i.invoice, i.refId, i.template)),
         opts,
       );
 

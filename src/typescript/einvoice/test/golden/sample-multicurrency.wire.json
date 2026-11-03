@@ -1,1 +1,44 @@
-{"RefID":"33333333-3333-3333-3333-333333333333","InvoiceTemplateID":"TPL-1","InvSeries":"1C26TAA","InvDate":"2026-05-11","CreatedDate":"2026-05-11T00:00:00.0000000\u002B00:00","ModifiedDate":"2026-05-11T00:00:00.0000000\u002B00:00","CurrencyCode":"USD","ExchangeRate":25000,"PaymentMethod":"TM","AccountObjectName":"C\u00F4ng ty TNHH Mua h\u00E0ng","AccountObjectTaxCode":"0123456789","TotalSaleAmountOC":100,"TotalSaleAmount":2500000,"TotalDiscountAmountOC":0,"TotalDiscountAmount":0,"TotalAmountWithoutVATOC":100,"TotalAmountWithoutVAT":2500000,"TotalVATAmountOC":10,"TotalVATAmount":250000,"TotalAmountOC":110,"TotalAmount":2750000,"TotalAmountInWords":"One hundred ten US dollars only","EInvoiceStatus":"1","InvoiceDetails":[{"InventoryItemType":0,"SortOrder":1,"SortOrderView":1,"Description":"Export service","UnitName":"L\u1EA7n","Quantity":1,"UnitPrice":100,"AmountOC":100,"Amount":2500000,"AmountWithoutVATOC":100,"AmountWithoutVAT":2500000,"VATAmountOC":10,"VATAmount":250000,"VATRateName":"10%","VATRate":10}]}
+{
+  "RefID": "33333333-3333-3333-3333-333333333333",
+  "InvoiceTemplateID": "TPL-1",
+  "InvSeries": "1C26TAA",
+  "InvDate": "2026-05-11",
+  "CreatedDate": "2026-05-11T00:00:00.0000000\u002B00:00",
+  "ModifiedDate": "2026-05-11T00:00:00.0000000\u002B00:00",
+  "CurrencyCode": "USD",
+  "ExchangeRate": 25000,
+  "PaymentMethod": "TM",
+  "AccountObjectName": "C\u00F4ng ty TNHH Mua h\u00E0ng",
+  "AccountObjectTaxCode": "0123456789",
+  "TotalSaleAmountOC": 100,
+  "TotalSaleAmount": 2500000,
+  "TotalDiscountAmountOC": 0,
+  "TotalDiscountAmount": 0,
+  "TotalAmountWithoutVATOC": 100,
+  "TotalAmountWithoutVAT": 2500000,
+  "TotalVATAmountOC": 10,
+  "TotalVATAmount": 250000,
+  "TotalAmountOC": 110,
+  "TotalAmount": 2750000,
+  "TotalAmountInWords": "One hundred ten US dollars only",
+  "EInvoiceStatus": "1",
+  "InvoiceDetails": [
+    {
+      "InventoryItemType": 0,
+      "SortOrder": 1,
+      "SortOrderView": 1,
+      "Description": "Export service",
+      "UnitName": "L\u1EA7n",
+      "Quantity": 1,
+      "UnitPrice": 100,
+      "AmountOC": 100,
+      "Amount": 2500000,
+      "AmountWithoutVATOC": 100,
+      "AmountWithoutVAT": 2500000,
+      "VATAmountOC": 10,
+      "VATAmount": 250000,
+      "VATRateName": "10%",
+      "VATRate": 10
+    }
+  ]
+}

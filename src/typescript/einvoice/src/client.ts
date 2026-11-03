@@ -128,8 +128,6 @@ export function createMisaEInvoiceClient(options: MisaEInvoiceOptions): IMisaEIn
         (invoices ?? []).map((i) => i?.refId).filter((r): r is string => !!r),
       );
       if (label !== undefined) ctx.refId = label;
-      const tpl = invoices?.[0]?.template?.ipTemplateID;
-      if (tpl) ctx.templateId = tpl;
       return run('SaveDraft', opts, ctx, async () => {
         const result = await saveDraftInvoices(
           {
@@ -144,7 +142,7 @@ export function createMisaEInvoiceClient(options: MisaEInvoiceOptions): IMisaEIn
         );
         const sent = refIdLabel(result.results.map((r) => r.refId));
         if (sent !== undefined) ctx.refId = sent;
-        ctx.templateId = result.template.ipTemplateID;
+        if (result.templateId !== undefined) ctx.templateId = result.templateId;
         return result.results;
       });
     },

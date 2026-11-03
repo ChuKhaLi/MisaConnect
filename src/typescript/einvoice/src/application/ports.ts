@@ -102,8 +102,7 @@ export interface MeInvoiceGateway {
    * A RefID MISA does not echo yields `MisaUnknown` / `NoEchoedResult`.
    */
   insertInvoices(
-    items: readonly { invoice: InvoiceDto; refId: string }[],
-    template: TemplateDto,
+    items: readonly { invoice: InvoiceDto; refId: string; template: TemplateDto }[],
     withCode: boolean,
     opts?: GatewayCallOptions,
   ): Promise<InsertOutcome[]>;
