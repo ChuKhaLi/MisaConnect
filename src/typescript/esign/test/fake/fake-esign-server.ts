@@ -57,6 +57,8 @@ export interface FakeESignServer {
   scenario: FakeScenario;
   /** `AuthorizationRM` header (without "Bearer ") last seen on the certificates endpoint. */
   lastCertificatesBearer: string | undefined;
+  /** Restores every scenario default and clears once-only consumed flags and status poll counts. */
+  resetScenario(): void;
   close(): Promise<void>;
 }
 
@@ -273,12 +275,40 @@ export async function startFakeESignServer(): Promise<FakeESignServer> {
   const statusCalls = new Map<string, number>();
   let login122Consumed = false;
   let certs401Consumed = false;
+  // Setting a once-only scenario flag (again) re-arms it.
+  let login2fa = false;
+  let certs401 = false;
+  Object.defineProperties(scenario, {
+    loginRequires2FAOnFirstCall: {
+      enumerable: true,
+      get: () => login2fa,
+      set: (v: boolean) => {
+        login2fa = v;
+        login122Consumed = false;
+      },
+    },
+    certsForce401Once: {
+      enumerable: true,
+      get: () => certs401,
+      set: (v: boolean) => {
+        certs401 = v;
+        certs401Consumed = false;
+      },
+    },
+  });
 
   const fake: FakeESignServer = {
     baseUrl: '',
     requests,
     scenario,
     lastCertificatesBearer: undefined,
+    resetScenario: () => {
+      Object.assign(scenario, defaultScenario());
+      login122Consumed = false;
+      certs401Consumed = false;
+      statusCalls.clear();
+      fake.lastCertificatesBearer = undefined;
+    },
     close: () => Promise.resolve(),
   };
 
@@ -404,6 +434,7 @@ export async function startFakeESignServer(): Promise<FakeESignServer> {
         sendJson(res, scenario.signHashStatus, '');
         return;
       }
+      statusCalls.delete('tx-fake-1'); // every new sign flow starts at poll 1
       sendJson(res, 200, { transactionId: 'tx-fake-1' });
       return;
     }

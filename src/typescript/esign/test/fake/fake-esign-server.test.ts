@@ -19,14 +19,7 @@ afterAll(async () => {
 });
 beforeEach(() => {
   fake.requests.length = 0;
-  Object.assign(fake.scenario, {
-    loginAlways401: false,
-    certsEmptyArray200: false,
-    statusCancelled: false,
-    pendingsBeforeSuccess: 1,
-    signHashStatus: undefined,
-    hashRejectionForFormat: undefined,
-  });
+  fake.resetScenario();
 });
 
 const post = (path: string, body: unknown) =>
@@ -130,5 +123,59 @@ describe('fake eSign server', () => {
     const res = await postWebhook(echo.baseUrl + '/hook', body);
     expect(res.status).toBe(404);
     expect(echo.requests.at(-1)?.bodyText).toContain('"transactionId":"tx"');
+  });
+
+  const SIGN = '/external/esrm/service/signing/api/v1/Signing/hash';
+  const statusOf = async (tx: string) =>
+    (
+      (await (
+        await fetch(`${fake.baseUrl}/external/esrm/service/signing/api/v1/Signing/status/${tx}`)
+      ).json()) as { status: string }
+    ).status;
+
+  it('each sign flow starts at poll 1', async () => {
+    for (let i = 0; i < 2; i++) {
+      const tx = ((await (await post(SIGN, {})).json()) as { transactionId: string }).transactionId;
+      expect(await statusOf(tx)).toBe('PENDING');
+      expect(await statusOf(tx)).toBe('SUCCESS');
+    }
+  });
+
+  it('once-only scenarios re-arm when set again and on reset', async () => {
+    const login = () => post('/api/auth/api/v1/auth/login-api', {});
+    const isChallenge = async () =>
+      ((await (await login()).json()) as { status: { errorCode?: string } }).status.errorCode ===
+      '122';
+    fake.scenario.loginRequires2FAOnFirstCall = true;
+    expect(await isChallenge()).toBe(true);
+    expect(await isChallenge()).toBe(false);
+    fake.scenario.loginRequires2FAOnFirstCall = true;
+    expect(await isChallenge()).toBe(true);
+    fake.resetScenario();
+    expect(await isChallenge()).toBe(false);
+
+    const certs = () =>
+      fetch(`${fake.baseUrl}/external/esrm/service/general/api/v1/Certificates/by-userId`);
+    fake.scenario.certsForce401Once = true;
+    expect((await certs()).status).toBe(401);
+    expect((await certs()).status).toBe(200);
+    fake.scenario.certsForce401Once = true;
+    expect((await certs()).status).toBe(401);
+  });
+
+  it('covers cancelled, empty certs and resend modes', async () => {
+    fake.scenario.statusCancelled = true;
+    expect(await statusOf('tx-c')).toBe('CANCELLED');
+    fake.scenario.certsEmptyArray200 = true;
+    const certs = await fetch(
+      `${fake.baseUrl}/external/esrm/service/general/api/v1/Certificates/by-userId`,
+    );
+    expect(await certs.json()).toEqual([]);
+    const resend = '/webdev/api/auth/api/v1/auth/resend-otp-auth';
+    fake.scenario.resendMode = 'typedFailure200';
+    const t = (await (await post(resend, {})).json()) as { status: { errorCode: string } };
+    expect(t.status.errorCode).toBe('RateLimited');
+    fake.scenario.resendMode = 'transport500';
+    expect((await post(resend, {})).status).toBe(500);
   });
 });
