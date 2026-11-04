@@ -5,6 +5,7 @@ import type {
   WebhookOutcomeDto,
 } from '../domain/dtos.js';
 import type { DocumentFormat, OtpDeliveryChannel } from '../domain/enums.js';
+import type { HashOutput } from './hash-output.js';
 
 export interface Logger {
   debug(message: string, fields?: Record<string, unknown>): void;
@@ -57,14 +58,20 @@ export type MisaCredentialsProvider = (ctx: {
   signal?: AbortSignal;
 }) => MisaCredentials | Promise<MisaCredentials>;
 
+/**
+ * One webhook-mode signing transaction, registered by `beginSign*` after `Signing/hash`. Plain JSON
+ * data: a shared store may serialize it as is. Holds the caller's `clientId` and `userName` only,
+ * never `clientKey` or `password`.
+ */
 export interface SigningSession {
   clientId: string;
   userName: string;
   transactionId: string;
   format: Exclude<DocumentFormat, 'Unknown'>;
-  /** Per-format hash output, JSON-serializable; narrowed by the signing use cases. */
-  hash: unknown;
+  /** Per-format `documents/hash` output, needed to attach the signature on finalize. */
+  hash: HashOutput;
   recordedDocumentIds: string[];
+  /** ISO-8601 UTC instant; the session expires at `createdAt + ttlMs`. */
   createdAt: string;
   ttlMs: number;
   observedMessageIds: string[];
@@ -72,6 +79,12 @@ export interface SigningSession {
   cachedSuccess?: { ack: WebhookAckDto; signed: string };
 }
 
+/**
+ * Webhook session store, keyed by (clientId, transactionId). The default is in-memory and
+ * process-local: hosts running several instances behind a load balancer must supply a shared
+ * store. `withFinalizeLock` serializes finalizers of one transaction (across instances for a
+ * shared store) and throws `UnknownTransactionException` when no session exists.
+ */
 export interface SigningSessionStore {
   register(s: SigningSession): Promise<void>;
   get(clientId: string, transactionId: string): Promise<SigningSession | undefined>;

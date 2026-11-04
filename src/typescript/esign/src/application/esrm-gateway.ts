@@ -52,6 +52,7 @@ export interface EsrmGateway {
     cert: Certificate,
     hash: HashOutput,
     signature: string,
-    request: NormalizedSignRequest,
+    /** Unused by the current builders; absent on webhook finalize (the request is not stored). */
+    request?: NormalizedSignRequest,
   ): Promise<Uint8Array>;
 }

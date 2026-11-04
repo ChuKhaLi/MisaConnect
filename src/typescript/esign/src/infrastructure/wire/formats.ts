@@ -26,7 +26,7 @@ export interface FormatSpec {
     cert: Certificate,
     hash: HashOutput,
     signature: string,
-    n: NormalizedSignRequest,
+    n?: NormalizedSignRequest,
   ): object;
   parseAttach(json: unknown, ctx: WireContext): Uint8Array;
 }

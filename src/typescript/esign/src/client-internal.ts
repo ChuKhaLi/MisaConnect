@@ -8,8 +8,11 @@ import {
   type SignDocumentDeps,
   type SignDocumentResult,
 } from './application/use-cases/sign-document.js';
+import { beginSign } from './application/use-cases/begin-sign.js';
+import { finalizeFromWebhook } from './application/use-cases/finalize-webhook.js';
+import { handleWebhook } from './application/use-cases/handle-webhook.js';
 import { requireOtpCode, withTransparentOtp } from './application/use-cases/two-factor.js';
-import type { MisaCredentials } from './domain/dtos.js';
+import type { BeginResultDto, MisaCredentials } from './domain/dtos.js';
 import { AuthenticationFailedException, ESignGeneralException } from './domain/errors.js';
 import type { CallOptions, IMisaESignClient } from './client.js';
 import {
@@ -24,9 +27,11 @@ import {
   validateOptions,
   type MisaESignOptions,
 } from './infrastructure/options.js';
+import { createInMemorySigningSessionStore } from './infrastructure/in-memory-session-store.js';
+import { noopLogger, safeLogger } from './infrastructure/logging.js';
 import { createTransport, type TransportDeps } from './infrastructure/transport.js';
 import { createDefaultTokenManager } from './infrastructure/wire/auth.js';
-import { encodeBase64 } from './infrastructure/wire/base64.js';
+import { decodeBase64, encodeBase64 } from './infrastructure/wire/base64.js';
 import { createEsrmGateway } from './infrastructure/wire/esrm.js';
 
 /** Test seams; never reachable from the public factory. */
@@ -76,6 +81,11 @@ export function createMisaESignClientInternal(
     newDocumentId: deps.newId,
   };
   const mode = resolved.webhook.mode;
+  const logger = safeLogger(resolved.logger ?? noopLogger);
+  // Webhook sessions: one store per client (in-memory default is process-local).
+  const sessionStore =
+    resolved.signingSessionStore ?? createInMemorySigningSessionStore(signDeps.clock);
+  const deliveryHook = resolved.webhookDeliveryHook ?? ((): void => undefined);
 
   const correlationIdOf = (opts?: CallOptions): string =>
     opts?.correlationId ??
@@ -86,16 +96,6 @@ export function createMisaESignClientInternal(
   const modeError = (rawCode: string, detail: string, correlationId: string, format: SignFormat) =>
     new ESignGeneralException({ category: 'Validation', rawCode, detail, correlationId, format });
 
-  const notImplemented = (method: string, opts?: CallOptions): Promise<never> =>
-    Promise.reject(
-      new ESignGeneralException({
-        category: 'MisaUnknown',
-        rawCode: 'NotImplemented',
-        detail: `${method} is not implemented yet.`,
-        correlationId: correlationIdOf(opts),
-      }),
-    );
-
   /** Explicit-mode state: principals (see `principalOf`) with a 2FA challenge pending. */
   const pendingChallenges = new Set<string>();
 
@@ -103,8 +103,7 @@ export function createMisaESignClientInternal(
    * Runs one authenticated operation with the client's 2FA policy: with an `otpProvider` the
    * challenge is answered transparently (the whole operation is retried once); without one the
    * challenge is recorded for this caller's principal and propagates. A success clears only this
-   * principal's entry. HOOK POINT: Task 11's `beginSign*` must run its authenticated work through
-   * this function too.
+   * principal's entry. `sign*`, `beginSign*` and the webhook finalize all run through it.
    */
   async function withTwoFactor<T>(
     credentials: MisaCredentials,
@@ -187,16 +186,82 @@ export function createMisaESignClientInternal(
     );
   }
 
-  async function begin(format: SignFormat, opts: CallOptions | undefined): Promise<never> {
+  async function begin<F extends SignFormat>(
+    format: F,
+    dto: SignRequestDtoByFormat[F],
+    opts: CallOptions | undefined,
+  ): Promise<BeginResultDto> {
+    const correlationId = correlationIdOf(opts);
     if (mode === 'polling') {
       throw modeError(
         'PollingModeOnly',
         `beginSign${format} is unavailable when webhook.mode is 'polling'; use sign${format}.`,
-        correlationIdOf(opts),
+        correlationId,
         format,
       );
     }
-    return notImplemented(`beginSign${format}`, opts);
+    const signal = opts?.signal;
+    signal?.throwIfAborted();
+    const credentials = await resolveCredentials(
+      resolved,
+      { correlationId, ...(signal === undefined ? {} : { signal }) },
+      opts?.credentials,
+    );
+    return beginSign(
+      {
+        ...signDeps,
+        store: sessionStore,
+        sessionTtlMs: resolved.webhook.sessionTtlMs,
+        withTwoFactor: (operation) => withTwoFactor(credentials, correlationId, signal, operation),
+      },
+      format,
+      dto,
+      { credentials, correlationId, signal },
+    );
+  }
+
+  /**
+   * Finalize has no caller context: the session's principal is resolved again — a provider is
+   * called with the session's `{ clientId, userName }`, static credentials are used as is, and a
+   * per-call `opts.credentials` on `handleWebhook` wins. The finalize use case rejects credentials
+   * that are not the session's principal.
+   */
+  async function handle(body: unknown, opts: CallOptions | undefined) {
+    const correlationId = correlationIdOf(opts);
+    const signal = opts?.signal;
+    const ctx = { correlationId, ...(signal === undefined ? {} : { signal }) };
+    return handleWebhook(
+      {
+        store: sessionStore,
+        hook: deliveryHook,
+        decodeBase64,
+        logger,
+        finalize: (envelope, c) =>
+          finalizeFromWebhook(
+            {
+              store: sessionStore,
+              gateway: signDeps.gateway,
+              tokens,
+              selectCertificate: signDeps.selectCertificate,
+              encodeBase64,
+              decodeBase64,
+              hook: deliveryHook,
+              credentialsFor: (session) =>
+                resolveCredentials(
+                  resolved,
+                  { ...ctx, clientId: session.clientId, userName: session.userName },
+                  opts?.credentials,
+                ),
+              withTwoFactor: (credentials, operation) =>
+                withTwoFactor(credentials, correlationId, signal, operation),
+            },
+            envelope,
+            c,
+          ),
+      },
+      body,
+      ctx,
+    );
   }
 
   const base = (r: SignDocumentResult) => ({
@@ -223,7 +288,6 @@ export function createMisaESignClientInternal(
       return { signedExcel: r.signed, ...base(r), format: 'Excel' };
     },
 
-    // Task 10 replaces these.
     signInWithOtp: async (code, otpType, remember, opts) => {
       const correlationId = correlationIdOf(opts);
       const { credentials, ctx } = await pendingCredentials(opts, correlationId);
@@ -236,11 +300,10 @@ export function createMisaESignClientInternal(
       return tokens.resendOtp(credentials, language || resolved.otp.defaultResendLanguage, ctx);
     },
 
-    // Task 11 replaces these.
-    beginSignPdf: (_request, opts) => begin('Pdf', opts),
-    beginSignXml: (_request, opts) => begin('Xml', opts),
-    beginSignWord: (_request, opts) => begin('Word', opts),
-    beginSignExcel: (_request, opts) => begin('Excel', opts),
-    handleWebhook: (_envelope, opts) => notImplemented('handleWebhook', opts),
+    beginSignPdf: (request, opts) => begin('Pdf', request, opts),
+    beginSignXml: (request, opts) => begin('Xml', request, opts),
+    beginSignWord: (request, opts) => begin('Word', request, opts),
+    beginSignExcel: (request, opts) => begin('Excel', request, opts),
+    handleWebhook: (envelope, opts) => handle(envelope, opts),
   };
 }

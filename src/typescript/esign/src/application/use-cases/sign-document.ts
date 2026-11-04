@@ -1,8 +1,10 @@
-import type { MisaCredentials } from '../../domain/dtos.js';
+import type { Certificate, MisaCredentials } from '../../domain/dtos.js';
 import type { EsrmCall, EsrmGateway } from '../esrm-gateway.js';
+import type { HashOutput } from '../hash-output.js';
 import {
   toNormalized,
   type Base64Encoder,
+  type NormalizedSignRequest,
   type SignFormat,
   type SignRequestDtoByFormat,
 } from '../mapping/sign-request-mapper.js';
@@ -39,32 +41,51 @@ export interface SignDocumentResult {
   completedAtUtc: string;
 }
 
+/** Runs one ESRM call under `withAuth` (401 → re-authenticate once and re-send that call only). */
+export type EsrmRunner = <T>(fn: (call: EsrmCall, userId: string) => Promise<T>) => Promise<T>;
+
+export function esrmRunner(tokens: TokenManager, format: SignFormat, ctx: SignContext): EsrmRunner {
+  const { credentials, correlationId, signal } = ctx;
+  const authCtx = { correlationId, signal };
+  return (fn) =>
+    tokens.withAuth(credentials, authCtx, (bearer, userId) =>
+      fn({ credentials, bearer, correlationId, signal, format }, userId),
+    );
+}
+
+/** Dependencies of the part of the flow shared by `sign*` and `beginSign*`. */
+export type StartSigningDeps = Pick<
+  SignDocumentDeps,
+  'gateway' | 'tokens' | 'selectCertificate' | 'encodeBase64' | 'newDocumentId'
+>;
+
+export interface StartedSigning {
+  request: NormalizedSignRequest;
+  cert: Certificate;
+  hash: HashOutput;
+  transactionId: string;
+  esrm: EsrmRunner;
+}
+
 /**
- * Polling sign flow (INV §2.4): validate → token → certificates → select → hash → Signing/hash →
- * poll → attach. Each ESRM call runs under `withAuth`, so a 401 re-authenticates and re-sends only
- * that call, and every later call uses the renewed token (design §9.1).
+ * validate → token → certificates → select → hash → `Signing/hash`. Shared by the polling flow
+ * (which then polls and attaches) and `beginSign*` (which registers a webhook session).
  */
-export async function signDocument<F extends SignFormat>(
-  deps: SignDocumentDeps,
+export async function startSigning<F extends SignFormat>(
+  deps: StartSigningDeps,
   format: F,
   dto: SignRequestDtoByFormat[F],
   ctx: SignContext,
-): Promise<SignDocumentResult> {
-  const { correlationId, signal, credentials } = ctx;
-  validateSignRequest(format, dto, correlationId);
-  signal?.throwIfAborted();
+): Promise<StartedSigning> {
+  validateSignRequest(format, dto, ctx.correlationId);
+  ctx.signal?.throwIfAborted();
 
   const withId =
     deps.newDocumentId !== undefined && !dto.documentId
       ? { ...dto, documentId: deps.newDocumentId() }
       : dto;
   const request = toNormalized(format, withId, deps.encodeBase64);
-
-  const authCtx = { correlationId, signal };
-  const esrm = <T>(fn: (call: EsrmCall, userId: string) => Promise<T>): Promise<T> =>
-    deps.tokens.withAuth(credentials, authCtx, (bearer, userId) =>
-      fn({ credentials, bearer, correlationId, signal, format }, userId),
-    );
+  const esrm = esrmRunner(deps.tokens, format, ctx);
 
   const certificates = await esrm((call) => listActiveCertificates(deps.gateway, call));
   const cert = await deps.selectCertificate(certificates);
@@ -79,6 +100,22 @@ export async function signDocument<F extends SignFormat>(
       documentName: request.documentName,
     }),
   );
+  return { request, cert, hash, transactionId, esrm };
+}
+
+/**
+ * Polling sign flow (INV §2.4): validate → token → certificates → select → hash → Signing/hash →
+ * poll → attach. Each ESRM call runs under `withAuth`, so a 401 re-authenticates and re-sends only
+ * that call, and every later call uses the renewed token (design §9.1).
+ */
+export async function signDocument<F extends SignFormat>(
+  deps: SignDocumentDeps,
+  format: F,
+  dto: SignRequestDtoByFormat[F],
+  ctx: SignContext,
+): Promise<SignDocumentResult> {
+  const { correlationId, signal } = ctx;
+  const { request, cert, hash, transactionId, esrm } = await startSigning(deps, format, dto, ctx);
   const snapshot = await pollSignStatus(
     {
       getStatus: (tx) => esrm((call) => deps.gateway.status(call, tx)),
