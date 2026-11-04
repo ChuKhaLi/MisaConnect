@@ -11,7 +11,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Record the baseline: run `dotnet build MisaConnect.slnx`, `dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests`, `dotnet test tests/dotnet/MisaConnect.EInvoice.IntegrationTests` and note pass/skip counts in this file under "Baseline" (expected from the handoff: Unit 315/315; Integration 69 passed / 27 skipped)
+- [x] T001 Record the baseline: run `dotnet build MisaConnect.slnx`, `dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests`, `dotnet test tests/dotnet/MisaConnect.EInvoice.IntegrationTests` and note pass/skip counts in this file under "Baseline" (expected from the handoff: Unit 315/315; Integration 69 passed / 27 skipped)
 
 ## Phase 2: Foundational
 
@@ -24,8 +24,8 @@ None — no shared prerequisite. (Factory test placement resolved in research R1
 **Goal**: `MisaEInvoiceClientFactory.Create(options)` carries every option, including `Delete`.
 **Independent Test**: reflection round-trip test passes; deleting any copy line makes it fail.
 
-- [ ] T002 [US1] Write failing test `tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Client/ClientFactoryOptionsRoundTripTests.cs`: build a source `MisaEInvoiceOptions` with every public settable property (recursing into nested option classes such as `MisaEInvoiceDeleteOptions`) set to a non-default value via reflection (strings → unique text, bools → true, enums → a non-default member), call `MisaEInvoiceClientFactory.CopyTo(source, target)` on a fresh target, and assert every leaf property equal; also assert `target.Delete` is not the same reference as `source.Delete`. Add a second fact that `Create(options)` with `Delete.IncludeRawErrorMessage = true` resolves `IOptions<MisaEInvoiceOptions>` with the flag true — if `IMisaEInvoiceClient` gives no route to the provider, cover this through `CopyTo` only and note it in the test comment
-- [ ] T003 [US1] Fix `src/dotnet/MisaConnect.EInvoice.Client/MisaEInvoiceClientFactory.cs`: extract `internal static void CopyTo(MisaEInvoiceOptions source, MisaEInvoiceOptions target)` copying all six top-level settings plus `target.Delete = new MisaEInvoiceDeleteOptions { IncludeRawErrorMessage = source.Delete.IncludeRawErrorMessage }`; `Create(options)` calls `Create(target => CopyTo(options, target))`. Run T002 → green
+- [x] T002 [US1] Write failing test `tests/dotnet/MisaConnect.EInvoice.IntegrationTests/Client/ClientFactoryOptionsRoundTripTests.cs`: build a source `MisaEInvoiceOptions` with every public settable property (recursing into nested option classes such as `MisaEInvoiceDeleteOptions`) set to a non-default value via reflection (strings → unique text, bools → true, enums → a non-default member), call `MisaEInvoiceClientFactory.CopyTo(source, target)` on a fresh target, and assert every leaf property equal; also assert `target.Delete` is not the same reference as `source.Delete`. Add a second fact that `Create(options)` with `Delete.IncludeRawErrorMessage = true` resolves `IOptions<MisaEInvoiceOptions>` with the flag true — if `IMisaEInvoiceClient` gives no route to the provider, cover this through `CopyTo` only and note it in the test comment
+- [x] T003 [US1] Fix `src/dotnet/MisaConnect.EInvoice.Client/MisaEInvoiceClientFactory.cs`: extract `internal static void CopyTo(MisaEInvoiceOptions source, MisaEInvoiceOptions target)` copying all six top-level settings plus `target.Delete = new MisaEInvoiceDeleteOptions { IncludeRawErrorMessage = source.Delete.IncludeRawErrorMessage }`; `Create(options)` calls `Create(target => CopyTo(options, target))`. Run T002 → green
 
 **Checkpoint**: US1 complete; FR-001, FR-002, SC-001.
 
@@ -95,4 +95,5 @@ MVP = US1 + US2 (both P1). US3 is the behaviour change and ships in the same rel
 
 ## Baseline
 
-_(filled by T001 / T017)_
+- T001 (2026-11-04, Debug): build 0 warnings; EInvoice.UnitTests 315/315; EInvoice.IntegrationTests 69 passed / 27 skipped.
+- T017: _(pending)_
