@@ -51,7 +51,12 @@ function setup(steps: Step[], over: Partial<ResolvedESignOptions> = {}) {
   return { transport, calls, delays, logs };
 }
 
-const base = { method: 'POST' as const, credentials: creds, correlationId: 'corr-1' };
+const base = {
+  method: 'POST' as const,
+  credentials: creds,
+  correlationId: 'corr-1',
+  expectJson: false,
+};
 const net = (code: string): Error => Object.assign(new Error('net'), { code });
 
 describe('transport', () => {
@@ -213,8 +218,9 @@ describe('transport', () => {
     expect((err as ESignTransportException).attemptCount).toBe(2);
   });
 
-  it('rejects HTML 200 with UnexpectedContentType', async () => {
-    const html = new Response('<html><body>oops</body></html>', {
+  it('rejects HTML 200 with UnexpectedContentType, reporting only the body length', async () => {
+    const body = '<html><body>oops SECRET-TOKEN-abc123</body></html>';
+    const html = new Response(body, {
       status: 200,
       headers: { 'content-type': 'text/html' },
     });
@@ -226,9 +232,50 @@ describe('transport', () => {
     const e = err as ESignGeneralException;
     expect(e.category).toBe('MisaUnknown');
     expect(e.rawCode).toBe('UnexpectedContentType');
-    expect(e.detail).toContain('<html');
+    expect(e.detail).toContain(`body length ${body.length}`);
     expect(e.detail).toContain('Certificates/by-userId');
     expect(e.detail).toContain('text/html');
+    expect(e.message).not.toContain('SECRET-TOKEN-abc123');
+    expect(e.message).not.toContain('<html');
+    expect(e.detail).not.toContain('SECRET-TOKEN-abc123');
+  });
+
+  it.each(['login', 'twoFactor', 'refresh'] as const)(
+    '%s parses a JSON body whatever the content type',
+    async (route) => {
+      const res = new Response('{"accessToken":"AT-SECRET-1"}', {
+        status: 200,
+        headers: { 'content-type': 'text/plain' },
+      });
+      const { transport } = setup([res]);
+      const r = await transport.send({ ...base, route, expectJson: true });
+      expect(r.json).toEqual({ accessToken: 'AT-SECRET-1' });
+    },
+  );
+
+  it('resendOtp parses a JSON body whatever the content type', async () => {
+    const res = new Response('{"error":false}', {
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+    });
+    const { transport } = setup([res]);
+    const r = await transport.send({ ...base, route: 'resendOtp', expectJson: false });
+    expect(r.json).toEqual({ error: false });
+  });
+
+  it('auth route with an unparseable non-JSON body throws UnparseableResponse without the body', async () => {
+    const res = new Response('accessToken=AT-SECRET-2; not json', {
+      status: 200,
+      headers: { 'content-type': 'text/plain' },
+    });
+    const { transport } = setup([res]);
+    const err = await transport
+      .send({ ...base, route: 'login', expectJson: true })
+      .catch((e: unknown) => e);
+    const e = err as ESignGeneralException;
+    expect(e).toBeInstanceOf(ESignGeneralException);
+    expect(e.rawCode).toBe('UnparseableResponse');
+    expect(e.message).not.toContain('AT-SECRET-2');
   });
 
   it.each(['', '   '])(

@@ -302,14 +302,16 @@ describe('handleWebhook terminal and validation outcomes', () => {
       categoryName: 'UnknownTransaction',
       correlationId: 'corr-u',
     });
-    expect(delivered).toEqual([r.outcome]);
+    // R12: validation failures are returned, never delivered to the hook.
+    expect(delivered).toEqual([]);
   });
 
   it('an envelope clientId with no session for the transaction → webhook.unknown_transaction', async () => {
-    const { client } = makeClient();
+    const { client, delivered } = makeClient();
     await client.beginSignPdf(pdf);
     const r = await client.handleWebhook(success({ clientId: 'someone-else' }));
     expect(r.ack.errorCode).toBe('webhook.unknown_transaction');
+    expect(delivered).toEqual([]);
     expect(attachments()).toBe(0);
   });
 
@@ -338,12 +340,12 @@ describe('handleWebhook terminal and validation outcomes', () => {
       categoryName: 'ClientIdMismatch',
       correlationId: 'corr-c',
     });
-    expect(delivered).toEqual([r.outcome]);
+    expect(delivered).toEqual([]);
     expect(attachments()).toBe(0);
   });
 
   it('foreign documentId → webhook.document_id_mismatch', async () => {
-    const { client } = makeClient();
+    const { client, delivered } = makeClient();
     await client.beginSignPdf(pdf);
     const r = await client.handleWebhook(
       success({ signatures: [{ documentId: 'doc-evil', signature: 'SIG' }] }),
@@ -359,11 +361,12 @@ describe('handleWebhook terminal and validation outcomes', () => {
       format: 'Pdf',
       categoryName: 'DocumentIdMismatch',
     });
+    expect(delivered).toEqual([]);
     expect(attachments()).toBe(0);
   });
 
   it('SUCCESS with empty signatures → webhook.incomplete_success', async () => {
-    const { client } = makeClient();
+    const { client, delivered } = makeClient();
     await client.beginSignPdf(pdf);
     const r = await client.handleWebhook(success({ signatures: [] }));
     expect(r.ack).toEqual({
@@ -376,6 +379,7 @@ describe('handleWebhook terminal and validation outcomes', () => {
       format: 'Pdf',
       categoryName: 'IncompleteSuccessEnvelope',
     });
+    expect(delivered).toEqual([]);
     expect(attachments()).toBe(0);
   });
 
@@ -393,24 +397,47 @@ describe('handleWebhook terminal and validation outcomes', () => {
       categoryName: 'MalformedEnvelope',
       correlationId: 'corr-m',
     });
-    expect(delivered).toEqual([r.outcome]);
+    expect(delivered).toEqual([]);
   });
 
   it('a malformed envelope with a string transactionId reports it', async () => {
-    const { client } = makeClient();
+    const { client, delivered } = makeClient();
     const r = await client.handleWebhook(success({ status: 'PENDING' }));
     expect(r.ack.errorCode).toBe('webhook.malformed');
     expect(r.outcome).toMatchObject({ kind: 'FailureWithError', transactionId: TX });
+    expect(delivered).toEqual([]);
   });
 
-  it('a hook error on a validation-failure outcome is swallowed', async () => {
+  it('a validation failure never invokes the hook (R12)', async () => {
+    let calls = 0;
     const { client } = makeClient({
       webhookDeliveryHook: () => {
+        calls++;
         throw new Error('hook down');
       },
     });
-    const r = await client.handleWebhook('x');
-    expect(r.ack.errorCode).toBe('webhook.malformed');
+    await client.beginSignPdf(pdf);
+    const results = [
+      await client.handleWebhook('x'),
+      await client.handleWebhook(success({ transactionId: 'tx-nope' })),
+      await client.handleWebhook(success({ signatures: [] })),
+      await client.handleWebhook(
+        success({ signatures: [{ documentId: 'doc-evil', signature: 'SIG' }] }),
+      ),
+    ];
+    expect(results.map((r) => r.outcome.kind)).toEqual([
+      'FailureWithError',
+      'FailureWithError',
+      'FailureWithError',
+      'FailureWithError',
+    ]);
+    expect(results.map((r) => r.ack.errorCode)).toEqual([
+      'webhook.malformed',
+      'webhook.unknown_transaction',
+      'webhook.incomplete_success',
+      'webhook.document_id_mismatch',
+    ]);
+    expect(calls).toBe(0);
   });
 
   it('a hook error on success propagates (as .NET), and the success stays cached', async () => {

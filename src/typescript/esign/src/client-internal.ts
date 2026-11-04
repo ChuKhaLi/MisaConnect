@@ -45,6 +45,44 @@ export interface InternalClientDeps {
   transport?: TransportDeps;
 }
 
+/** Upper bound on principals with a pending explicit-mode 2FA challenge, per client. */
+export const MAX_PENDING_CHALLENGES = 1000;
+
+/** The pending-challenge principal set: `has` / `add` / `delete`, plus `size` for tests. */
+export interface PendingChallengeSet {
+  has(principal: string): boolean;
+  add(principal: string): void;
+  delete(principal: string): void;
+  readonly size: number;
+}
+
+/**
+ * A principal set capped at `max` entries. `add` moves an existing principal to the newest
+ * position; past the cap the oldest entry is evicted (its owner just gets `NoPendingOtpChallenge`
+ * and signs again), so a stream of distinct principals that never finish 2FA cannot grow it.
+ */
+export function createPendingChallengeSet(max = MAX_PENDING_CHALLENGES): PendingChallengeSet {
+  const entries = new Set<string>();
+  return {
+    has: (p) => entries.has(p),
+    add: (p) => {
+      entries.delete(p);
+      entries.add(p);
+      while (entries.size > max) {
+        const oldest = entries.values().next().value;
+        if (oldest === undefined) break;
+        entries.delete(oldest);
+      }
+    },
+    delete: (p) => {
+      entries.delete(p);
+    },
+    get size() {
+      return entries.size;
+    },
+  };
+}
+
 /**
  * Builds the client. Not exported from the package entry point: `createMisaESignClient` and
  * in-repo tests call it. Options are validated as for the public factory (http is allowed only
@@ -96,8 +134,8 @@ export function createMisaESignClientInternal(
   const modeError = (rawCode: string, detail: string, correlationId: string, format: SignFormat) =>
     new ESignGeneralException({ category: 'Validation', rawCode, detail, correlationId, format });
 
-  /** Explicit-mode state: principals (see `principalOf`) with a 2FA challenge pending. */
-  const pendingChallenges = new Set<string>();
+  /** Explicit-mode state: principals (see `principalOf`) with a 2FA challenge pending (bounded). */
+  const pendingChallenges = createPendingChallengeSet();
 
   /**
    * Runs one authenticated operation with the client's 2FA policy: with an `otpProvider` the
@@ -234,7 +272,6 @@ export function createMisaESignClientInternal(
     return handleWebhook(
       {
         store: sessionStore,
-        hook: deliveryHook,
         logger,
         finalize: (envelope, c) =>
           finalizeFromWebhook(

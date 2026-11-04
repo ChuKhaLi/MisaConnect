@@ -68,6 +68,15 @@ const isBlank = (v: unknown): boolean => typeof v !== 'string' || v.trim() === '
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 const CREDENTIAL_FIELDS = ['clientId', 'clientKey', 'userName', 'password'] as const;
 
+/**
+ * Masks any userinfo in a URL-ish string for error messages: `https://user:pass@host` →
+ * `https://***@host`. Works on unparseable input too, and on a password containing a raw `@`
+ * (everything up to the last `@` before the path is masked).
+ */
+export function redactUserinfo(value: string): string {
+  return value.replace(/^([a-z][a-z0-9+.-]*:\/\/)?[^/?#]*@/i, '$1***@');
+}
+
 export function validateOptions(o: MisaESignOptions): ResolvedESignOptions {
   const failures: string[] = [];
   const environment = o.environment ?? 'sandbox';
@@ -87,13 +96,13 @@ export function validateOptions(o: MisaESignOptions): ResolvedESignOptions {
       url = undefined;
     }
     if (url === undefined) {
-      failures.push(`baseUrl '${o.baseUrl}' must be an absolute URI.`);
+      failures.push(`baseUrl '${redactUserinfo(o.baseUrl)}' must be an absolute URI.`);
     } else if (
       url.protocol !== 'https:' &&
       !(url.protocol === 'http:' && LOOPBACK.has(url.hostname.toLowerCase()))
     ) {
       failures.push(
-        `baseUrl '${o.baseUrl}' must use https (http is allowed only for localhost, 127.0.0.1 and ::1).`,
+        `baseUrl '${redactUserinfo(o.baseUrl)}' must use https (http is allowed only for localhost, 127.0.0.1 and ::1).`,
       );
     }
     if (url !== undefined && (environment === 'sandbox' || environment === 'production')) {

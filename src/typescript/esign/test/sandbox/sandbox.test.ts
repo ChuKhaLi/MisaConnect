@@ -1,9 +1,16 @@
 import { connect } from 'node:net';
-import { describe, expect, it } from 'vitest';
-import { createMisaESignClient, SignXmlRequest, type IMisaESignClient } from '../../src/index.js';
+import { describe, expect, it, type TestContext } from 'vitest';
+import {
+  createMisaESignClient,
+  NoActiveCertificateException,
+  SignXmlRequest,
+  type IMisaESignClient,
+} from '../../src/index.js';
 
 // Opt-in live-sandbox flows (port of the .NET Sandbox/* tests). Skipped unless all five
-// credentials are set AND the sandbox host answers. With MISACONNECT_ESIGN_SANDBOX_REQUIRED=1 a
+// credentials are set AND the sandbox host answers. A sign test that hits
+// NoActiveCertificateException (the sandbox account has no ACTIVE certificate — login and the
+// certificate listing worked) is also skipped. With MISACONNECT_ESIGN_SANDBOX_REQUIRED=1 every
 // skip is a failure instead, so a green job always means the live tests actually ran.
 const PROBE_TIMEOUT_MS = 5000;
 const TEST_TIMEOUT_MS = 120_000;
@@ -96,26 +103,45 @@ function minimalPdf(): Uint8Array {
   return new TextEncoder().encode(out);
 }
 
+/**
+ * Runs a live sign call. NoActiveCertificateException means the account has no ACTIVE
+ * certificate (an account-setup problem, not an SDK defect): skip, unless the run is REQUIRED.
+ */
+async function signOrSkip<T>(ctx: TestContext, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (err) {
+    if (err instanceof NoActiveCertificateException && !required) {
+      ctx.skip(
+        'sandbox account has no ACTIVE certificate (NoActiveCertificate): login and certificate listing worked; set MISACONNECT_ESIGN_SANDBOX_REQUIRED=1 to fail instead',
+      );
+    }
+    throw err;
+  }
+}
+
 describe.runIf(runnable)('MISA eSign sandbox', () => {
   it(
     'signs a PDF',
-    async () => {
-      const result = await createClient().signPdf({
-        pdf: minimalPdf(),
-        documentName: 'test.pdf',
-        signerName: 'Alice',
-        location: 'Hanoi',
-        reason: 'Test',
-        contact: 'alice@example.com',
-        logoImageBase64: 'base64-logo',
-        dataToBeDisplayed: '<p>Confirm sign</p>',
-        page: 1,
-        positionX: 100,
-        positionY: 100,
-        width: 200,
-        height: 80,
-        renderingMode: 1,
-      });
+    async (ctx) => {
+      const result = await signOrSkip(ctx, () =>
+        createClient().signPdf({
+          pdf: minimalPdf(),
+          documentName: 'test.pdf',
+          signerName: 'Alice',
+          location: 'Hanoi',
+          reason: 'Test',
+          contact: 'alice@example.com',
+          logoImageBase64: 'base64-logo',
+          dataToBeDisplayed: '<p>Confirm sign</p>',
+          page: 1,
+          positionX: 100,
+          positionY: 100,
+          width: 200,
+          height: 80,
+          renderingMode: 1,
+        }),
+      );
       expect(result.format).toBe('Pdf');
       expect(result.transactionId).not.toBe('');
       expect(result.signedPdf.length).toBeGreaterThan(0);
@@ -126,23 +152,25 @@ describe.runIf(runnable)('MISA eSign sandbox', () => {
 
   it(
     'signs an XML document',
-    async () => {
-      const result = await createClient().signXml(
-        SignXmlRequest.fromString('<root><child>hello</child></root>', {
-          signatureContext: {
-            signatureName: 'XmlSig1',
-            hashAlgorithm: 'SHA256',
-            signatureDescription: {
-              signedBy: 'Alice',
-              location: 'Hanoi',
-              reason: 'Test',
-              contact: 'alice@example.com',
-              showSignedDate: true,
+    async (ctx) => {
+      const result = await signOrSkip(ctx, () =>
+        createClient().signXml(
+          SignXmlRequest.fromString('<root><child>hello</child></root>', {
+            signatureContext: {
+              signatureName: 'XmlSig1',
+              hashAlgorithm: 'SHA256',
+              signatureDescription: {
+                signedBy: 'Alice',
+                location: 'Hanoi',
+                reason: 'Test',
+                contact: 'alice@example.com',
+                showSignedDate: true,
+              },
             },
-          },
-          documentName: 'test.xml',
-          dataToBeDisplayed: '<p>Confirm sign</p>',
-        }),
+            documentName: 'test.xml',
+            dataToBeDisplayed: '<p>Confirm sign</p>',
+          }),
+        ),
       );
       expect(result.format).toBe('Xml');
       expect(result.signedXml.length).toBeGreaterThan(0);

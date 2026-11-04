@@ -5,13 +5,12 @@ import {
   UnknownTransactionException,
   type WebhookValidationException,
 } from '../../domain/errors.js';
-import type { Logger, SigningSessionStore, WebhookDeliveryHook } from '../ports.js';
+import type { Logger, SigningSessionStore } from '../ports.js';
 import { parseWebhookEnvelope, WEBHOOK_ACKS, type WebhookEnvelope } from '../webhook-envelope.js';
 import type { WebhookCallContext } from './finalize-webhook.js';
 
 export interface HandleWebhookDeps {
   store: SigningSessionStore;
-  hook: WebhookDeliveryHook;
   /** Runs under the finalize lock: state precedence, MISA `Signing/status` confirmation, attach. */
   finalize: (envelope: WebhookEnvelope, ctx: WebhookCallContext) => Promise<WebhookHandleResultDto>;
   logger: Logger;
@@ -38,8 +37,8 @@ function ackFor(err: WebhookValidationException) {
  * finalize. Everything after that — cached success / recorded terminal precedence, SUCCESS shape
  * checks, and acting on MISA's own `Signing/status` whatever the envelope claims — happens under
  * the finalize lock. A validation failure answers its ACK with a `FailureWithError` outcome and
- * invokes the hook, swallowing hook errors; hook errors on terminal and success outcomes
- * propagate (as .NET).
+ * does NOT invoke the hook (ruling R12: only MISA-confirmed outcomes — `SuccessWithSignedBytes`
+ * and a confirmed `TerminalWithoutFinalize` — reach it); hook errors on those propagate (as .NET).
  */
 export async function handleWebhook(
   deps: HandleWebhookDeps,
@@ -93,13 +92,9 @@ export async function handleWebhook(
       categoryName: err.webhookCategory,
       correlationId,
     };
-    try {
-      await deps.hook(outcome);
-    } catch {
-      deps.logger.warn('Webhook delivery hook threw during failure outcome dispatch', {
-        correlationId,
-      });
-    }
+    // Ruling R12: a validation failure is an unauthenticated delivery diagnostic, not a verdict on
+    // the transaction (anyone past the host's transport auth can forge one), so it is returned to
+    // the caller but never delivered to the hook. Only MISA-confirmed outcomes reach the hook.
     return { ack: ackFor(err), outcome };
   }
 }

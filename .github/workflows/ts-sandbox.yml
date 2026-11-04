@@ -87,6 +87,8 @@ jobs:
           MISACONNECT_ESIGN_SANDBOX_CLIENT_KEY: ${{ secrets.MISA_ESIGN_CLIENT_KEY }}
           MISACONNECT_ESIGN_SANDBOX_USERNAME: ${{ secrets.MISA_ESIGN_USERNAME }}
           MISACONNECT_ESIGN_SANDBOX_PASSWORD: ${{ secrets.MISA_ESIGN_PASSWORD }}
-          # Not required yet: the sandbox account has no ACTIVE remote-signing certificate.
-          # Add MISACONNECT_ESIGN_SANDBOX_REQUIRED: '1' (fail instead of skip) once it has one.
+          # Not required yet: the sandbox account has no ACTIVE remote-signing certificate. Without
+          # REQUIRED, the sign tests skip (not fail) on NoActiveCertificateException, as they do
+          # when credentials are missing or the host is unreachable. Add
+          # MISACONNECT_ESIGN_SANDBOX_REQUIRED: '1' (every skip becomes a failure) once it has one.
         run: npm run test:sandbox -w @misaconnect/esign

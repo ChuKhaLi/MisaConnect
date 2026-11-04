@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ESignGeneralException } from '../../src/domain/errors.js';
-import { resolveCredentials, validateOptions } from '../../src/infrastructure/options.js';
+import {
+  redactUserinfo,
+  resolveCredentials,
+  validateOptions,
+} from '../../src/infrastructure/options.js';
 import type { MisaESignOptions } from '../../src/infrastructure/options.js';
 
 const creds = { clientId: 'c', clientKey: 'k', userName: 'u', password: 'p' };
@@ -73,6 +77,30 @@ describe('validateOptions', () => {
       expect(validateOptions(base({ baseUrl })).origin).toBe(new URL(baseUrl).origin + '/');
     },
   );
+
+  it('never echoes userinfo from baseUrl in failure messages', () => {
+    const e = failure(base({ baseUrl: 'http://admin:S3cr3t-PW@example.vn/x' }));
+    expect(e.detail).toContain("'http://***@example.vn/x'");
+    expect(e.message).not.toContain('S3cr3t-PW');
+    expect(e.message).not.toContain('admin');
+  });
+
+  it('redacts userinfo in an unparseable baseUrl too', () => {
+    const e = failure(base({ baseUrl: 'https://admin:p@ss@word@exa mple.vn/' }));
+    expect(e.detail).toContain('absolute');
+    expect(e.message).not.toContain('admin');
+    expect(e.message).not.toContain('ss@word');
+  });
+
+  it.each([
+    ['https://user:pass@host/p', 'https://***@host/p'],
+    ['https://u:p@ss@host', 'https://***@host'],
+    ['user:pass@host', '***@host'],
+    ['https://host/p?a=b@c', 'https://host/p?a=b@c'],
+    ['https://host/', 'https://host/'],
+  ])('redactUserinfo(%s) → %s', (input, expected) => {
+    expect(redactUserinfo(input)).toBe(expected);
+  });
 
   it('reports two failures together', () => {
     const e = failure(base({ polling: { intervalMs: 0 }, webhook: { sessionTtlMs: -1 } }));

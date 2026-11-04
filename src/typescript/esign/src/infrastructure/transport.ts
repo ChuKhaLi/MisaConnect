@@ -22,8 +22,21 @@ export interface TransportRequest {
   bearer?: string;
   correlationId: string;
   signal?: AbortSignal;
-  expectJson?: boolean;
+  /**
+   * A 2xx body must be JSON: unparseable bodies throw `UnparseableResponse`, and (on ESRM routes
+   * only) a non-JSON content type throws `UnexpectedContentType`. Auth routes parse the body as
+   * JSON whatever the content type, as .NET does.
+   */
+  expectJson: boolean;
 }
+
+/** Auth routes: .NET reads the body as a string and deserializes it whatever the content type. */
+const AUTH_ROUTES: ReadonlySet<RouteKey> = new Set<RouteKey>([
+  'login',
+  'twoFactor',
+  'refresh',
+  'resendOtp',
+]);
 
 export interface TransportResponse {
   status: number;
@@ -158,7 +171,8 @@ export function createTransport(
 
   function toResponse(a: Extract<Attempt, { kind: 'response' }>, req: TransportRequest) {
     const ct = a.contentType;
-    const isJson = /json/i.test(ct);
+    // Auth routes are content-type agnostic: try JSON whatever the header says (.NET parity).
+    const isJson = AUTH_ROUTES.has(req.route) || /json/i.test(ct);
     const label = endpointLabel(req.route);
     let parsed: unknown;
     if (isJson && a.text.trim() === '') {
@@ -181,7 +195,8 @@ export function createTransport(
       throw new ESignGeneralException({
         category: 'MisaUnknown',
         rawCode: 'UnexpectedContentType',
-        detail: `MISA ${label} returned content type '${ct}' instead of JSON: ${a.text.slice(0, 256)}`,
+        // Never echo the body: it may carry tokens, certificates, document bytes or PII.
+        detail: `MISA ${label} returned content type '${ct}' instead of JSON (body length ${a.text.length}).`,
         correlationId: req.correlationId,
       });
     }

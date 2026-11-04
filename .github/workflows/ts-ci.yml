@@ -16,6 +16,7 @@ on:
       - ".nvmrc"
       - ".gitattributes"
       - ".github/workflows/ts-ci.yml"
+      - ".github/scripts/**"
   pull_request:
     branches: [ main ]
     paths:
@@ -30,6 +31,7 @@ on:
       - ".nvmrc"
       - ".gitattributes"
       - ".github/workflows/ts-ci.yml"
+      - ".github/scripts/**"
   workflow_dispatch:
 
 permissions:
@@ -59,6 +61,7 @@ jobs:
               - ".nvmrc"
               - ".gitattributes"
               - ".github/workflows/ts-ci.yml"
+              - ".github/scripts/**"
               - "samples/typescript/**"
             einvoice:
               - *shared
@@ -79,6 +82,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
+      # Release tag → workspace mapping used by release-ts.yml (fixed strings only).
+      - run: bash .github/scripts/ts-release-target.sh --self-test
 
   einvoice:
     needs: changes
