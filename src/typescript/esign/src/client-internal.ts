@@ -8,7 +8,9 @@ import {
   type SignDocumentDeps,
   type SignDocumentResult,
 } from './application/use-cases/sign-document.js';
-import { ESignGeneralException } from './domain/errors.js';
+import { withTransparentOtp } from './application/use-cases/two-factor.js';
+import type { MisaCredentials } from './domain/dtos.js';
+import { AuthenticationFailedException, ESignGeneralException } from './domain/errors.js';
 import type { CallOptions, IMisaESignClient } from './client.js';
 import {
   abortableDelay,
@@ -85,6 +87,67 @@ export function createMisaESignClientInternal(
       }),
     );
 
+  /** Explicit-mode state: the user a 2FA challenge is pending for (set on failure, cleared on success). */
+  let pendingUserName: string | undefined;
+
+  /**
+   * Runs one authenticated operation with the client's 2FA policy: with an `otpProvider` the
+   * challenge is answered transparently (the whole operation is retried once); without one the
+   * challenge is recorded for `signInWithOtp` / `resendOtp` and propagates. Task 11's `beginSign*`
+   * calls this too.
+   */
+  async function withTwoFactor<T>(
+    credentials: MisaCredentials,
+    correlationId: string,
+    signal: AbortSignal | undefined,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      const result = resolved.otpProvider
+        ? await withTransparentOtp(
+            { tokens, otpProvider: resolved.otpProvider },
+            { credentials, correlationId, signal },
+            operation,
+          )
+        : await operation();
+      pendingUserName = undefined;
+      return result;
+    } catch (err) {
+      if (
+        !resolved.otpProvider &&
+        err instanceof AuthenticationFailedException &&
+        err.requires2FA
+      ) {
+        pendingUserName = err.username || credentials.userName || undefined;
+      }
+      throw err;
+    }
+  }
+
+  async function pendingCredentials(
+    opts: CallOptions | undefined,
+    correlationId: string,
+  ): Promise<{
+    credentials: MisaCredentials;
+    ctx: { correlationId: string; signal?: AbortSignal };
+  }> {
+    const userName = pendingUserName;
+    const signal = opts?.signal;
+    signal?.throwIfAborted();
+    if (userName === undefined) {
+      throw new ESignGeneralException({
+        category: 'Validation',
+        rawCode: 'NoPendingOtpChallenge',
+        detail:
+          'NoPendingOtpChallenge: no 2FA challenge is pending; call this after a sign call fails with requires2FA.',
+        correlationId,
+      });
+    }
+    const ctx = { correlationId, ...(signal === undefined ? {} : { signal }) };
+    const credentials = await resolveCredentials(resolved, ctx, opts?.credentials);
+    return { credentials: { ...credentials, userName }, ctx };
+  }
+
   async function sign<F extends SignFormat>(
     format: F,
     dto: SignRequestDtoByFormat[F],
@@ -106,7 +169,9 @@ export function createMisaESignClientInternal(
       { correlationId, ...(signal === undefined ? {} : { signal }) },
       opts?.credentials,
     );
-    return signDocument(signDeps, format, dto, { credentials, correlationId, signal });
+    return withTwoFactor(credentials, correlationId, signal, () =>
+      signDocument(signDeps, format, dto, { credentials, correlationId, signal }),
+    );
   }
 
   async function begin(format: SignFormat, opts: CallOptions | undefined): Promise<never> {
@@ -146,8 +211,24 @@ export function createMisaESignClientInternal(
     },
 
     // Task 10 replaces these.
-    signInWithOtp: (_code, _otpType, _remember, opts) => notImplemented('signInWithOtp', opts),
-    resendOtp: (_language, opts) => notImplemented('resendOtp', opts),
+    signInWithOtp: async (code, otpType, remember, opts) => {
+      const correlationId = correlationIdOf(opts);
+      const { credentials, ctx } = await pendingCredentials(opts, correlationId);
+      if (!code || code.trim() === '') {
+        throw new ESignGeneralException({
+          category: 'Validation',
+          rawCode: 'InvalidOtpSubmission',
+          detail: 'InvalidOtpSubmission: the OTP code must not be empty.',
+          correlationId,
+        });
+      }
+      await tokens.exchangeOtp(credentials, { code, otpType, remember }, ctx);
+    },
+    resendOtp: async (language, opts) => {
+      const correlationId = correlationIdOf(opts);
+      const { credentials, ctx } = await pendingCredentials(opts, correlationId);
+      return tokens.resendOtp(credentials, language || resolved.otp.defaultResendLanguage, ctx);
+    },
 
     // Task 11 replaces these.
     beginSignPdf: (_request, opts) => begin('Pdf', opts),
