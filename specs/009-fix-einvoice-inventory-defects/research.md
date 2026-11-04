@@ -27,7 +27,8 @@ All four defects were verified against `main` (2026-11-04). No open NEEDS CLARIF
 ## R4 — Correlation ID docs
 
 - **Decision**: In both collaborator tables in `docs/architecture.md`, replace "(you must register)" with "`LibraryCorrelationIdAccessor` (internal; generates a new ID per scope)" and keep the override note. Check `LibraryCorrelationIdAccessor` behaviour before writing the description.
-- **Out of scope**: EInvoice registers it with `AddScoped` (a consumer registering *before* `AddMisaConnectEInvoice` is overridden), ESign with `TryAddScoped`. Recorded here; not changed in this slice.
+- **Found while implementing (2026-11-04)**: not only `ICorrelationIdAccessor` — every EInvoice default is registered with `Add…` (no `TryAdd…`), while ESign uses `TryAdd…` throughout. The EInvoice table's lead sentence ("register before `AddMisaConnectEInvoice`") was therefore wrong for all ports: a registration made before the call is overridden. Docs now say "after" for EInvoice and keep "before" for ESign.
+- **Out of scope**: switching EInvoice to `TryAdd…` (would make both orders work and match ESign, but changes DI behaviour for anyone relying on last-wins). Candidate for a later slice.
 
 ## R5 — TypeScript sync
 

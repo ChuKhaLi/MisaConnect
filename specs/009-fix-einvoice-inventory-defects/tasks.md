@@ -63,7 +63,7 @@ None — no shared prerequisite. (Factory test placement resolved in research R1
 
 ## Phase 6: User Story 4 — Correlation ID docs (P3)
 
-- [ ] T014 [P] [US4] Edit `docs/architecture.md` lines 71 and 87: replace "(you must register)" with "`LibraryCorrelationIdAccessor` (internal; a new GUID per DI scope)" and keep the override use-case column; add one sentence under the table noting that registering your own implementation replaces the default
+- [x] T014 [P] [US4] Edit `docs/architecture.md` lines 71 and 87: replace "(you must register)" with "`LibraryCorrelationIdAccessor` (internal; a new GUID per DI scope)" and keep the override use-case column; add one sentence under the table noting that registering your own implementation replaces the default
 
 **Checkpoint**: US4 complete; FR-008.
 
