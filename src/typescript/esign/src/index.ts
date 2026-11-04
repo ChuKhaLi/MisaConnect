@@ -36,6 +36,7 @@ export {
 export {
   SignXmlRequest,
   type BeginResultDto,
+  type Certificate,
   type MisaCredentials,
   type OtpResendResultDto,
   type SignExcelRequestDto,
@@ -58,3 +59,26 @@ export {
 export { createMisaESignClient } from './client.js';
 export type { CallOptions, IMisaESignClient } from './client.js';
 export type { MisaESignOptions } from './infrastructure/options.js';
+export type {
+  AccessToken,
+  CertificateSelector,
+  Clock,
+  Delay,
+  Logger,
+  MisaCredentialsProvider,
+  OtpProvider,
+  SigningSession,
+  SigningSessionStore,
+  SigningTerminal,
+  TokenCache,
+  WebhookDeliveryHook,
+} from './application/ports.js';
+export type {
+  HashOutput,
+  PdfHashOutput,
+  WordExcelHashOutput,
+  XmlHashOutput,
+} from './application/hash-output.js';
+export { createInMemoryTokenCache } from './infrastructure/defaults.js';
+export { createInMemorySigningSessionStore } from './infrastructure/in-memory-session-store.js';
+export { fromPino, type PinoLike } from './infrastructure/logging.js';

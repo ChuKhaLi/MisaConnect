@@ -10,7 +10,7 @@ import {
 import { Routes } from './routes.js';
 import { buildErrorDetail, parseResponseError, type ResponseError } from './response-error.js';
 
-const INVALID_OTP = [
+export const INVALID_OTP = [
   'invalid otp',
   'wrong otp',
   'otp incorrect',
@@ -19,8 +19,8 @@ const INVALID_OTP = [
   'không đúng',
   'otp không hợp lệ',
 ];
-const EXPIRED_OTP = ['expired', 'hết hạn', 'quá hạn', 'timed out'];
-const EXHAUSTED_OTP = [
+export const EXPIRED_OTP = ['expired', 'hết hạn', 'quá hạn', 'timed out'];
+export const EXHAUSTED_OTP = [
   'max attempts',
   'exceeded',
   'vượt quá số lần',
