@@ -45,8 +45,33 @@ public class SaveDraftInvoicesTests
         var sut = MakeSut(out var stub);
         var invoices = Enumerable.Repeat(SampleInvoices.TypicalVatInvoice(), 31).ToArray();
         var ex = await Assert.ThrowsAsync<MeInvoiceException>(() => sut.ExecuteAsync(invoices, true, default));
-        Assert.Equal(MeInvoiceErrorCategory.Validation, ex.Category);
+        // Slice 009 US3: the dedicated category, not Validation.
+        Assert.Equal(MeInvoiceErrorCategory.BatchOrSize, ex.Category);
         Assert.Equal("InvoiceQuantityTooLarge", ex.RawErrorCode);
+        Assert.Equal("FR-030", Assert.Single(ex.Failures!).RuleId);
+        Assert.Null(stub.LastBatch);
+    }
+
+    [Fact]
+    public async Task Batch_size_30_is_accepted()
+    {
+        var sut = MakeSut(out var stub);
+        var invoices = Enumerable.Repeat(SampleInvoices.TypicalVatInvoice(), 30).ToArray();
+        await sut.ExecuteAsync(invoices, true, default);
+        Assert.NotNull(stub.LastBatch);
+    }
+
+    [Fact]
+    public async Task Empty_batch_rejected_before_MISA()
+    {
+        var sut = MakeSut(out var stub);
+        var ex = await Assert.ThrowsAsync<MeInvoiceException>(() => sut.ExecuteAsync(Array.Empty<Invoice>(), true, default));
+        Assert.Equal(MeInvoiceErrorCategory.Validation, ex.Category);
+        Assert.Equal("ValidationFailed", ex.RawErrorCode);
+        var failure = Assert.Single(ex.Failures!);
+        Assert.Equal("FR-030", failure.RuleId);
+        Assert.Contains("empty", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("exceeds", failure.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Null(stub.LastBatch);
     }
 

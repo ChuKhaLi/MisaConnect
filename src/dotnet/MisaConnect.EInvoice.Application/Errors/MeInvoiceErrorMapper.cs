@@ -53,8 +53,8 @@ internal static class MeInvoiceErrorMapper
             ["InvalidInvoiceData"] = MeInvoiceErrorCategory.Validation,
 
             // Batch / size — surfaced as Validation in slice 1
-            ["InvoiceQuantityTooLarge"] = MeInvoiceErrorCategory.Validation,
-            ["XMLTooLong"] = MeInvoiceErrorCategory.Validation,
+            ["InvoiceQuantityTooLarge"] = MeInvoiceErrorCategory.BatchOrSize,
+            ["XMLTooLong"] = MeInvoiceErrorCategory.BatchOrSize,
 
             // Duplicate / uniqueness
             ["DuplicateInvoiceRefID"] = MeInvoiceErrorCategory.DuplicateOrUniqueness,
