@@ -5,5 +5,5 @@ export function encodeBase64(bytes: Uint8Array): string {
 
 export function decodeBase64(text: string): Uint8Array {
   const buf = Buffer.from(text, 'base64');
-  return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+  return new Uint8Array(buf);
 }

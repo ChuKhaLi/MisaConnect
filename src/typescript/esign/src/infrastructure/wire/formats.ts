@@ -6,38 +6,13 @@ import type {
 import type { Certificate } from '../../domain/dtos.js';
 import { ESignGeneralException } from '../../domain/errors.js';
 import { decodeBase64 } from './base64.js';
-
-export interface PdfHashOutput {
-  format: 'Pdf';
-  documentId: string;
-  documentBytes: string;
-  documentHash: string;
-  sh: string;
-  signatureName: string;
-  digest: string;
-}
-
-export interface XmlHashOutput {
-  format: 'Xml';
-  documentId: string;
-  /** Raw XML text MISA returns for attachment. */
-  document: string;
-  signatureId: string;
-  digest: string;
-  sh: string;
-}
-
-export interface WordExcelHashOutput {
-  format: 'Word' | 'Excel';
-  documentId: string;
-  documentBytes: string;
-  signatureId: string;
-  digest: string;
-  mainDom: string;
-}
-
-/** Plain JSON data (no binary): safe to persist in webhook sessions. */
-export type HashOutput = PdfHashOutput | XmlHashOutput | WordExcelHashOutput;
+import type {
+  HashOutput,
+  PdfHashOutput,
+  WordExcelHashOutput,
+  XmlHashOutput,
+} from '../../application/hash-output.js';
+export type { HashOutput, PdfHashOutput, WordExcelHashOutput, XmlHashOutput };
 
 export interface WireContext {
   correlationId: string;
@@ -59,6 +34,7 @@ export interface FormatSpec {
 type Json = Record<string, unknown>;
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+const optStr = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
 function firstDoc(json: unknown, key: string): Json | undefined {
   if (typeof json !== 'object' || json === null) return undefined;
@@ -118,7 +94,7 @@ function wordExcel(format: 'Word' | 'Excel', key: 'wordDocs' | 'excelDocs'): For
       if (d === undefined) throw emptyResponse('documents/hash', key, format, ctx);
       const out: WordExcelHashOutput = {
         format,
-        documentId: str(d['documentId']),
+        documentId: optStr(d['documentId']),
         documentBytes: str(d['documentBytes']),
         signatureId: str(d['signatureId']),
         digest: str(d['digest']),
@@ -175,11 +151,11 @@ const pdf: FormatSpec = {
     if (d === undefined) throw emptyResponse('documents/hash', 'pdfDocs', 'Pdf', ctx);
     const out: PdfHashOutput = {
       format: 'Pdf',
-      documentId: str(d['documentId']),
-      documentBytes: str(d['documentBytes']),
-      documentHash: str(d['documentHash']),
-      sh: str(d['sh']),
-      signatureName: str(d['signatureName']),
+      documentId: optStr(d['documentId']),
+      documentBytes: optStr(d['documentBytes']),
+      documentHash: optStr(d['documentHash']),
+      sh: optStr(d['sh']),
+      signatureName: optStr(d['signatureName']),
       digest: str(d['digest']),
     };
     if (out.digest === '') {
@@ -229,7 +205,7 @@ const xml: FormatSpec = {
     if (d === undefined) throw emptyResponse('documents/hash', 'xmlDocs', 'Xml', ctx);
     const out: XmlHashOutput = {
       format: 'Xml',
-      documentId: str(d['documentId']),
+      documentId: optStr(d['documentId']),
       document: str(d['document']),
       signatureId: str(d['signatureId']),
       digest: str(d['digest']),

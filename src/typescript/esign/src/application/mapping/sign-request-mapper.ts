@@ -100,7 +100,9 @@ export function toNormalized<F extends SignFormat>(
         'Exactly one of xml or xmlUtf8Bytes must be set (not both, not neither).',
       );
     }
-    const text = hasString ? (x.xml as string) : new TextDecoder().decode(x.xmlUtf8Bytes);
+    const text = hasString
+      ? (x.xml as string)
+      : new TextDecoder('utf-8', { ignoreBOM: true }).decode(x.xmlUtf8Bytes);
     const d = x.signatureContext.signatureDescription;
     const description: WireSignatureDescription = {
       SignedBy: d.signedBy,

@@ -429,3 +429,36 @@ function withoutXml(d: SignXmlRequestDto): Omit<SignXmlRequestDto, 'xml'> {
   delete c.xml;
   return c as Omit<SignXmlRequestDto, 'xml'>;
 }
+
+describe('fix round 1', () => {
+  it('xml bytes keep a leading BOM like .NET', () => {
+    const bytes = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode('<a>x</a>')]);
+    const rest = withoutXml(xmlDto());
+    const n = toNormalized('Xml', { ...rest, xmlUtf8Bytes: bytes }, encodeBase64);
+    expect(n.fileToSign.startsWith('﻿')).toBe(true);
+    expect(n.fileToSign).toBe('﻿<a>x</a>');
+  });
+
+  it('decodeBase64 returns an exact copy, not a pooled view', () => {
+    const out = decodeBase64('AQID');
+    expect(out.byteOffset).toBe(0);
+    expect(out.buffer.byteLength).toBe(out.length);
+    expect(Array.from(out)).toEqual([1, 2, 3]);
+  });
+
+  it('pdf attach omits sh/signatureName/documentHash when the hash response had null', () => {
+    const hash = FORMATS.Pdf.parseHash(
+      { pdfDocs: [{ documentId: 'd', documentBytes: 'b', sh: null, digest: 'dg' }] },
+      ctx,
+    );
+    expect(JSON.parse(JSON.stringify(hash))).toEqual({
+      format: 'Pdf',
+      documentId: 'd',
+      documentBytes: 'b',
+      digest: 'dg',
+    });
+    const body = FORMATS.Pdf.buildAttachBody(cert, hash, 'SIG', norm('Pdf'));
+    const e = JSON.parse(JSON.stringify(entry(body, 'pdfDocs'))) as Json;
+    expect(Object.keys(e).sort()).toEqual(['digest', 'documentBytes', 'documentId', 'signature']);
+  });
+});
