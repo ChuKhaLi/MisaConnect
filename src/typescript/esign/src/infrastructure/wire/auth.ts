@@ -16,7 +16,12 @@ import {
 import type { MisaCredentials, OtpResendResultDto } from '../../domain/dtos.js';
 import { otpChannelWireValue } from '../../domain/enums.js';
 import { AuthenticationFailedException, ESignGeneralException } from '../../domain/errors.js';
-import { createInMemoryTokenCache, defaultTokenCacheKey, systemClock } from '../defaults.js';
+import {
+  createCredentialFingerprinter,
+  createInMemoryTokenCache,
+  defaultTokenCacheKey,
+  systemClock,
+} from '../defaults.js';
 import type { ResolvedESignOptions } from '../options.js';
 import { Routes } from '../routes.js';
 import type { Transport, TransportResponse } from '../transport.js';
@@ -61,10 +66,18 @@ interface ParseCtx {
 }
 
 /** `data` block of a login / two-factor / enveloped refresh response (mirrors `AuthSessionMapper`). */
-function sessionFromData(data: Record<string, unknown>, now: Date): AccessToken {
+function sessionFromData(
+  route: 'login' | 'twoFactor' | 'refresh',
+  data: Record<string, unknown>,
+  c: ParseCtx,
+): AccessToken {
+  const value = str(data.remoteSigningAccessToken);
+  // An empty bearer is never cached (a refresh failure then falls back to login, §9.2).
+  if (!value) throw emptyResponse(route, c.correlationId);
+  const now = c.now;
   const user = isRecord(data.user) ? data.user : {};
   const token: AccessToken = {
-    value: str(data.remoteSigningAccessToken) ?? '',
+    value,
     expiresAt: new Date(now.getTime() + expiresInSeconds(data.expiresIn) * 1000),
     userId: str(user.id) ?? '',
     username: str(user.username) ?? '',
@@ -78,7 +91,7 @@ function emptyResponse(route: 'login' | 'twoFactor' | 'refresh', correlationId: 
   return new ESignGeneralException({
     category: 'MisaUnknown',
     rawCode: 'EmptyResponse',
-    detail: `MISA ${Routes[route]} returned an empty data block.`,
+    detail: `MISA ${Routes[route]} returned no data block or an empty remoteSigningAccessToken.`,
     correlationId,
   });
 }
@@ -131,7 +144,7 @@ export function parseLoginResponse(
         });
   }
   if (json === undefined || !isRecord(json.data)) throw emptyResponse(route, c.correlationId);
-  return sessionFromData(json.data, c.now);
+  return sessionFromData(route, json.data, c);
 }
 
 /** Refresh accepts `{status, data:{…}}` or the flat `{accessToken, remoteSigningAccessToken, …}` (INV §2.3). */
@@ -151,14 +164,13 @@ export function parseRefreshResponse(
   }
   const json = isRecord(res.json) ? res.json : {};
   if (isRecord(json.data)) {
-    const t = sessionFromData(json.data, c.now);
+    const t = sessionFromData('refresh', json.data, c);
     return { ...t, userId: t.userId || undefined, username: t.username || undefined };
   }
-  const access = str(json.accessToken);
   const remote = str(json.remoteSigningAccessToken);
-  if (access === undefined && remote === undefined) throw emptyResponse('refresh', c.correlationId);
+  if (!remote) throw emptyResponse('refresh', c.correlationId);
   const out: RefreshedSession = {
-    value: remote ?? '',
+    value: remote,
     expiresAt: new Date(c.now.getTime() + expiresInSeconds(json.expiresIn) * 1000),
   };
   const rt = str(json.refreshToken);
@@ -238,6 +250,7 @@ export function createAuthGateway(
 export function createDefaultTokenManager(
   resolved: ResolvedESignOptions,
   transport: Transport,
+  overrides: { fingerprint?: (creds: MisaCredentials) => string } = {},
 ): TokenManager {
   const keyFn = resolved.tokenCacheKey ?? defaultTokenCacheKey;
   return createTokenManager({
@@ -246,5 +259,6 @@ export function createDefaultTokenManager(
     clock: resolved.clock ?? systemClock,
     cacheKey: (creds) =>
       keyFn({ userName: creds.userName, clientId: creds.clientId, host: resolved.host }),
+    fingerprint: overrides.fingerprint ?? createCredentialFingerprinter(),
   });
 }

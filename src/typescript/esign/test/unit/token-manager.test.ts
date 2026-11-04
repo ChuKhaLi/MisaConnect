@@ -9,6 +9,7 @@ import {
 } from '../../src/domain/errors.js';
 import { mapESignError } from '../../src/application/errors/esign-error-mapper.js';
 import {
+  createCredentialFingerprinter,
   createInMemoryTokenCache,
   defaultTokenCacheKey,
   firstCertificateSelector,
@@ -25,9 +26,12 @@ const creds: MisaCredentials = {
 };
 const ctx = { correlationId: 'corr-1' };
 const KEY = 'alice|cid|h.vn';
+/** Deterministic test fingerprint; production uses a salted SHA-256 (see `defaults`). */
+const fp = (c: MisaCredentials): string => `${c.password}#${c.clientKey}`;
+const FP = 'pw#ck';
 const T0 = Date.parse('2026-11-04T00:00:00Z');
 
-type Handler = (body: Record<string, unknown>) => Response;
+type Handler = (body: Record<string, unknown>) => Response | Promise<Response>;
 const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), {
     status,
@@ -73,7 +77,7 @@ function setup(handlers: Partial<Record<string, Handler>>) {
     tokenCache: cache,
   } as unknown as ResolvedESignOptions;
   const transport = createTransport(resolved);
-  const tm = createDefaultTokenManager(resolved, transport);
+  const tm = createDefaultTokenManager(resolved, transport, { fingerprint: fp });
   const count = (name: string) => calls.filter((c) => c.path === name).length;
   return {
     tm,
@@ -92,6 +96,7 @@ const token = (over: Partial<AccessToken> = {}): AccessToken => ({
   expiresAt: new Date(T0 + 3_600_000),
   userId: 'user-1',
   username: 'alice',
+  credentialFingerprint: FP,
   ...over,
 });
 
@@ -165,6 +170,7 @@ describe('token manager', () => {
       expiresAt: new Date(T0 + 60_000),
       userId: 'user-1',
       username: 'alice',
+      credentialFingerprint: FP,
     });
   });
 
@@ -312,7 +318,7 @@ describe('token manager', () => {
     expect((err as AuthenticationFailedException).username).toBe('alice');
   });
 
-  it('login 2FA on a 5xx body is detected before transport mapping', async () => {
+  it('login 122 inside a 5xx body surfaces as Transport (R4)', async () => {
     const { tm } = setup({
       'login-api': () => json(503, { errorCode: '122' }),
     });
@@ -398,9 +404,176 @@ describe('token manager', () => {
       correlationId: 'corr-1',
     });
   });
+
+  it('a failed shared login is not cached: the next getToken logs in again', async () => {
+    let n = 0;
+    const { tm, count } = setup({
+      'login-api': () => (n++ === 0 ? json(400, { errorCode: 'Boom' }) : loginOk('T2')),
+    });
+    const r = await Promise.allSettled([tm.getToken(creds, ctx), tm.getToken(creds, ctx)]);
+    expect(r.map((x) => x.status)).toEqual(['rejected', 'rejected']);
+    expect(count('login-api')).toBe(1);
+    expect((await tm.getToken(creds, ctx)).value).toBe('T2');
+    expect(count('login-api')).toBe(2);
+  });
+
+  it("one caller's abort leaves other waiters on the same flight unaffected", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const { tm, count } = setup({ 'login-api': () => gate.then(() => loginOk('T1')) });
+    const ac = new AbortController();
+    const aborted = tm.getToken(creds, { ...ctx, signal: ac.signal });
+    const other = tm.getToken(creds, ctx);
+    const reason = new Error('caller gave up');
+    ac.abort(reason);
+    await expect(aborted).rejects.toBe(reason);
+    release();
+    expect((await other).value).toBe('T1');
+    expect(count('login-api')).toBe(1);
+  });
+
+  describe('credential binding (R5)', () => {
+    const wrong: MisaCredentials = { ...creds, password: 'WRONG' };
+
+    it('a wrong password never gets the cached token; the login failure surfaces', async () => {
+      const { tm, count, calls } = setup({
+        'login-api': (b) =>
+          b.password === 'pw' ? loginOk('A-TOKEN') : json(400, { errorCode: 'WrongPassword' }),
+      });
+      expect((await tm.getToken(creds, ctx)).value).toBe('A-TOKEN');
+      const err = await tm.getToken(wrong, ctx).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(AuthenticationFailedException);
+      expect((err as AuthenticationFailedException).rawCode).toBe('WrongPassword');
+      expect(count('login-api')).toBe(2);
+      expect(calls[1]?.body).toEqual({ userName: 'alice', password: 'WRONG' });
+      // A's entry survives and still serves A without a new login.
+      expect((await tm.getToken(creds, ctx)).value).toBe('A-TOKEN');
+      expect(count('login-api')).toBe(2);
+    });
+
+    it('withAuth with a wrong password does not run the call with the cached token', async () => {
+      const { tm, cache } = setup({ 'login-api': () => json(400, { errorCode: 'WrongPassword' }) });
+      await cache.set(KEY, token());
+      let ran = false;
+      await expect(
+        tm.withAuth(wrong, ctx, () => {
+          ran = true;
+          return Promise.resolve(1);
+        }),
+      ).rejects.toBeInstanceOf(AuthenticationFailedException);
+      expect(ran).toBe(false);
+      expect((await cache.get(KEY))?.value).toBe('old');
+    });
+
+    it('a changed clientKey forces a fresh login', async () => {
+      const { tm, cache, count } = setup({ 'login-api': () => loginOk('K2') });
+      await cache.set(KEY, token());
+      const t = await tm.getToken({ ...creds, clientKey: 'ck2' }, ctx);
+      expect(t.value).toBe('K2');
+      expect(count('login-api')).toBe(1);
+    });
+
+    it('a cached token without a fingerprint is a miss', async () => {
+      const { tm, cache, count } = setup({ 'login-api': () => loginOk('NEW') });
+      const legacy = token();
+      delete legacy.credentialFingerprint;
+      await cache.set(KEY, legacy);
+      expect((await tm.getToken(creds, ctx)).value).toBe('NEW');
+      expect(count('login-api')).toBe(1);
+    });
+
+    it('an expired entry of another credential is not refreshed with its refresh token', async () => {
+      const { tm, cache, count } = setup({
+        refreshtoken: () => json(200, { remoteSigningAccessToken: 'STOLEN', expiresIn: 3600 }),
+        'login-api': () => json(400, { errorCode: 'WrongPassword' }),
+      });
+      await cache.set(KEY, token({ expiresAt: new Date(T0 - 1) }));
+      await expect(tm.getToken(wrong, ctx)).rejects.toBeInstanceOf(AuthenticationFailedException);
+      expect(count('refreshtoken')).toBe(0);
+      expect((await cache.get(KEY))?.value).toBe('old');
+    });
+
+    it('concurrent right/wrong-password callers do not share a flight', async () => {
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const { tm, count } = setup({
+        'login-api': (b) =>
+          gate.then(() =>
+            b.password === 'pw' ? loginOk('A-TOKEN') : json(400, { errorCode: 'WrongPassword' }),
+          ),
+      });
+      const a = tm.getToken(creds, ctx);
+      const w = tm.getToken(wrong, ctx).catch((e: unknown) => e);
+      await Promise.resolve();
+      release();
+      expect((await a).value).toBe('A-TOKEN');
+      expect(await w).toBeInstanceOf(AuthenticationFailedException);
+      expect(count('login-api')).toBe(2);
+    });
+
+    it('a wrong-password OTP exchange does not join the right one', async () => {
+      const { tm, count } = setup({ 'two-factor-auth': () => loginOk('OTP') });
+      const s = { code: '1', otpType: 'SmsOrEmail', remember: false } as const;
+      await Promise.all([tm.exchangeOtp(creds, s, ctx), tm.exchangeOtp(wrong, s, ctx)]);
+      expect(count('two-factor-auth')).toBe(2);
+    });
+  });
+
+  describe('empty remoteSigningAccessToken is never cached', () => {
+    const isEmptyResponse = (e: unknown) =>
+      e instanceof ESignGeneralException &&
+      e.category === 'MisaUnknown' &&
+      e.rawCode === 'EmptyResponse';
+
+    it('login', async () => {
+      const { tm, cache } = setup({ 'login-api': () => loginOk('') });
+      const err = await tm.getToken(creds, ctx).catch((e: unknown) => e);
+      expect(isEmptyResponse(err)).toBe(true);
+      expect(await cache.get(KEY)).toBeUndefined();
+    });
+
+    it('two-factor', async () => {
+      const { tm, cache } = setup({ 'two-factor-auth': () => loginOk('') });
+      const err = await tm
+        .exchangeOtp(creds, { code: '1', otpType: 'SmsOrEmail', remember: false }, ctx)
+        .catch((e: unknown) => e);
+      expect(isEmptyResponse(err)).toBe(true);
+      expect(await cache.get(KEY)).toBeUndefined();
+    });
+
+    it.each([
+      ['envelope', { data: { remoteSigningAccessToken: '', expiresIn: 3600 } }],
+      ['flat', { accessToken: 'raw', remoteSigningAccessToken: '', expiresIn: 3600 }],
+      ['flat without remote token', { accessToken: 'raw', expiresIn: 3600 }],
+    ])('refresh (%s) -> falls back to login', async (_name, body) => {
+      const { tm, cache, count } = setup({
+        refreshtoken: () => json(200, body),
+        'login-api': () => loginOk('L'),
+      });
+      await cache.set(KEY, token({ expiresAt: new Date(T0 - 1) }));
+      expect((await tm.getToken(creds, ctx)).value).toBe('L');
+      expect(count('refreshtoken')).toBe(1);
+      expect(count('login-api')).toBe(1);
+    });
+  });
 });
 
 describe('defaults', () => {
+  it('credential fingerprint: salted SHA-256 hex over password and clientKey', () => {
+    const f = createCredentialFingerprinter();
+    const a = f(creds);
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+    expect(f({ ...creds })).toBe(a);
+    expect(f({ ...creds, password: 'x' })).not.toBe(a);
+    expect(f({ ...creds, clientKey: 'x' })).not.toBe(a);
+    // The '\0' separator keeps the password/clientKey boundary unambiguous.
+    expect(f({ ...creds, password: 'ab', clientKey: 'c' })).not.toBe(
+      f({ ...creds, password: 'a', clientKey: 'bc' }),
+    );
+    // Per-instance salt.
+    expect(createCredentialFingerprinter()(creds)).not.toBe(a);
+  });
+
   it('default token cache key', () => {
     expect(defaultTokenCacheKey({ userName: 'u', clientId: 'c', host: 'h' })).toBe('u|c|h');
   });

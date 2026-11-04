@@ -1,3 +1,5 @@
+import { createHash, randomBytes } from 'node:crypto';
+import type { MisaCredentials } from '../domain/dtos.js';
 import type {
   AccessToken,
   CertificateSelector,
@@ -47,6 +49,23 @@ export function defaultTokenCacheKey(c: {
   host: string;
 }): string {
   return `${c.userName}|${c.clientId}|${c.host}`;
+}
+
+/**
+ * Returns a function computing `hex(SHA-256(salt ‖ password ‖ '\0' ‖ clientKey))` with a random
+ * salt generated once per call of this factory (one per token manager). Never log its output.
+ */
+export function createCredentialFingerprinter(): (
+  c: Pick<MisaCredentials, 'password' | 'clientKey'>,
+) => string {
+  const salt = randomBytes(16);
+  return (c) =>
+    createHash('sha256')
+      .update(salt)
+      .update(c.password)
+      .update('\0')
+      .update(c.clientKey)
+      .digest('hex');
 }
 
 /** Default certificate selector: the first active certificate. */

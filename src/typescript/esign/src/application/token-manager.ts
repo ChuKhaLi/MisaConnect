@@ -52,6 +52,11 @@ export interface TokenManagerDeps {
   clock: Clock;
   /** Composes the cache key; called only with non-empty `userName` and `clientId`. */
   cacheKey: (creds: MisaCredentials) => string;
+  /**
+   * Binds cached tokens to the credential secrets (R5): a cached token is used only when its
+   * `credentialFingerprint` equals this value for the caller's credentials. Never log it.
+   */
+  fingerprint: (creds: MisaCredentials) => string;
 }
 
 export interface TokenManager {
@@ -159,24 +164,36 @@ export function createTokenManager(deps: TokenManagerDeps): TokenManager {
     return deps.cacheKey(creds);
   }
 
-  const isFresh = (t: AccessToken | undefined): t is AccessToken =>
-    t !== undefined &&
-    t !== null &&
+  /** Slot of a shared flight: kind, cache key and credential fingerprint (R5: never shared across secrets). */
+  const slotOf = (kind: string, key: string, fp: string): string => `${kind}\0${key}\0${fp}`;
+
+  const isFresh = (t: AccessToken): boolean =>
     expiryTime(t.expiresAt) - REFRESH_SKEW_MS > clock.now().getTime();
 
-  async function loginAndStore(
-    key: string,
-    creds: MisaCredentials,
-    ctx: AuthCallContext,
-  ): Promise<AccessToken> {
-    const token = await gateway.login(creds, ctx);
-    await tokenCache.set(key, token);
-    return token;
+  /** The cached entry when it was obtained with the same credential secrets (R5), else undefined. */
+  async function readOwned(key: string, fp: string): Promise<AccessToken | undefined> {
+    const cached = (await tokenCache.get(key)) ?? undefined;
+    return cached !== undefined && cached.credentialFingerprint === fp ? cached : undefined;
   }
 
-  /** Refreshes `previous` (merging omitted fields); on any failure evicts and logs in once. */
+  async function store(key: string, fp: string, token: AccessToken): Promise<AccessToken> {
+    const bound: AccessToken = { ...token, credentialFingerprint: fp };
+    await tokenCache.set(key, bound);
+    return bound;
+  }
+
+  /** Evicts the entry only while it still belongs to these credentials (never another user's). */
+  async function evictOwned(key: string, fp: string): Promise<void> {
+    if ((await readOwned(key, fp)) !== undefined) await tokenCache.delete(key);
+  }
+
+  /**
+   * Refreshes `previous` (merging omitted fields); on any failure evicts and logs in once.
+   * `previous` must belong to these credentials; with none, logs in directly.
+   */
   async function renew(
     key: string,
+    fp: string,
     creds: MisaCredentials,
     previous: AccessToken | undefined,
     ctx: AuthCallContext,
@@ -196,22 +213,20 @@ export function createTokenManager(deps: TokenManagerDeps): TokenManager {
       } catch {
         refreshed = undefined;
       }
-      if (refreshed !== undefined) {
-        await tokenCache.set(key, refreshed);
-        return refreshed;
-      }
+      if (refreshed !== undefined) return store(key, fp, refreshed);
+      await evictOwned(key, fp);
     }
-    if (previous !== undefined) await tokenCache.delete(key);
-    return loginAndStore(key, creds, ctx);
+    return store(key, fp, await gateway.login(creds, ctx));
   }
 
   async function getToken(creds: MisaCredentials, ctx: AuthCallContext): Promise<AccessToken> {
     const key = keyFor(creds, ctx.correlationId);
+    const fp = deps.fingerprint(creds);
     const shared: AuthCallContext = { correlationId: ctx.correlationId };
-    return singleFlight(`acquire:${key}`, ctx.signal, async () => {
-      const cached = (await tokenCache.get(key)) ?? undefined;
-      if (isFresh(cached)) return cached;
-      return renew(key, creds, cached, shared);
+    return singleFlight(slotOf('acquire', key, fp), ctx.signal, async () => {
+      const owned = await readOwned(key, fp);
+      if (owned !== undefined && isFresh(owned)) return owned;
+      return renew(key, fp, creds, owned, shared);
     });
   }
 
@@ -221,12 +236,13 @@ export function createTokenManager(deps: TokenManagerDeps): TokenManager {
     ctx: AuthCallContext,
   ): Promise<AccessToken> {
     const key = keyFor(creds, ctx.correlationId);
+    const fp = deps.fingerprint(creds);
     const shared: AuthCallContext = { correlationId: ctx.correlationId };
-    return singleFlight(`reauth:${key}`, ctx.signal, async () => {
-      const cached = (await tokenCache.get(key)) ?? undefined;
-      // Another caller already replaced the rejected token: use theirs.
-      if (isFresh(cached) && cached.value !== stale.value) return cached;
-      return renew(key, creds, cached ?? stale, shared);
+    return singleFlight(slotOf('reauth', key, fp), ctx.signal, async () => {
+      const owned = await readOwned(key, fp);
+      // Another caller with the same credentials already replaced the rejected token: use theirs.
+      if (owned !== undefined && isFresh(owned) && owned.value !== stale.value) return owned;
+      return renew(key, fp, creds, owned ?? stale, shared);
     });
   }
 
@@ -256,12 +272,11 @@ export function createTokenManager(deps: TokenManagerDeps): TokenManager {
 
     exchangeOtp(creds, submission, ctx) {
       const key = keyFor(creds, ctx.correlationId);
+      const fp = deps.fingerprint(creds);
       const shared: AuthCallContext = { correlationId: ctx.correlationId };
-      return singleFlight(`otp:${key}`, ctx.signal, async () => {
-        const token = await gateway.twoFactor(creds, submission, shared);
-        await tokenCache.set(key, token);
-        return token;
-      });
+      return singleFlight(slotOf('otp', key, fp), ctx.signal, async () =>
+        store(key, fp, await gateway.twoFactor(creds, submission, shared)),
+      );
     },
 
     resendOtp(creds, language, ctx) {

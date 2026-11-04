@@ -26,6 +26,12 @@ export interface AccessToken {
   expiresAt: Date;
   userId: string;
   username: string;
+  /**
+   * Salted hash binding the token to the credential secrets it was obtained with. Opaque plain
+   * data: custom caches must store and return it unchanged. Never log it. A cached token without
+   * a matching fingerprint is treated as a miss.
+   */
+  credentialFingerprint?: string;
 }
 
 export interface TokenCache {
