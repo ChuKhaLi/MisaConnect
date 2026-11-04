@@ -1,0 +1,63 @@
+{
+  "name": "@misaconnect/esign",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for MISA eSign RemoteSigning.",
+  "license": "MIT",
+  "homepage": "https://github.com/ChuKhaLi/MisaConnect/tree/main/src/typescript/esign#readme",
+  "bugs": {
+    "url": "https://github.com/ChuKhaLi/MisaConnect/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChuKhaLi/MisaConnect.git",
+    "directory": "src/typescript/esign"
+  },
+  "keywords": [
+    "misa",
+    "esign",
+    "remote-signing",
+    "digital-signature",
+    "vietnam",
+    "sdk"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "prepublishOnly": "npm run build",
+    "pretest": "npm run build",
+    "test": "vitest run",
+    "test:sandbox": "vitest run --config vitest.sandbox.config.ts",
+    "pretypecheck": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.mjs && node scripts/smoke.cjs"
+  }
+}

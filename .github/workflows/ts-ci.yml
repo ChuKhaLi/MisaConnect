@@ -127,19 +127,40 @@ jobs:
     needs: changes
     if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.esign == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [ 22, 24 ]
     steps:
       - uses: actions/checkout@v4
-      # No-op until the @misaconnect/esign package exists.
-      - id: exists
-        run: echo "ok=$([ -f src/typescript/esign/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-      - if: steps.exists.outputs.ok == 'true'
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ matrix.node }}
           cache: npm
-      - if: steps.exists.outputs.ok == 'true'
-        run: npm ci
-      - if: steps.exists.outputs.ok == 'true'
-        run: npm run typecheck -w @misaconnect/esign
-      - if: steps.exists.outputs.ok == 'true'
-        run: npm test -w @misaconnect/esign
+      - run: npm ci
+      - run: npm run typecheck -w @misaconnect/esign
+      - run: npm test -w @misaconnect/esign
+      - run: npm run smoke -w @misaconnect/esign
+      - uses: actions/upload-artifact@v4
+        if: matrix.node == 22
+        with:
+          name: esign-dist
+          path: src/typescript/esign/dist
+          retention-days: 1
+
+  # Oldest supported runtime (package engines >=20); see einvoice-node20.
+  esign-node20:
+    needs: esign
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: esign-dist
+          path: src/typescript/esign/dist
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Link workspace package without installing dev tooling
+        run: mkdir -p node_modules/@misaconnect && ln -s ../../src/typescript/esign node_modules/@misaconnect/esign
+      - run: node --version && npm run smoke -w @misaconnect/esign
