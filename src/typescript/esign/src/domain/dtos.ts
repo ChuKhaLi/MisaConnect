@@ -178,7 +178,8 @@ export interface Certificate {
   userId: string;
   keyAlias: string;
   appName: string;
-  keyStatus: 'ACTIVE' | 'INACTIVE';
+  /** As MISA sends it; only certificates whose value is "ACTIVE" (any case) are kept. */
+  keyStatus: string;
   certStatus?: string;
   /** Signing certificate (base64). */
   certificate: string;

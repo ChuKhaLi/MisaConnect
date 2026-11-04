@@ -55,3 +55,6 @@ export {
   type WebhookSignatureDto,
   type XmlSignatureContextDto,
 } from './domain/dtos.js';
+export { createMisaESignClient } from './client.js';
+export type { CallOptions, IMisaESignClient } from './client.js';
+export type { MisaESignOptions } from './infrastructure/options.js';
