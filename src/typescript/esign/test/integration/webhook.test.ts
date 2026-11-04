@@ -1,7 +1,8 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
+  Logger,
   MisaCredentialsProvider,
   OtpProvider,
   SigningSession,
@@ -61,9 +62,15 @@ beforeAll(async () => {
 afterAll(async () => {
   await fake.close();
 });
+/** Restores the fake's defaults, with Signing/status answering SUCCESS on the first call. */
+function resetFake(): void {
+  fake.resetScenario();
+  fake.scenario.pendingsBeforeSuccess = 0;
+}
+
 beforeEach(() => {
   fake.requests.length = 0;
-  fake.resetScenario();
+  resetFake();
 });
 
 interface Harness {
@@ -109,6 +116,9 @@ const text = (b: Uint8Array): string => new TextDecoder().decode(b);
 const countPath = (fragment: string): number =>
   fake.requests.filter((r) => r.path.includes(fragment)).length;
 const attachments = (): number => countPath('documents/attachment');
+const statusCalls = (): number => countPath('Signing/status');
+const attachBodies = (): string[] =>
+  fake.requests.filter((r) => r.path.includes('documents/attachment')).map((r) => r.bodyText);
 
 async function catchErr(p: Promise<unknown>): Promise<unknown> {
   try {
@@ -247,11 +257,16 @@ describe('beginSign* + handleWebhook happy path', () => {
 });
 
 describe('handleWebhook terminal and validation outcomes', () => {
-  it.each(['FAILED', 'CANCELLED', 'canceled'])(
-    '%s → TerminalWithoutFinalize, ACK "0", no attachment',
-    async (status) => {
+  it.each([
+    ['FAILED', 'statusAlwaysFailed', 'Failed', 'ResultBad'],
+    ['CANCELLED', 'statusCancelled', 'Cancelled', undefined],
+    ['canceled', 'statusCancelled', 'Cancelled', undefined],
+  ] as const)(
+    '%s confirmed by Signing/status: TerminalWithoutFinalize with MISA status, ACK "0", no attachment',
+    async (status, flag, expected, misaErrorCode) => {
       const { client, delivered } = makeClient();
       await client.beginSignPdf(pdf);
+      fake.scenario[flag] = true;
       const r = await client.handleWebhook(success({ status, errorCode: 'E42', signatures: [] }), {
         correlationId: 'corr-t',
       });
@@ -260,11 +275,12 @@ describe('handleWebhook terminal and validation outcomes', () => {
         kind: 'TerminalWithoutFinalize',
         transactionId: TX,
         format: 'Pdf',
-        status: status === 'FAILED' ? 'Failed' : 'Cancelled',
-        misaErrorCode: 'E42',
+        status: expected,
+        ...(misaErrorCode === undefined ? {} : { misaErrorCode }),
         correlationId: 'corr-t',
       });
       expect(delivered).toEqual([r.outcome]);
+      expect(statusCalls()).toBe(1);
       expect(attachments()).toBe(0);
     },
   );
@@ -440,7 +456,7 @@ describe('finalize', () => {
     expect(r.outcome.misaErrorCode).toEqual(expect.any(String));
     expect(delivered).toHaveLength(0);
 
-    fake.resetScenario();
+    resetFake();
     const retry = await client.handleWebhook(success());
     expect(retry.ack).toEqual(ACK_OK);
     expect(retry.outcome.kind).toBe('SuccessWithSignedBytes');
@@ -510,6 +526,202 @@ describe('finalize', () => {
     const { client } = makeClient();
     await client.beginSignPdf(pdf);
     expect((await client.handleWebhook(success())).ack).toEqual(ACK_OK);
+  });
+});
+
+describe('Signing/status confirms the envelope (R10)', () => {
+  it('forged SUCCESS while MISA says FAILED: terminal outcome, no attachment', async () => {
+    const { client, delivered } = makeClient();
+    await client.beginSignPdf(pdf);
+    fake.scenario.statusAlwaysFailed = true;
+    const r = await client.handleWebhook(success());
+    expect(r.ack).toEqual(ACK_OK);
+    expect(r.outcome).toMatchObject({
+      kind: 'TerminalWithoutFinalize',
+      status: 'Failed',
+      misaErrorCode: 'ResultBad',
+    });
+    expect(delivered).toEqual([r.outcome]);
+    expect(attachments()).toBe(0);
+  });
+
+  it("forged FAILED while MISA says SUCCESS: finalized with MISA's signature", async () => {
+    const { client, delivered } = makeClient();
+    await client.beginSignPdf(pdf);
+    const r = await client.handleWebhook(success({ status: 'FAILED', signatures: [] }));
+    expect(r.ack).toEqual(ACK_OK);
+    expect(r.outcome.kind).toBe('SuccessWithSignedBytes');
+    expect(delivered).toEqual([r.outcome]);
+    expect(attachBodies()).toHaveLength(1);
+    expect(attachBodies()[0]).toContain('SIGNATURE-BYTES');
+  });
+
+  it("attaches MISA's signature, never the envelope's", async () => {
+    const { client } = makeClient();
+    await client.beginSignPdf(pdf);
+    const r = await client.handleWebhook(
+      success({ signatures: [{ documentId: 'doc-1', signature: 'FORGED-SIG' }] }),
+    );
+    expect(r.ack).toEqual(ACK_OK);
+    const [body] = attachBodies();
+    expect(body).toContain('SIGNATURE-BYTES');
+    expect(body).not.toContain('FORGED-SIG');
+  });
+
+  it('SUCCESS after a confirmed terminal: stored terminal, no MISA call, no hook, no attach', async () => {
+    const { client, delivered } = makeClient();
+    await client.beginSignPdf(pdf);
+    fake.scenario.statusAlwaysFailed = true;
+    const first = await client.handleWebhook(success({ status: 'FAILED', signatures: [] }));
+    resetFake();
+    const before = fake.requests.length;
+    const later = await client.handleWebhook(success(), { correlationId: 'corr-later' });
+    expect(later.ack).toEqual(ACK_OK);
+    expect(later.outcome).toEqual({ ...first.outcome, correlationId: 'corr-later' });
+    expect(fake.requests.length).toBe(before); // no token, status or attach call
+    expect(delivered).toHaveLength(1);
+    expect(attachments()).toBe(0);
+  });
+
+  it('any delivery after a cached success: cached answer, no MISA call', async () => {
+    const { client, delivered } = makeClient();
+    await client.beginSignPdf(pdf);
+    await client.handleWebhook(success());
+    const before = fake.requests.length;
+    fake.scenario.statusAlwaysFailed = true;
+    const failed = await client.handleWebhook(success({ status: 'FAILED', signatures: [] }));
+    expect(failed.ack).toEqual(ACK_OK);
+    expect(failed.outcome.kind).toBe('SuccessWithSignedBytes');
+    expect(fake.requests.length).toBe(before);
+    expect(delivered).toHaveLength(1);
+  });
+
+  it('status PENDING: webhook.finalize_failed, nothing cached, no hook; a retry finalizes', async () => {
+    const store = createInMemorySigningSessionStore({ now: () => NOW });
+    const { client, delivered } = makeClient({ signingSessionStore: store });
+    await client.beginSignPdf(pdf);
+    fake.scenario.statusPending = true;
+    const r = await client.handleWebhook(success());
+    expect(r.ack).toEqual(ACK_FINALIZE_FAILED);
+    expect(r.outcome).toMatchObject({ kind: 'FailureWithError', categoryName: 'None' });
+    expect(delivered).toHaveLength(0);
+    expect(attachments()).toBe(0);
+    const s = await store.get('cid', TX);
+    expect(s?.cachedSuccess).toBeUndefined();
+    expect(s?.terminal).toBeUndefined();
+
+    fake.scenario.statusPending = false;
+    const retry = await client.handleWebhook(success());
+    expect(retry.ack).toEqual(ACK_OK);
+    expect(delivered).toHaveLength(1);
+  });
+
+  it('a duplicate messageId after a cached success short-circuits', async () => {
+    const { client, delivered } = makeClient();
+    await client.beginSignPdf(pdf);
+    await client.handleWebhook(success({ messageId: 'dup' }));
+    const before = fake.requests.length;
+    const again = await client.handleWebhook(success({ messageId: 'dup' }));
+    expect(again.ack).toEqual(ACK_OK);
+    expect(fake.requests.length).toBe(before);
+    expect(delivered).toHaveLength(1);
+  });
+});
+
+describe('finalize never prompts for 2FA (R11)', () => {
+  /** A token cache that keeps nothing: finalize must log in again. */
+  const noCache = { get: () => undefined, set: () => undefined, delete: () => undefined };
+
+  it('a 2FA challenge during finalize: finalize_failed; the otpProvider is never called', async () => {
+    const provide = vi.fn(() =>
+      Promise.resolve({ code: '123456', otpType: 'SmsOrEmail' as const, remember: true }),
+    );
+    const { client, delivered } = makeClient({ tokenCache: noCache, otpProvider: { provide } });
+    await client.beginSignPdf(pdf);
+    fake.scenario.loginRequires2FAOnFirstCall = true;
+    const r = await client.handleWebhook(success());
+    expect(r.ack).toEqual(ACK_FINALIZE_FAILED);
+    expect(provide).not.toHaveBeenCalled();
+    expect(countPath('two-factor-auth')).toBe(0);
+    expect(delivered).toHaveLength(0);
+  });
+
+  it('records no pending explicit challenge', async () => {
+    const { client } = makeClient({ tokenCache: noCache });
+    await client.beginSignPdf(pdf);
+    fake.scenario.loginRequires2FAOnFirstCall = true;
+    const r = await client.handleWebhook(success());
+    expect(r.ack).toEqual(ACK_FINALIZE_FAILED);
+    const err = await catchErr(client.signInWithOtp('123456', 'SmsOrEmail', false));
+    expect((err as ESignGeneralException).rawCode).toBe('NoPendingOtpChallenge');
+  });
+});
+
+describe('finalize logging', () => {
+  interface Line {
+    level: string;
+    message: string;
+    fields?: Record<string, unknown>;
+  }
+  function capture(): { logger: Logger; lines: Line[] } {
+    const lines: Line[] = [];
+    const at =
+      (level: string) =>
+      (message: string, fields?: Record<string, unknown>): void => {
+        lines.push({ level, message, ...(fields === undefined ? {} : { fields }) });
+      };
+    return {
+      lines,
+      logger: { debug: at('debug'), info: at('info'), warn: at('warn'), error: at('error') },
+    };
+  }
+  const SECRETS = ['ck-secret', 'pw-secret', 'SIGNATURE-BYTES', SIGNED_PDF_TEXT, 'rs-token'];
+
+  it('logs success with the byte count only', async () => {
+    const { logger, lines } = capture();
+    const { client } = makeClient({ logger });
+    await client.beginSignPdf(pdf);
+    await client.handleWebhook(success(), { correlationId: 'corr-log' });
+    const line = lines.find((l) => l.message === 'MISA eSign webhook finalized');
+    expect(line).toEqual({
+      level: 'info',
+      message: 'MISA eSign webhook finalized',
+      fields: {
+        transactionId: TX,
+        format: 'Pdf',
+        signedByteCount: SIGNED_PDF_TEXT.length,
+        correlationId: 'corr-log',
+      },
+    });
+    const all = JSON.stringify(lines);
+    for (const secret of SECRETS) expect(all).not.toContain(secret);
+  });
+
+  it('logs a finalize failure with category and rawCode only', async () => {
+    const { logger, lines } = capture();
+    const { client } = makeClient({ logger });
+    await client.beginSignPdf(pdf);
+    fake.scenario.attachmentRejectionForFormat = {
+      format: 'pdf',
+      statusCode: 400,
+      errorCode: 'AttachBad',
+      devMsg: 'leaky dev message',
+      userMsg: 'leaky user message',
+    };
+    await client.handleWebhook(success(), { correlationId: 'corr-log' });
+    const line = lines.find((l) => l.message === 'MISA eSign webhook finalize failed');
+    expect(line?.level).toBe('warn');
+    expect(Object.keys(line?.fields ?? {}).sort()).toEqual(
+      ['correlationId', 'errorCategory', 'format', 'rawCode', 'transactionId'].sort(),
+    );
+    expect(line?.fields).toMatchObject({
+      transactionId: TX,
+      format: 'Pdf',
+      errorCategory: 'AttachmentRejected',
+      correlationId: 'corr-log',
+    });
+    const all = JSON.stringify(lines);
+    for (const secret of [...SECRETS, 'leaky']) expect(all).not.toContain(secret);
   });
 });
 

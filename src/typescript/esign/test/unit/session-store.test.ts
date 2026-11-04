@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { SigningSession } from '../../src/application/ports.js';
 import { UnknownTransactionException } from '../../src/domain/errors.js';
-import { createInMemorySigningSessionStore } from '../../src/infrastructure/in-memory-session-store.js';
+import {
+  createInMemorySigningSessionStore,
+  MAX_OBSERVED_MESSAGE_IDS,
+} from '../../src/infrastructure/in-memory-session-store.js';
 
 const T0 = new Date('2026-11-04T08:00:00.000Z');
 
@@ -117,5 +120,49 @@ describe('in-memory signing session store', () => {
     await expect(store.withFinalizeLock('cid', 'tx-2', () => Promise.resolve(2))).resolves.toBe(2);
     release();
     await a;
+  });
+
+  it('keeps only the most recent 100 message ids', async () => {
+    expect(MAX_OBSERVED_MESSAGE_IDS).toBe(100);
+    const store = createInMemorySigningSessionStore(fakeClock());
+    await store.register(session());
+    for (let i = 0; i < 150; i++) await store.recordMessageId('cid', 'tx-1', `m${i}`);
+    const ids = (await store.get('cid', 'tx-1'))?.observedMessageIds ?? [];
+    expect(ids).toHaveLength(100);
+    expect(ids[0]).toBe('m50');
+    expect(ids[99]).toBe('m149');
+  });
+
+  it('records a terminal state', async () => {
+    const store = createInMemorySigningSessionStore(fakeClock());
+    await store.register(session());
+    await store.recordTerminal('cid', 'tx-1', { status: 'Failed', misaErrorCode: 'E1' });
+    expect((await store.get('cid', 'tx-1'))?.terminal).toEqual({
+      status: 'Failed',
+      misaErrorCode: 'E1',
+    });
+  });
+
+  it('ignores writes to an expired session', async () => {
+    const clock = fakeClock();
+    const store = createInMemorySigningSessionStore(clock);
+    await store.register(session());
+    clock.advance(60_000);
+    const ack = { errorCode: '0', devMsg: 'd', userMsg: 'u' };
+    await store.recordMessageId('cid', 'tx-1', 'm1');
+    await store.cacheSuccess('cid', 'tx-1', ack, 'x');
+    await store.recordTerminal('cid', 'tx-1', { status: 'Failed' });
+    clock.advance(-60_000); // were the entry still there, it would be live again
+    expect(await store.get('cid', 'tx-1')).toBeUndefined();
+  });
+
+  it('register sweeps expired sessions', async () => {
+    const clock = fakeClock();
+    const store = createInMemorySigningSessionStore(clock);
+    await store.register(session({ transactionId: 'old' }));
+    clock.advance(60_000);
+    await store.register(session({ transactionId: 'new', createdAt: clock.now().toISOString() }));
+    clock.advance(-60_000); // 'old' would be live at this time if it had not been swept
+    expect(await store.get('cid', 'old')).toBeUndefined();
   });
 });

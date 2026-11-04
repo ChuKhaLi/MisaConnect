@@ -12,12 +12,13 @@ export interface WebhookEnvelope {
   signatures: WebhookSignatureDto[];
 }
 
-const STATUS: Record<string, WebhookStatusDto> = {
-  SUCCESS: 'Success',
-  FAILED: 'Failed',
-  CANCELLED: 'Cancelled',
-  CANCELED: 'Cancelled',
-};
+/** Exact ASCII keys; a Map so inherited names ('constructor', '__proto__') never match. */
+const STATUS: ReadonlyMap<string, WebhookStatusDto> = new Map([
+  ['SUCCESS', 'Success'],
+  ['FAILED', 'Failed'],
+  ['CANCELLED', 'Cancelled'],
+  ['CANCELED', 'Cancelled'],
+]);
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -45,7 +46,11 @@ export function parseWebhookEnvelope(body: unknown, correlationId = 'webhook'): 
   const transactionId = required('transactionId');
 
   const rawStatus = body['status'];
-  const status = typeof rawStatus === 'string' ? STATUS[rawStatus.toUpperCase()] : undefined;
+  // 'ſuccess'.toUpperCase() is 'SUCCESS'; requiring ASCII input first rejects such look-alikes.
+  const status =
+    typeof rawStatus === 'string' && /^[A-Za-z]+$/.test(rawStatus)
+      ? STATUS.get(rawStatus.toUpperCase())
+      : undefined;
   if (status === undefined) {
     return fail('status is missing or not one of SUCCESS, FAILED, CANCELLED, CANCELED.');
   }

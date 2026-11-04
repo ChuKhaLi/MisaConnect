@@ -103,7 +103,7 @@ export function createMisaESignClientInternal(
    * Runs one authenticated operation with the client's 2FA policy: with an `otpProvider` the
    * challenge is answered transparently (the whole operation is retried once); without one the
    * challenge is recorded for this caller's principal and propagates. A success clears only this
-   * principal's entry. `sign*`, `beginSign*` and the webhook finalize all run through it.
+   * principal's entry. `sign*` and `beginSign*` run through it; the webhook finalize does not (R11).
    */
   async function withTwoFactor<T>(
     credentials: MisaCredentials,
@@ -224,7 +224,8 @@ export function createMisaESignClientInternal(
    * Finalize has no caller context: the session's principal is resolved again — a provider is
    * called with the session's `{ clientId, userName }`, static credentials are used as is, and a
    * per-call `opts.credentials` on `handleWebhook` wins. The finalize use case rejects credentials
-   * that are not the session's principal.
+   * that are not the session's principal. No 2FA policy here (ruling R11): a challenge during
+   * finalize is a finalize failure — no OTP prompt and no pending challenge.
    */
   async function handle(body: unknown, opts: CallOptions | undefined) {
     const correlationId = correlationIdOf(opts);
@@ -234,7 +235,6 @@ export function createMisaESignClientInternal(
       {
         store: sessionStore,
         hook: deliveryHook,
-        decodeBase64,
         logger,
         finalize: (envelope, c) =>
           finalizeFromWebhook(
@@ -246,14 +246,13 @@ export function createMisaESignClientInternal(
               encodeBase64,
               decodeBase64,
               hook: deliveryHook,
+              logger,
               credentialsFor: (session) =>
                 resolveCredentials(
                   resolved,
                   { ...ctx, clientId: session.clientId, userName: session.userName },
                   opts?.credentials,
                 ),
-              withTwoFactor: (credentials, operation) =>
-                withTwoFactor(credentials, correlationId, signal, operation),
             },
             envelope,
             c,

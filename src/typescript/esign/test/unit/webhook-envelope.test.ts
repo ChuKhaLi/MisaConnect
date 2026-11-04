@@ -75,9 +75,12 @@ describe('parseWebhookEnvelope', () => {
     },
   );
 
-  it.each(['PENDING', 'DONE', '', 1, null])('rejects status %j', (status) => {
-    malformed({ ...valid, status });
-  });
+  it.each(['PENDING', 'DONE', '', 1, null, 'ſuccess', 'ſUCCESS', 'constructor', '__proto__'])(
+    'rejects status %j',
+    (status) => {
+      malformed({ ...valid, status });
+    },
+  );
 
   it('rejects signatures that are not an array', () => {
     malformed({ ...valid, signatures: 'SIG' });

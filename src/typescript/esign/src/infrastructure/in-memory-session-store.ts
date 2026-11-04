@@ -8,6 +8,9 @@ interface Entry {
   tail: Promise<void>;
 }
 
+/** Only the most recent message ids are kept: a sender cannot grow a session without bound. */
+export const MAX_OBSERVED_MESSAGE_IDS = 100;
+
 const keyOf = (clientId: string, transactionId: string): string => `${clientId}\0${transactionId}`;
 
 /**
@@ -18,12 +21,14 @@ const keyOf = (clientId: string, transactionId: string): string => `${clientId}\
 export function createInMemorySigningSessionStore(clock: Clock = systemClock): SigningSessionStore {
   const entries = new Map<string, Entry>();
 
+  const expired = (entry: Entry, nowMs: number): boolean =>
+    !(nowMs < Date.parse(entry.session.createdAt) + entry.session.ttlMs);
+
   function live(clientId: string, transactionId: string): Entry | undefined {
     const key = keyOf(clientId, transactionId);
     const entry = entries.get(key);
     if (entry === undefined) return undefined;
-    const expiresAt = Date.parse(entry.session.createdAt) + entry.session.ttlMs;
-    if (!(clock.now().getTime() < expiresAt)) {
+    if (expired(entry, clock.now().getTime())) {
       entries.delete(key);
       return undefined;
     }
@@ -32,6 +37,12 @@ export function createInMemorySigningSessionStore(clock: Clock = systemClock): S
 
   return {
     register(s) {
+      // Opportunistic sweep: sessions nobody reads again would otherwise stay forever.
+      const nowMs = clock.now().getTime();
+      for (const [key, entry] of entries) {
+        if (expired(entry, nowMs)) entries.delete(key);
+      }
+      // Replaces any entry with the same key; fine because MISA transaction ids are unique.
       entries.set(keyOf(s.clientId, s.transactionId), {
         session: structuredClone(s),
         tail: Promise.resolve(),
@@ -45,18 +56,27 @@ export function createInMemorySigningSessionStore(clock: Clock = systemClock): S
     },
 
     recordMessageId(clientId, transactionId, messageId) {
-      const entry = entries.get(keyOf(clientId, transactionId));
-      if (entry !== undefined && !entry.session.observedMessageIds.includes(messageId)) {
-        entry.session.observedMessageIds.push(messageId);
+      const ids = live(clientId, transactionId)?.session.observedMessageIds;
+      if (ids !== undefined && !ids.includes(messageId)) {
+        ids.push(messageId);
+        if (ids.length > MAX_OBSERVED_MESSAGE_IDS) {
+          ids.splice(0, ids.length - MAX_OBSERVED_MESSAGE_IDS);
+        }
       }
       return Promise.resolve();
     },
 
     cacheSuccess(clientId, transactionId, ack, signedBase64) {
-      const entry = entries.get(keyOf(clientId, transactionId));
+      const entry = live(clientId, transactionId);
       if (entry !== undefined) {
         entry.session.cachedSuccess = { ack: { ...ack }, signed: signedBase64 };
       }
+      return Promise.resolve();
+    },
+
+    recordTerminal(clientId, transactionId, terminal) {
+      const entry = live(clientId, transactionId);
+      if (entry !== undefined) entry.session.terminal = { ...terminal };
       return Promise.resolve();
     },
 

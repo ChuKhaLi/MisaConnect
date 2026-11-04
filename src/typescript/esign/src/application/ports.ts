@@ -75,8 +75,18 @@ export interface SigningSession {
   createdAt: string;
   ttlMs: number;
   observedMessageIds: string[];
-  /** `signed` is base64. */
+  /** `signed` is base64. Once set, every later delivery is answered from it (no MISA call). */
   cachedSuccess?: { ack: WebhookAckDto; signed: string };
+  /**
+   * MISA-confirmed FAILED/CANCELLED. Once set, every later delivery is answered ACK "0" with a
+   * `TerminalWithoutFinalize` rebuilt from it (no MISA call, no hook).
+   */
+  terminal?: SigningTerminal;
+}
+
+export interface SigningTerminal {
+  status: 'Failed' | 'Cancelled';
+  misaErrorCode?: string;
 }
 
 /**
@@ -95,6 +105,7 @@ export interface SigningSessionStore {
     ack: WebhookAckDto,
     signedBase64: string,
   ): Promise<void>;
+  recordTerminal(clientId: string, transactionId: string, terminal: SigningTerminal): Promise<void>;
   withFinalizeLock<T>(clientId: string, transactionId: string, fn: () => Promise<T>): Promise<T>;
 }
 
