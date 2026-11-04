@@ -4,6 +4,10 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-04
+
+Minor release of `MisaConnect.EInvoice`: slice 009 bug fixes, one of which changes an error category (see "Behaviour change"). `MisaConnect.ESign` 2.4.0 has no code changes from 2.3.0; it ships at the same version because the release pipeline packs both families together.
+
 #### Behaviour change — `MisaConnect.EInvoice` (slice 009)
 
 - Batch-size errors now report `MeInvoiceErrorCategory.BatchOrSize` instead of `Validation`. This covers the MISA codes `InvoiceQuantityTooLarge` and `XMLTooLong` and the SDK's own check for a `SaveDraftInvoices` batch of more than 30 invoices (raw code `InvoiceQuantityTooLarge` and rule `FR-030` unchanged). Code that catches `Validation` to handle oversize batches must also handle `BatchOrSize`.
