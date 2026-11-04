@@ -245,3 +245,47 @@ describe('resendOtp', () => {
     expect(err).toBeInstanceOf(ESignTransportException);
   });
 });
+
+describe('2FA hardening', () => {
+  const credsB: MisaCredentials = { ...creds, userName: 'bob', password: 'pw-b' };
+
+  it('keeps pending challenges per principal on one client', async () => {
+    const client = makeClient();
+    fake.scenario.loginRequires2FAOnFirstCall = true;
+    await catchErr(client.signPdf(pdf)); // A is challenged
+
+    fake.requests.length = 0;
+    const errB = await catchErr(
+      client.signInWithOtp('123456', 'SmsOrEmail', false, { credentials: credsB }),
+    );
+    expect((errB as ESignGeneralException).rawCode).toBe('NoPendingOtpChallenge');
+    const errBResend = await catchErr(client.resendOtp(undefined, { credentials: credsB }));
+    expect((errBResend as ESignGeneralException).rawCode).toBe('NoPendingOtpChallenge');
+    expect(twoFactorRequests()).toHaveLength(0);
+    expect(resendRequests()).toHaveLength(0);
+
+    // B signs successfully; A's entry survives.
+    await client.signPdf(pdf, { credentials: credsB });
+    await client.signInWithOtp('123456', 'SmsOrEmail', false);
+    expect((body(twoFactorRequests()) as { userName: string }).userName).toBe('alice');
+  });
+
+  it('sends Authenticator as otpType 1', async () => {
+    const client = makeClient();
+    fake.scenario.loginRequires2FAOnFirstCall = true;
+    await catchErr(client.signPdf(pdf));
+    await client.signInWithOtp('123456', 'Authenticator', false);
+    expect((body(twoFactorRequests()) as { otpType: number }).otpType).toBe(1);
+  });
+
+  it('rejects a blank code in signInWithOtp without any request', async () => {
+    const client = makeClient();
+    fake.scenario.loginRequires2FAOnFirstCall = true;
+    await catchErr(client.signPdf(pdf));
+    fake.requests.length = 0;
+    const err = await catchErr(client.signInWithOtp('  ', 'SmsOrEmail', false));
+    expect((err as ESignGeneralException).category).toBe('Validation');
+    expect((err as ESignGeneralException).rawCode).toBe('InvalidOtpSubmission');
+    expect(fake.requests).toHaveLength(0);
+  });
+});

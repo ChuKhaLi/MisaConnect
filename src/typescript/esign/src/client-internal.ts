@@ -8,12 +8,14 @@ import {
   type SignDocumentDeps,
   type SignDocumentResult,
 } from './application/use-cases/sign-document.js';
-import { withTransparentOtp } from './application/use-cases/two-factor.js';
+import { requireOtpCode, withTransparentOtp } from './application/use-cases/two-factor.js';
 import type { MisaCredentials } from './domain/dtos.js';
 import { AuthenticationFailedException, ESignGeneralException } from './domain/errors.js';
 import type { CallOptions, IMisaESignClient } from './client.js';
 import {
   abortableDelay,
+  createCredentialFingerprinter,
+  defaultTokenCacheKey,
   firstCertificateSelector,
   systemClock,
 } from './infrastructure/defaults.js';
@@ -55,7 +57,14 @@ export function createMisaESignClientInternal(
   // One transport and one token manager per client: every method shares the token cache and the
   // single-flight login/refresh.
   const transport = createTransport(resolved, deps.transport);
-  const tokens = createDefaultTokenManager(resolved, transport);
+  const fingerprint = createCredentialFingerprinter();
+  const cacheKeyOf = resolved.tokenCacheKey ?? defaultTokenCacheKey;
+  /** Identity of a caller: token-cache key plus secret fingerprint (never the secrets themselves). */
+  const principalOf = (c: MisaCredentials): string | undefined =>
+    c.userName && c.clientId
+      ? `${cacheKeyOf({ userName: c.userName, clientId: c.clientId, host: resolved.host })}\0${fingerprint(c)}`
+      : undefined;
+  const tokens = createDefaultTokenManager(resolved, transport, { fingerprint });
   const signDeps: SignDocumentDeps = {
     gateway: createEsrmGateway(resolved, transport),
     tokens,
@@ -87,14 +96,15 @@ export function createMisaESignClientInternal(
       }),
     );
 
-  /** Explicit-mode state: the user a 2FA challenge is pending for (set on failure, cleared on success). */
-  let pendingUserName: string | undefined;
+  /** Explicit-mode state: principals (see `principalOf`) with a 2FA challenge pending. */
+  const pendingChallenges = new Set<string>();
 
   /**
    * Runs one authenticated operation with the client's 2FA policy: with an `otpProvider` the
    * challenge is answered transparently (the whole operation is retried once); without one the
-   * challenge is recorded for `signInWithOtp` / `resendOtp` and propagates. Task 11's `beginSign*`
-   * calls this too.
+   * challenge is recorded for this caller's principal and propagates. A success clears only this
+   * principal's entry. HOOK POINT: Task 11's `beginSign*` must run its authenticated work through
+   * this function too.
    */
   async function withTwoFactor<T>(
     credentials: MisaCredentials,
@@ -102,6 +112,7 @@ export function createMisaESignClientInternal(
     signal: AbortSignal | undefined,
     operation: () => Promise<T>,
   ): Promise<T> {
+    const principal = principalOf(credentials);
     try {
       const result = resolved.otpProvider
         ? await withTransparentOtp(
@@ -110,20 +121,22 @@ export function createMisaESignClientInternal(
             operation,
           )
         : await operation();
-      pendingUserName = undefined;
+      if (principal !== undefined) pendingChallenges.delete(principal);
       return result;
     } catch (err) {
       if (
         !resolved.otpProvider &&
+        principal !== undefined &&
         err instanceof AuthenticationFailedException &&
         err.requires2FA
       ) {
-        pendingUserName = err.username || credentials.userName || undefined;
+        pendingChallenges.add(principal);
       }
       throw err;
     }
   }
 
+  /** The caller's own credentials, provided a challenge is pending for exactly this principal. */
   async function pendingCredentials(
     opts: CallOptions | undefined,
     correlationId: string,
@@ -131,21 +144,21 @@ export function createMisaESignClientInternal(
     credentials: MisaCredentials;
     ctx: { correlationId: string; signal?: AbortSignal };
   }> {
-    const userName = pendingUserName;
     const signal = opts?.signal;
     signal?.throwIfAborted();
-    if (userName === undefined) {
+    const ctx = { correlationId, ...(signal === undefined ? {} : { signal }) };
+    const credentials = await resolveCredentials(resolved, ctx, opts?.credentials);
+    const principal = principalOf(credentials);
+    if (principal === undefined || !pendingChallenges.has(principal)) {
       throw new ESignGeneralException({
         category: 'Validation',
         rawCode: 'NoPendingOtpChallenge',
         detail:
-          'NoPendingOtpChallenge: no 2FA challenge is pending; call this after a sign call fails with requires2FA.',
+          'NoPendingOtpChallenge: no 2FA challenge is pending for these credentials; call this after a sign call fails with requires2FA.',
         correlationId,
       });
     }
-    const ctx = { correlationId, ...(signal === undefined ? {} : { signal }) };
-    const credentials = await resolveCredentials(resolved, ctx, opts?.credentials);
-    return { credentials: { ...credentials, userName }, ctx };
+    return { credentials, ctx };
   }
 
   async function sign<F extends SignFormat>(
@@ -214,14 +227,7 @@ export function createMisaESignClientInternal(
     signInWithOtp: async (code, otpType, remember, opts) => {
       const correlationId = correlationIdOf(opts);
       const { credentials, ctx } = await pendingCredentials(opts, correlationId);
-      if (!code || code.trim() === '') {
-        throw new ESignGeneralException({
-          category: 'Validation',
-          rawCode: 'InvalidOtpSubmission',
-          detail: 'InvalidOtpSubmission: the OTP code must not be empty.',
-          correlationId,
-        });
-      }
+      requireOtpCode(code, correlationId);
       await tokens.exchangeOtp(credentials, { code, otpType, remember }, ctx);
     },
     resendOtp: async (language, opts) => {

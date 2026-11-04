@@ -9,6 +9,19 @@ export interface TransparentOtpContext {
   signal?: AbortSignal | undefined;
 }
 
+/** Shared by the transparent and explicit flows: a blank OTP code is never sent to MISA. */
+export function requireOtpCode(code: string | undefined, correlationId: string): string {
+  if (!code || code.trim() === '') {
+    throw new ESignGeneralException({
+      category: 'Validation',
+      rawCode: 'InvalidOtpSubmission',
+      detail: 'InvalidOtpSubmission: the OTP code must not be empty.',
+      correlationId,
+    });
+  }
+  return code;
+}
+
 /**
  * Transparent 2FA (INV §2.5): runs `operation`; when it fails with a 2FA challenge, asks the
  * provider for a code, exchanges it, and re-runs the whole operation once. A second challenge (or
@@ -23,22 +36,16 @@ export async function withTransparentOtp<T>(
     return await operation();
   } catch (err) {
     if (!(err instanceof AuthenticationFailedException) || !err.requires2FA) throw err;
-    const userName = err.username || ctx.credentials.userName || '';
+    // Always the caller's own user name: a name echoed by MISA must not change the cache key.
+    const userName = ctx.credentials.userName;
     const submission = await deps.otpProvider.provide({
       userName,
       correlationId: ctx.correlationId,
     });
-    if (!submission.code || submission.code.trim() === '') {
-      throw new ESignGeneralException({
-        category: 'Validation',
-        rawCode: 'InvalidOtpSubmission',
-        detail: 'InvalidOtpSubmission: the OTP provider returned an empty code.',
-        correlationId: ctx.correlationId,
-      });
-    }
+    const code = requireOtpCode(submission.code, ctx.correlationId);
     await deps.tokens.exchangeOtp(
-      { ...ctx.credentials, userName },
-      { code: submission.code, otpType: submission.otpType, remember: submission.remember },
+      ctx.credentials,
+      { code, otpType: submission.otpType, remember: submission.remember },
       { correlationId: ctx.correlationId, signal: ctx.signal },
     );
     return operation();
