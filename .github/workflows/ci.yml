@@ -56,6 +56,12 @@ jobs:
       - name: Restore
         run: dotnet restore MisaConnect.slnx
 
+      # Gate for the CONTRIBUTING rule "dotnet format before PR". Runs on Linux, where the
+      # checkout is LF like .editorconfig (end_of_line = lf); on Windows checkouts with
+      # core.autocrlf=true the same command reports ENDOFLINE noise only.
+      - name: Format check
+        run: dotnet format MisaConnect.slnx --verify-no-changes --no-restore --verbosity minimal
+
       - name: Build
         run: dotnet build MisaConnect.slnx --no-restore --configuration ${{ inputs.configuration || 'Release' }}
 
