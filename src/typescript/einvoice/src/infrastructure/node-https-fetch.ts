@@ -1,3 +1,4 @@
+// Duplicated to @misaconnect/esign (src/infrastructure/node-https-fetch.ts) — keep in sync.
 import http from 'node:http';
 import https from 'node:https';
 
