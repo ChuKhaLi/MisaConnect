@@ -71,10 +71,10 @@ None — no shared prerequisite. (Factory test placement resolved in research R1
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T015 Add `[Unreleased]` entries to `CHANGELOG.md` under `#### Fixed` for US1, US2, US4 and under a `#### Behaviour change` heading for US3 (old vs new category, empty-batch code, what integrators catching `Validation` must change), citing slice 009 (FR-010)
-- [ ] T016 Update `docs/superpowers/specs/2026-11-02-typescript-sdk-design.md` §9: mark items 1–4 as fixed in .NET by slice 009 (one line each), keeping the original text
-- [ ] T017 Full verification per `quickstart.md`: `dotnet build MisaConnect.slnx -c Release` (0 warnings), EInvoice unit + integration suites, ESign unit suite (regression), `npm test -w @misaconnect/einvoice`, `npm run lint`, `npm run format:check`; record results under "Baseline" for comparison
-- [ ] T018 Run `dotnet format MisaConnect.slnx --verify-no-changes --include` on the changed .cs files only (whole-solution verify reports CRLF noise on Windows; CI on Linux is the gate)
+- [x] T015 Add `[Unreleased]` entries to `CHANGELOG.md` under `#### Fixed` for US1, US2, US4 and under a `#### Behaviour change` heading for US3 (old vs new category, empty-batch code, what integrators catching `Validation` must change), citing slice 009 (FR-010)
+- [x] T016 Update `docs/superpowers/specs/2026-11-02-typescript-sdk-design.md` §9: mark items 1–4 as fixed in .NET by slice 009 (one line each), keeping the original text
+- [x] T017 Full verification per `quickstart.md`: `dotnet build MisaConnect.slnx -c Release` (0 warnings), EInvoice unit + integration suites, ESign unit suite (regression), `npm test -w @misaconnect/einvoice`, `npm run lint`, `npm run format:check`; record results under "Baseline" for comparison
+- [x] T018 Run `dotnet format MisaConnect.slnx --verify-no-changes --include` on the changed .cs files only (whole-solution verify reports CRLF noise on Windows; CI on Linux is the gate)
 
 ---
 
@@ -96,4 +96,5 @@ MVP = US1 + US2 (both P1). US3 is the behaviour change and ships in the same rel
 ## Baseline
 
 - T001 (2026-11-04, Debug): build 0 warnings; EInvoice.UnitTests 315/315; EInvoice.IntegrationTests 69 passed / 27 skipped.
-- T017: _(pending)_
+- T017 (2026-11-04, Release): build 0 warnings / 0 errors; EInvoice.UnitTests 332/332 (+17 new); ESign.UnitTests 301/301; EInvoice.IntegrationTests 71 passed / 27 skipped (+2 new); ESign.IntegrationTests 78 passed / 5 skipped; TS 539/539; lint, typecheck, format:check clean.
+- T018: `dotnet format --verify-no-changes --include <changed .cs>` reports only ENDOFLINE (Windows CRLF working copy); the index holds LF, matching `.editorconfig` `end_of_line = lf`.

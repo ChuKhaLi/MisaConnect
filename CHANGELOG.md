@@ -4,6 +4,17 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+#### Behaviour change — `MisaConnect.EInvoice` (slice 009)
+
+- Batch-size errors now report `MeInvoiceErrorCategory.BatchOrSize` instead of `Validation`. This covers the MISA codes `InvoiceQuantityTooLarge` and `XMLTooLong` and the SDK's own check for a `SaveDraftInvoices` batch of more than 30 invoices (raw code `InvoiceQuantityTooLarge` and rule `FR-030` unchanged). Code that catches `Validation` to handle oversize batches must also handle `BatchOrSize`.
+- An empty `SaveDraftInvoices` batch now throws `Validation` with raw code `ValidationFailed` and the message "Batch is empty; …". It used to reuse `InvoiceQuantityTooLarge` with a misleading "exceeds the limit" message.
+
+#### Fixed — `MisaConnect.EInvoice` (slice 009)
+
+- `MisaEInvoiceClientFactory.Create(MisaEInvoiceOptions)` dropped `Delete.IncludeRawErrorMessage`, so a factory-built client never surfaced raw MISA messages on delete/lookup failures even when opted in. All options are now copied, and a test fails when a new option is not.
+- Call logs no longer include `customerTaxCode` (the configured `Misa:EInvoice:TaxCode`). The SDK's own log scrubber treats tax codes as sensitive. Log queries that filtered on it should use `CorrelationId`.
+- `docs/architecture.md`: `ICorrelationIdAccessor` has a built-in default (`LibraryCorrelationIdAccessor`); it is not something you must register. The EInvoice port table also said to register overrides *before* `AddMisaConnectEInvoice`, but EInvoice registers its defaults with `Add…`, so overrides must come *after* the call.
+
 #### Changed
 
 - Sample API (`samples/dotnet/MisaConnect.Samples.Api`) wires up eSign only when a `Misa:ESign` configuration section exists. Since the eSign webhook slice it always required eSign credentials, so an eInvoice-only host failed at startup with `OptionsValidationException` — and 52 `MisaConnect.EInvoice.IntegrationTests` (which host the sample) failed unnoticed.
