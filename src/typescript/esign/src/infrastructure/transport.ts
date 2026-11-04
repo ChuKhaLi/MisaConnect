@@ -1,10 +1,10 @@
-import type { Delay } from '../application/ports.js';
 import type { MisaCredentials } from '../domain/dtos.js';
 import {
   ESignGeneralException,
   ESignTransportException,
   isESignException,
 } from '../domain/errors.js';
+import { abortableDelay } from './defaults.js';
 import { noopLogger, safeLogger } from './logging.js';
 import { createNodeHttpsFetch } from './node-https-fetch.js';
 import type { ResolvedESignOptions } from './options.js';
@@ -42,24 +42,6 @@ export interface TransportDeps {
   /** Per-attempt timeout override (tests). */
   timeoutMs?: number;
 }
-
-/** Default backoff: a `setTimeout` wait that rejects with the signal's reason on abort. */
-export const abortableDelay: Delay = (ms, signal) =>
-  new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(signal.reason as Error);
-      return;
-    }
-    const onAbort = (): void => {
-      clearTimeout(timer);
-      reject(signal?.reason as Error);
-    };
-    const timer = setTimeout(() => {
-      signal?.removeEventListener('abort', onAbort);
-      resolve();
-    }, ms);
-    signal?.addEventListener('abort', onAbort, { once: true });
-  });
 
 /** Network error codes that prove no request bytes reached MISA (safe to retry a sign call). */
 const SIGN_SAFE_CODES = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN']);
