@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@misaconnect/einvoice": "*",
+    "@misaconnect/esign": "*",
     "express": "^5.1.0"
   },
   "devDependencies": {

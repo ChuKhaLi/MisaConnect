@@ -1,3 +1,23 @@
 # Changelog
 
-## [Unreleased]
+All notable changes to `@misaconnect/esign` are documented here.
+
+## [0.1.0] - 2026-11-04
+
+First release: a TypeScript port of the .NET `MisaConnect.ESign` package.
+
+### Added
+
+- `createMisaESignClient(options)` returning `IMisaESignClient` with `signPdf`, `signXml` (string and bytes via `SignXmlRequest`), `signWord`, `signExcel`, `signInWithOtp`, `resendOtp`, `beginSignPdf`, `beginSignXml`, `beginSignWord`, `beginSignExcel` and `handleWebhook`.
+- `MisaESignOptions`: environment and base URL checks, static / provider / per-call credentials, polling and transport-retry settings, OTP and webhook settings, raw-error opt-in.
+- Swappable ports with defaults: `TokenCache`, `CertificateSelector`, `OtpProvider`, `MisaCredentialsProvider`, `SigningSessionStore`, `WebhookDeliveryHook`, `Clock`, `Delay`, `Logger` (`fromPino`).
+- Typed errors (`ESignException` and subclasses, `isESignException`) with the .NET categories and error-code mapping.
+- Built-in `node:https` HTTP client with classical TLS key-exchange groups.
+
+### Differences from .NET
+
+See the README section "Differences from the .NET SDK" (token refresh, `Signing/hash` retries, token fingerprint binding, per-principal OTP challenges, webhook confirmation via `Signing/status`, and more).
+
+### Known limitation
+
+Signing has not been verified against the live sandbox yet (the sandbox account has no ACTIVE certificate); sign-in works.
