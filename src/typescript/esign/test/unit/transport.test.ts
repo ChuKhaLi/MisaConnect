@@ -231,6 +231,54 @@ describe('transport', () => {
     expect(e.detail).toContain('text/html');
   });
 
+  it.each(['', '   '])(
+    'JSON content type with an empty body (%j) is not a content-type error',
+    async (body) => {
+      const empty = new Response(body, {
+        status: 200,
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      });
+      const { transport } = setup([empty]);
+      const r = await transport.send({ ...base, route: 'certificates', expectJson: true });
+      expect(r.status).toBe(200);
+      expect(r.json).toBeUndefined();
+    },
+  );
+
+  it('non-JSON content type with an empty body is still UnexpectedContentType', async () => {
+    const empty = new Response('', { status: 200, headers: { 'content-type': 'text/plain' } });
+    const { transport } = setup([empty]);
+    const err = await transport
+      .send({ ...base, route: 'certificates', expectJson: true })
+      .catch((e: unknown) => e);
+    expect((err as ESignGeneralException).rawCode).toBe('UnexpectedContentType');
+  });
+
+  it('signHash per-attempt timeout is not retried', async () => {
+    let count = 0;
+    const fetchFn = ((_u: string, init: RequestInit) => {
+      count++;
+      return new Promise((_res, rej) => {
+        init.signal!.addEventListener('abort', () => rej(init.signal!.reason));
+      });
+    }) as unknown as typeof fetch;
+    const t = createTransport(
+      {
+        origin: 'https://h.vn/',
+        authUnderWebdev: false,
+        transportRetry: { maxAttempts: 3, baseDelayMs: 1, maxDelayMs: 1 },
+        fetch: fetchFn,
+        delay: () => Promise.resolve(),
+      } as unknown as ResolvedESignOptions,
+      { timeoutMs: 5 },
+    );
+    const err = await t.send({ ...base, route: 'signHash' }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ESignTransportException);
+    expect((err as ESignTransportException).attemptCount).toBe(1);
+    expect((err as ESignTransportException).rawCode).toBe('Transport');
+    expect(count).toBe(1);
+  });
+
   it('flags unparseable JSON without leaking the body', async () => {
     const bad = new Response('{bad SECRETBODY', {
       status: 200,

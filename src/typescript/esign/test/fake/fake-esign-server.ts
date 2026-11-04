@@ -33,6 +33,8 @@ export interface FakeScenario {
   certsNoContentType200: boolean;
   certsJsonNonArray200: boolean;
   certsEmptyArray200: boolean;
+  /** 200 with an `application/json` content type and an empty body. */
+  certsEmptyBody200: boolean;
   certsContentTypeOverride: string | undefined;
   hashRejectionForFormat: FakeRejection | undefined;
   pendingsBeforeSuccess: number;
@@ -44,6 +46,8 @@ export interface FakeScenario {
   attachmentRejectionForFormat: FakeRejection | undefined;
   /** When set (e.g. 503), Signing/hash answers that status with an empty JSON body. */
   signHashStatus: number | undefined;
+  /** Signing/hash answers 200 with an `application/json` content type and an empty body. */
+  signHashEmptyBody200: boolean;
 }
 
 export const SIGNED_PDF_TEXT = 'SIGNED-PDF';
@@ -73,6 +77,7 @@ function defaultScenario(): FakeScenario {
     certsNoContentType200: false,
     certsJsonNonArray200: false,
     certsEmptyArray200: false,
+    certsEmptyBody200: false,
     certsContentTypeOverride: undefined,
     hashRejectionForFormat: undefined,
     pendingsBeforeSuccess: 1,
@@ -83,6 +88,7 @@ function defaultScenario(): FakeScenario {
     attachmentMissingFormatArrayFor: undefined,
     attachmentRejectionForFormat: undefined,
     signHashStatus: undefined,
+    signHashEmptyBody200: false,
   };
 }
 
@@ -406,6 +412,11 @@ export async function startFakeESignServer(): Promise<FakeESignServer> {
         sendJson(res, 200, { error: 'oops', emailName: 'leak@example.test' });
         return;
       }
+      if (scenario.certsEmptyBody200) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end();
+        return;
+      }
       res.writeHead(200, {
         'Content-Type': scenario.certsContentTypeOverride ?? 'application/json',
       });
@@ -432,6 +443,11 @@ export async function startFakeESignServer(): Promise<FakeESignServer> {
     if (route === `POST ${ESRM}/signing/api/v1/Signing/hash`) {
       if (scenario.signHashStatus !== undefined) {
         sendJson(res, scenario.signHashStatus, '');
+        return;
+      }
+      if (scenario.signHashEmptyBody200) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end();
         return;
       }
       statusCalls.delete('tx-fake-1'); // every new sign flow starts at poll 1

@@ -161,7 +161,10 @@ export function createTransport(
     const isJson = /json/i.test(ct);
     const label = endpointLabel(req.route);
     let parsed: unknown;
-    if (isJson && a.text.trim() !== '') {
+    if (isJson && a.text.trim() === '') {
+      // An empty JSON body is not a content-type error: callers see `json: undefined` (INV §5.4).
+      parsed = undefined;
+    } else if (isJson) {
       try {
         parsed = JSON.parse(a.text);
       } catch {

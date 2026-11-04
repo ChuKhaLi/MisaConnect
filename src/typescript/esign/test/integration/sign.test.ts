@@ -335,6 +335,83 @@ describe('sign flow — shared behaviour', () => {
     expect(fake.requests).toHaveLength(0);
   });
 
+  it('empty JSON certificates body → NoActiveCertificate', async () => {
+    fake.scenario.certsEmptyBody200 = true;
+    const e = await rejection(PDF.sign(makeClient()));
+    expect(e).toBeInstanceOf(NoActiveCertificateException);
+    expect(labels()).toEqual(['login', 'certificates']);
+  });
+
+  it('certificates without a content type → UnexpectedContentType', async () => {
+    fake.scenario.certsNoContentType200 = true;
+    const e = (await rejection(PDF.sign(makeClient()))) as ESignGeneralException;
+    expect(e).toBeInstanceOf(ESignGeneralException);
+    expect(e.category).toBe('MisaUnknown');
+    expect(e.rawCode).toBe('UnexpectedContentType');
+  });
+
+  it('Signing/hash 200 with an empty JSON body → MisaUnknown EmptyResponse', async () => {
+    fake.scenario.signHashEmptyBody200 = true;
+    const e = (await rejection(PDF.sign(makeClient()))) as ESignGeneralException;
+    expect(e).toBeInstanceOf(ESignGeneralException);
+    expect(e.category).toBe('MisaUnknown');
+    expect(e.rawCode).toBe('EmptyResponse');
+    expect(e.detail).toContain('Signing/hash');
+    expect(labels().filter((l) => l === 'signHash')).toHaveLength(1);
+    expect(labels()).not.toContain('status');
+  });
+
+  it('Signing/hash per-attempt timeout → one request and ESignTransportException', async () => {
+    // A fetch that never answers Signing/hash; every other call goes to the fake server.
+    const realFetch = globalThis.fetch;
+    let signHashCalls = 0;
+    const fetchFn = ((url: string, init: RequestInit) => {
+      if (url.endsWith('/Signing/hash')) {
+        signHashCalls++;
+        return new Promise((_res, rej) => {
+          init.signal?.addEventListener('abort', () => rej(init.signal?.reason as Error));
+        });
+      }
+      return realFetch(url, init);
+    }) as typeof fetch;
+    const client = createMisaESignClientInternal(
+      { baseUrl: fake.baseUrl, credentials: creds, fetch: fetchFn },
+      { delay: () => Promise.resolve(), transport: { timeoutMs: 50 } },
+    );
+    const e = (await rejection(PDF.sign(client))) as ESignTransportException;
+    expect(e).toBeInstanceOf(ESignTransportException);
+    expect(e.attemptCount).toBe(1);
+    expect(signHashCalls).toBe(1);
+    expect(labels()).not.toContain('status');
+  });
+
+  it('two users on one client: each logs in with its own credentials', async () => {
+    const bob: MisaCredentials = {
+      clientId: 'cid-b',
+      clientKey: 'ck-b',
+      userName: 'bob',
+      password: 'pw-b',
+    };
+    const client = makeClient();
+    await PDF.sign(client);
+    const firstCount = fake.requests.length;
+    await PDF.sign(client, { credentials: bob });
+    const logins = fake.requests.filter((r) => label(r) === 'login');
+    expect(logins.map((r) => JSON.parse(r.bodyText) as unknown)).toEqual([
+      { userName: 'alice', password: 'pw' },
+      { userName: 'bob', password: 'pw-b' },
+    ]);
+    const second = fake.requests.slice(firstCount);
+    expect(second.map(label)).toEqual(HAPPY_ORDER);
+    for (const r of second) {
+      expect(r.headers['x-clientid']).toBe('cid-b');
+      expect(r.headers['x-clientkey']).toBe('ck-b');
+    }
+    for (const r of fake.requests.slice(0, firstCount)) {
+      expect(r.headers['x-clientid']).toBe('cid');
+    }
+  });
+
   it('non-array JSON certificates → UnparseableResponse without echoing the body', async () => {
     fake.scenario.certsJsonNonArray200 = true;
     const e = (await rejection(PDF.sign(makeClient()))) as ESignGeneralException;
