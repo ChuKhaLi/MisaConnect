@@ -14,8 +14,8 @@ namespace MisaConnect.EInvoice.Infrastructure.Logging;
 
 /// <summary>
 /// Decorator over <see cref="IMeInvoiceClient"/> emitting the FR-014 log shape
-/// (endpoint, outcome, errorCategory, durationMs, refId, customerTaxCode,
-/// templateId). Never logs buyer info, line content, amounts, tokens, or raw
+/// (endpoint, outcome, errorCategory, durationMs, refId, templateId). Never logs
+/// buyer info, line content, amounts, tokens, the configured tax code, or raw
 /// MISA error messages.
 /// </summary>
 public sealed class MeInvoiceCallLogger : IMeInvoiceClient
@@ -131,7 +131,6 @@ public sealed class MeInvoiceCallLogger : IMeInvoiceClient
         string changeReason,
         Func<Task<SaveResult>> action)
     {
-        var taxCode = _options.Value.TaxCode;
         var cid = _correlation.CorrelationId;
         var refIdLabel = invoice?.RefId.Value;
         var templateId = invoice?.Template?.IPTemplateID;
@@ -144,14 +143,14 @@ public sealed class MeInvoiceCallLogger : IMeInvoiceClient
         if (includeChangeReason)
         {
             _logger.LogInformation(
-                "MeInvoice call started: endpoint={Endpoint}, correlationId={CorrelationId}, customerTaxCode={TaxCode}, templateId={TemplateId}, refId={RefId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}, changeReason={ChangeReason}",
-                endpoint, cid, taxCode, templateId, refIdLabel, eInvoiceStatus, orgRefId, redactedChangeReason);
+                "MeInvoice call started: endpoint={Endpoint}, correlationId={CorrelationId}, templateId={TemplateId}, refId={RefId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}, changeReason={ChangeReason}",
+                endpoint, cid, templateId, refIdLabel, eInvoiceStatus, orgRefId, redactedChangeReason);
         }
         else
         {
             _logger.LogInformation(
-                "MeInvoice call started: endpoint={Endpoint}, correlationId={CorrelationId}, customerTaxCode={TaxCode}, templateId={TemplateId}, refId={RefId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}",
-                endpoint, cid, taxCode, templateId, refIdLabel, eInvoiceStatus, orgRefId);
+                "MeInvoice call started: endpoint={Endpoint}, correlationId={CorrelationId}, templateId={TemplateId}, refId={RefId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}",
+                endpoint, cid, templateId, refIdLabel, eInvoiceStatus, orgRefId);
         }
 
         var sw = Stopwatch.StartNew();
@@ -162,14 +161,14 @@ public sealed class MeInvoiceCallLogger : IMeInvoiceClient
             if (includeChangeReason)
             {
                 _logger.LogInformation(
-                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, customerTaxCode={TaxCode}, templateId={TemplateId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}, changeReason={ChangeReason}",
-                    endpoint, "Success", null, sw.ElapsedMilliseconds, refIdLabel, taxCode, templateId, eInvoiceStatus, orgRefId, redactedChangeReason);
+                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, templateId={TemplateId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}, changeReason={ChangeReason}",
+                    endpoint, "Success", null, sw.ElapsedMilliseconds, refIdLabel, templateId, eInvoiceStatus, orgRefId, redactedChangeReason);
             }
             else
             {
                 _logger.LogInformation(
-                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, customerTaxCode={TaxCode}, templateId={TemplateId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}",
-                    endpoint, "Success", null, sw.ElapsedMilliseconds, refIdLabel, taxCode, templateId, eInvoiceStatus, orgRefId);
+                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, templateId={TemplateId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}",
+                    endpoint, "Success", null, sw.ElapsedMilliseconds, refIdLabel, templateId, eInvoiceStatus, orgRefId);
             }
             return result;
         }
@@ -180,14 +179,14 @@ public sealed class MeInvoiceCallLogger : IMeInvoiceClient
             {
                 var scrubbed = MeInvoiceLogScrubber.Redact(ex.Message ?? string.Empty);
                 _logger.LogWarning(
-                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, customerTaxCode={TaxCode}, templateId={TemplateId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}, changeReason={ChangeReason}, errorMessage={ErrorMessage}",
-                    endpoint, "Error", ex.Category, sw.ElapsedMilliseconds, refIdLabel, taxCode, templateId, eInvoiceStatus, orgRefId, redactedChangeReason, scrubbed);
+                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, templateId={TemplateId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}, changeReason={ChangeReason}, errorMessage={ErrorMessage}",
+                    endpoint, "Error", ex.Category, sw.ElapsedMilliseconds, refIdLabel, templateId, eInvoiceStatus, orgRefId, redactedChangeReason, scrubbed);
             }
             else
             {
                 _logger.LogWarning(
-                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, customerTaxCode={TaxCode}, templateId={TemplateId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}",
-                    endpoint, "Error", ex.Category, sw.ElapsedMilliseconds, refIdLabel, taxCode, templateId, eInvoiceStatus, orgRefId);
+                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, templateId={TemplateId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}",
+                    endpoint, "Error", ex.Category, sw.ElapsedMilliseconds, refIdLabel, templateId, eInvoiceStatus, orgRefId);
             }
             throw;
         }
@@ -195,8 +194,8 @@ public sealed class MeInvoiceCallLogger : IMeInvoiceClient
         {
             sw.Stop();
             _logger.LogError(
-                "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, customerTaxCode={TaxCode}, templateId={TemplateId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}",
-                endpoint, "Error", MeInvoiceErrorCategory.MisaUnknown, sw.ElapsedMilliseconds, refIdLabel, taxCode, templateId, eInvoiceStatus, orgRefId);
+                "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, templateId={TemplateId}, eInvoiceStatus={EInvoiceStatus}, orgRefId={OrgRefId}",
+                endpoint, "Error", MeInvoiceErrorCategory.MisaUnknown, sw.ElapsedMilliseconds, refIdLabel, templateId, eInvoiceStatus, orgRefId);
             throw;
         }
     }
@@ -213,11 +212,10 @@ public sealed class MeInvoiceCallLogger : IMeInvoiceClient
 
     private async Task<T> Wrap<T>(string endpoint, string? refIdLabel, string? templateId, Func<Task<T>> action)
     {
-        var taxCode = _options.Value.TaxCode;
         var cid = _correlation.CorrelationId;
         _logger.LogInformation(
-            "MeInvoice call started: endpoint={Endpoint}, correlationId={CorrelationId}, customerTaxCode={TaxCode}, templateId={TemplateId}, refId={RefId}",
-            endpoint, cid, taxCode, templateId, refIdLabel);
+            "MeInvoice call started: endpoint={Endpoint}, correlationId={CorrelationId}, templateId={TemplateId}, refId={RefId}",
+            endpoint, cid, templateId, refIdLabel);
 
         var sw = Stopwatch.StartNew();
         try
@@ -225,8 +223,8 @@ public sealed class MeInvoiceCallLogger : IMeInvoiceClient
             var result = await action().ConfigureAwait(false);
             sw.Stop();
             _logger.LogInformation(
-                "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, customerTaxCode={TaxCode}, templateId={TemplateId}",
-                endpoint, "Success", null, sw.ElapsedMilliseconds, refIdLabel, taxCode, templateId);
+                "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, templateId={TemplateId}",
+                endpoint, "Success", null, sw.ElapsedMilliseconds, refIdLabel, templateId);
             return result;
         }
         catch (MeInvoiceException ex)
@@ -241,14 +239,14 @@ public sealed class MeInvoiceCallLogger : IMeInvoiceClient
             {
                 var scrubbed = MeInvoiceLogScrubber.Redact(ex.Message ?? string.Empty);
                 _logger.LogWarning(
-                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, customerTaxCode={TaxCode}, templateId={TemplateId}, errorMessage={ErrorMessage}",
-                    endpoint, "Error", ex.Category, sw.ElapsedMilliseconds, refIdLabel, taxCode, templateId, scrubbed);
+                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, templateId={TemplateId}, errorMessage={ErrorMessage}",
+                    endpoint, "Error", ex.Category, sw.ElapsedMilliseconds, refIdLabel, templateId, scrubbed);
             }
             else
             {
                 _logger.LogWarning(
-                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, customerTaxCode={TaxCode}, templateId={TemplateId}",
-                    endpoint, "Error", ex.Category, sw.ElapsedMilliseconds, refIdLabel, taxCode, templateId);
+                    "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, templateId={TemplateId}",
+                    endpoint, "Error", ex.Category, sw.ElapsedMilliseconds, refIdLabel, templateId);
             }
             throw;
         }
@@ -256,8 +254,8 @@ public sealed class MeInvoiceCallLogger : IMeInvoiceClient
         {
             sw.Stop();
             _logger.LogError(
-                "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, customerTaxCode={TaxCode}, templateId={TemplateId}",
-                endpoint, "Error", MeInvoiceErrorCategory.MisaUnknown, sw.ElapsedMilliseconds, refIdLabel, taxCode, templateId);
+                "MeInvoice call completed: endpoint={Endpoint}, outcome={Outcome}, errorCategory={ErrorCategory}, durationMs={DurationMs}, refId={RefId}, templateId={TemplateId}",
+                endpoint, "Error", MeInvoiceErrorCategory.MisaUnknown, sw.ElapsedMilliseconds, refIdLabel, templateId);
             throw;
         }
     }
