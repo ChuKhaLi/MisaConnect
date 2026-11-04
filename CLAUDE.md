@@ -76,5 +76,5 @@ Never log secrets, tokens, or buyer PII (names, addresses, line-item content). R
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-[specs/008-esign-per-user-credentials/plan.md](specs/008-esign-per-user-credentials/plan.md).
+[specs/009-fix-einvoice-inventory-defects/plan.md](specs/009-fix-einvoice-inventory-defects/plan.md).
 <!-- SPECKIT END -->

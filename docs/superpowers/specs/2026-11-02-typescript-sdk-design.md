@@ -147,7 +147,7 @@ The .NET source of truth for behaviour is `src/dotnet/MisaConnect.EInvoice.*` (p
 
 ## 9. Known .NET defects — do not reproduce
 
-Found during inventory; fix in .NET separately, not in this work:
+Found during inventory; fix in .NET separately, not in this work. **All four fixed in .NET by Spec Kit slice `specs/009-fix-einvoice-inventory-defects/` (2026-11-04)**; the TS drift guard now expects no category deviations.
 
 1. `MisaEInvoiceClientFactory.Create(options)` drops `Delete.IncludeRawErrorMessage`.
 2. Call logger logs customer tax code, contradicting the scrubber's rule. TS: do not log it.

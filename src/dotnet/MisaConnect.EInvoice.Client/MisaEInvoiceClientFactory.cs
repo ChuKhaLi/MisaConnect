@@ -28,14 +28,25 @@ public static class MisaEInvoiceClientFactory
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        return Create(target =>
+        return Create(target => CopyTo(options, target));
+    }
+
+    /// <summary>
+    /// Copies every option from <paramref name="source"/> onto <paramref name="target"/>.
+    /// Nested option objects are copied by value. A round-trip test fails when an option is
+    /// added to <see cref="MisaEInvoiceOptions"/> without updating this method.
+    /// </summary>
+    internal static void CopyTo(MisaEInvoiceOptions source, MisaEInvoiceOptions target)
+    {
+        target.Environment = source.Environment;
+        target.BaseUrl = source.BaseUrl;
+        target.TaxCode = source.TaxCode;
+        target.UserName = source.UserName;
+        target.Password = source.Password;
+        target.AppId = source.AppId;
+        target.Delete = new MisaEInvoiceDeleteOptions
         {
-            target.Environment = options.Environment;
-            target.BaseUrl = options.BaseUrl;
-            target.TaxCode = options.TaxCode;
-            target.UserName = options.UserName;
-            target.Password = options.Password;
-            target.AppId = options.AppId;
-        });
+            IncludeRawErrorMessage = source.Delete.IncludeRawErrorMessage,
+        };
     }
 }

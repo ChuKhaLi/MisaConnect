@@ -33,14 +33,26 @@ public sealed class SaveDraftInvoices
     {
         ArgumentNullException.ThrowIfNull(invoices);
 
-        if (invoices.Count is < 1 or > BatchSubmission.MaxInvoices)
+        if (invoices.Count == 0)
+        {
+            var failure = new ValidationFailure(
+                "$batch.Count",
+                $"Batch is empty; submit between 1 and {BatchSubmission.MaxInvoices} invoices.",
+                "FR-030");
+            throw new MeInvoiceException(
+                MeInvoiceErrorCategory.Validation,
+                rawErrorCode: "ValidationFailed",
+                failures: new[] { failure });
+        }
+
+        if (invoices.Count > BatchSubmission.MaxInvoices)
         {
             var failure = new ValidationFailure(
                 "$batch.Count",
                 $"Batch size {invoices.Count} exceeds the MISA limit of {BatchSubmission.MaxInvoices} invoices per request.",
                 "FR-030");
             throw new MeInvoiceException(
-                MeInvoiceErrorCategory.Validation,
+                MeInvoiceErrorCategory.BatchOrSize,
                 rawErrorCode: "InvoiceQuantityTooLarge",
                 failures: new[] { failure });
         }

@@ -8,8 +8,7 @@ export interface MappedError {
   component?: string;
 }
 
-// Mirrors .NET MeInvoiceErrorMapper.ExactMap (exported for the drift guard test), except InvoiceQuantityTooLarge and
-// XMLTooLong map to BatchOrSize (spec 9.3 deviation).
+// Mirrors .NET MeInvoiceErrorMapper.ExactMap exactly (exported for the drift guard test).
 export const EXACT_ERROR_CODES: ReadonlyArray<readonly [string, MeInvoiceErrorCategory]> = [
   ['InvalidAppID', 'Configuration'],
   ['InActiveAppID', 'Configuration'],

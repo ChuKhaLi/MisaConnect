@@ -60,7 +60,7 @@ Domain has zero dependencies. Application has zero infrastructure concerns. This
 
 ### EInvoice ports
 
-Consumers swap any of these by registering their own implementation before `AddMisaConnectEInvoice`:
+Consumers swap any of these by registering their own implementation **after** `AddMisaConnectEInvoice`. EInvoice registers its defaults with `Add…` (not `TryAdd…`), so the last registration wins and one made before the call is overridden. ESign differs; see below.
 
 | Port | Default adapter | Why swap? |
 | --- | --- | --- |
@@ -68,14 +68,14 @@ Consumers swap any of these by registering their own implementation before `AddM
 | `ITokenCache` | `InMemoryTokenCache` | Use Redis / distributed cache |
 | `IRefIdGenerator` | GUID generator | Use a domain-meaningful RefId scheme |
 | `ISystemClock` | `TimeProvider.System` | Test-time clocks |
-| `ICorrelationIdAccessor` | (you must register) | ASP.NET vs console vs background worker |
+| `ICorrelationIdAccessor` | `LibraryCorrelationIdAccessor` (internal; a new GUID per DI scope) | Reuse the ASP.NET request ID / your tracing ID |
 | `ITemplateResolver` | `TemplateResolver` | Custom template selection |
 | `IInvoiceValidator` | `InvoiceValidator` | Domain-specific pre-flight validation |
 | `IDeleteOptionsAccessor` | `DeleteOptionsAccessor` | Override raw-error opt-in at runtime |
 
 ### ESign ports
 
-Consumers swap any of these by registering their own implementation before `AddMisaConnectESign`:
+Consumers swap any of these by registering their own implementation before `AddMisaConnectESign` (ESign registers its defaults with `TryAdd…`, so an earlier registration wins):
 
 | Port | Default adapter | Why swap? |
 | --- | --- | --- |
@@ -84,7 +84,7 @@ Consumers swap any of these by registering their own implementation before `AddM
 | `ICertificateSelector` | first-`ACTIVE` selector | Pick by issuer DN, alias, expiry, etc. |
 | `IOtpProvider` | (you must register for transparent 2FA) | Pull OTP from SMS gateway / TOTP / interactive prompt |
 | `ISystemClock` | `TimeProvider.System` | Test-time clocks |
-| `ICorrelationIdAccessor` | (you must register) | ASP.NET vs console vs background worker |
+| `ICorrelationIdAccessor` | `LibraryCorrelationIdAccessor` (internal; a new GUID per DI scope) | Reuse the ASP.NET request ID / your tracing ID |
 | `IWebhookDeliveryHook` | (you must register for webhook mode) | Fan out signed bytes to your queue / DB / SignalR |
 | `ISigningSessionStore` | `InMemorySigningSessionStore` | Distributed store (Redis, SQL) for multi-instance webhook mode |
 

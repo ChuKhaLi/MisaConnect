@@ -135,8 +135,6 @@ describe('mapErrorCode detail', () => {
   });
 });
 
-// Documented spec 9.3 deviations: TS reports these as BatchOrSize, .NET as Validation.
-const BATCH_OR_SIZE_DEVIATIONS = new Set(['InvoiceQuantityTooLarge', 'XMLTooLong']);
 const dotnetMapper = fileURLToPath(
   new URL(
     '../../../../dotnet/MisaConnect.EInvoice.Application/Errors/MeInvoiceErrorMapper.cs',
@@ -154,9 +152,9 @@ describe.skipIf(!existsSync(dotnetMapper))('drift guard against MeInvoiceErrorMa
     expect(entries).toHaveLength(exact.length);
   });
 
-  it.each(entries)('maps %s like .NET (%s) except documented deviations', (code, dotnetCat) => {
-    const expected = BATCH_OR_SIZE_DEVIATIONS.has(code) ? 'BatchOrSize' : dotnetCat;
-    expect(mapErrorCode(code).category).toBe(expected);
+  // .NET slice 009 aligned the batch-size codes (BatchOrSize), so there are no deviations left.
+  it.each(entries)('maps %s like .NET (%s)', (code, dotnetCat) => {
+    expect(mapErrorCode(code).category).toBe(dotnetCat);
   });
 
   it('has exactly the .NET ExactMap keys (no TS-only or missing codes)', () => {
@@ -165,11 +163,10 @@ describe.skipIf(!existsSync(dotnetMapper))('drift guard against MeInvoiceErrorMa
     expect(tsKeys.size).toBe(EXACT_ERROR_CODES.length);
     expect([...tsKeys].filter((k) => !dotnetKeys.has(k))).toEqual([]);
     expect([...dotnetKeys].filter((k) => !tsKeys.has(k))).toEqual([]);
-    // The only category differences are the documented BatchOrSize deviations.
     const differing = EXACT_ERROR_CODES.filter(
       ([code, cat]) => entries.find(([c]) => c === code)?.[1] !== cat,
     ).map(([code]) => code);
-    expect(new Set(differing)).toEqual(BATCH_OR_SIZE_DEVIATIONS);
+    expect(differing).toEqual([]);
   });
 
   it('has the .NET PrefixMap entries, in order', () => {
