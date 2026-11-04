@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { isIP } from 'node:net';
 import express from 'express';
 import { createMisaEInvoiceClient, isMeInvoiceException } from '@misaconnect/einvoice';
@@ -118,14 +118,10 @@ app.post(
 );
 
 // Webhook route protection. The SDK does not authenticate webhook requests: the host must.
-const sha = (v: string): Buffer => Buffer.from(v, 'utf8');
-function secretMatches(given: string, expected: string): boolean {
-  // timingSafeEqual needs equal lengths, so a length mismatch is rejected up front (the length of
-  // the secret is not worth hiding).
-  const a = sha(given);
-  const b = sha(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
+const digest = (v: string): Buffer => createHash('sha256').update(v, 'utf8').digest();
+// Hashing both sides gives equal-length buffers, so timingSafeEqual needs no length check.
+const secretMatches = (given: string, expected: string): boolean =>
+  timingSafeEqual(digest(given), digest(expected));
 
 function ipv4ToInt(ip: string): number | undefined {
   const parts = ip.split('.').map(Number);
@@ -161,12 +157,16 @@ app.post('/esign/webhook/:secret', async (req, res) => {
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s !== '');
-  if (expected.length < 32 || !secretMatches(req.params['secret'] ?? '', expected)) {
-    res.status(404).end(); // do not reveal that the route exists
+  if (expected.length < 32) {
+    res.status(404).end(); // not configured
     return;
   }
   if (!ipAllowed(req.ip, allowlist)) {
     res.status(403).end();
+    return;
+  }
+  if (!secretMatches(req.params['secret'] ?? '', expected)) {
+    res.status(404).end(); // do not reveal that the route exists
     return;
   }
   try {

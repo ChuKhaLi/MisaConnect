@@ -15,8 +15,12 @@ map() {
 if [ "${1:-}" = "--self-test" ]; then
   [ "$(map einvoice-ts-v1.2.3)" = "@misaconnect/einvoice src/typescript/einvoice einvoice-ts-v" ]
   [ "$(map esign-ts-v0.1.0)" = "@misaconnect/esign src/typescript/esign esign-ts-v" ]
-  ! map v1.0.0 >/dev/null 2>&1
-  ! map main >/dev/null 2>&1
+  for bad in v1.0.0 main refs/tags/esign-ts-v1 einvoice-ts-1.0.0 ""; do
+    if map "$bad" >/dev/null 2>&1; then
+      echo "FAIL: '$bad' accepted" >&2
+      exit 1
+    fi
+  done
   echo "ts-release-target self-test OK"
   exit 0
 fi

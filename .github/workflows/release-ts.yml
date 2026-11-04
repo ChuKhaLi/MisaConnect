@@ -47,6 +47,8 @@ jobs:
           cache: npm
       - name: npm CLI with trusted + staged publishing support (>= 11.15.0)
         run: npm install -g "npm@>=11.15.0 <12" && npm --version
+      - name: Self-test tag mapping
+        run: bash .github/scripts/ts-release-target.sh --self-test
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck

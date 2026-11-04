@@ -30,6 +30,6 @@ eInvoice endpoints work without them).
   The SDK does not authenticate webhook requests, so the sample does: `ESIGN_WEBHOOK_SECRET` (at
   least 32 characters) must equal the `:secret` path segment (constant-time compare, 404 otherwise),
   and an optional `ESIGN_WEBHOOK_ALLOWED_IPS` (comma-separated IPv4 addresses or CIDRs) restricts
-  the source address (403 otherwise; behind a proxy configure Express `trust proxy` so `req.ip` is
+  the source address, checked before the secret (403 otherwise; IPv6 sources are always rejected when an allowlist is set; behind a proxy configure Express `trust proxy` so `req.ip` is
   the real client). It then calls `client.handleWebhook(req.body)` and answers with the ACK JSON.
   Keep the secret out of access logs.
