@@ -43,7 +43,7 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
         _keySelector = keySelector;
         _singleFlight = singleFlight;
         _options = options;
-        _correlation = correlation;
+        _correlation = AmbientCorrelationId.Wrap(correlation);
         _clock = clock;
     }
 
@@ -53,6 +53,9 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
         {
             return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         }
+
+        // Auth calls made below run in this handler's DI scope; keep them under the flow's ID.
+        using var correlationScope = AmbientCorrelationId.PushFrom(request);
 
         // Always use the current token: callers capture a token once and pass it to every
         // wire call, so the header they set can be stale after a refresh.

@@ -146,6 +146,25 @@ public class RemoteSigningAuthHandlerTests
     }
 
     [Fact]
+    public async Task Auth_calls_inside_handler_see_the_request_correlation_id()
+    {
+        var h = new Harness((_, _, _) => Task.FromResult(HttpStatusCode.Unauthorized));
+        string? seenAtLogin = null;
+        h.Wire.OnLogin = (_, _, _) =>
+        {
+            seenAtLogin = AmbientCorrelationId.Current;
+            return Task.FromResult(Session("T1"));
+        };
+        h.Wire.OnRefresh = (_, _) => Task.FromResult(Session("T2"));
+
+        var ex = await Assert.ThrowsAsync<AuthenticationFailedException>(() => h.SendAsync("flow-cid"));
+
+        Assert.Equal("flow-cid", seenAtLogin);
+        Assert.Equal("flow-cid", ex.CorrelationId);
+        Assert.Null(AmbientCorrelationId.Current);
+    }
+
+    [Fact]
     public async Task Retry_401_evicts_the_rejected_token()
     {
         var h = new Harness((_, _, _) => Task.FromResult(HttpStatusCode.Unauthorized));

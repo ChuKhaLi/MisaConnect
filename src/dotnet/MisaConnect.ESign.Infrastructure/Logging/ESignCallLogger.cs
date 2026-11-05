@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using MisaConnect.ESign.Application.Abstractions;
+using MisaConnect.ESign.Infrastructure.Http;
 using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Domain.Certificates;
 using MisaConnect.ESign.Domain.Documents;
@@ -19,7 +20,7 @@ internal sealed class ESignCallLogger : IMisaESignWireClient
     {
         _inner = inner;
         _logger = logger;
-        _correlation = correlation;
+        _correlation = AmbientCorrelationId.Wrap(correlation);
     }
 
     public Task<AuthSession> LoginAsync(string userName, string password, CancellationToken ct) =>
