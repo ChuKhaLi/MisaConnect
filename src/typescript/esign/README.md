@@ -322,9 +322,10 @@ DTO property names are the camelCase of the .NET names; wire field names match M
 
 ## Differences from the .NET SDK
 
-Since .NET `MisaConnect.ESign` 2.5.0 the two SDKs agree on token handling, retries, response guards, 2FA detection and webhook handling. The one remaining difference is the default of the validation-failure delivery option.
+Since .NET `MisaConnect.ESign` 2.5.0 the two SDKs agree on token handling, retries, response guards, 2FA detection and webhook handling. Two differences remain: the default of the validation-failure delivery option, and how webhook credentials are found in static credentials mode.
 
 - **Validation-failure delivery default.** `handleWebhook` answers validation failures (malformed body, unknown transaction, client id or document mismatch) to the caller only and never calls your delivery hook. .NET 2.x delivers them to `IWebhookDeliveryHook` by default (`Webhook.DeliverValidationFailuresToHook = true`) so a minor release does not change behaviour; set it to `false` for the TypeScript behaviour. The .NET default becomes `false` in 3.0.
+- **Webhook credentials in static mode.** When `credentials` is a provider function, `handleWebhook` always calls it with the session's `clientId` and `userName` to finalize a webhook. .NET in `CredentialsMode.Static` never calls `IWebhookCredentialsResolver`, even a custom one; it uses the credentials from its options. Only `CredentialsMode.Dynamic` calls the resolver.
 
 ### Fixed in .NET 2.5.0
 

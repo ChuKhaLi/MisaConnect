@@ -48,8 +48,13 @@ using MisaConnect.ESign.Client.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-// `configuration` is your IConfiguration, e.g. builder.Configuration in ASP.NET or the Generic Host.
-IConfiguration configuration = GetConfiguration();
+// In ASP.NET or the Generic Host, use builder.Configuration instead.
+// AddJsonFile and AddEnvironmentVariables need the Microsoft.Extensions.Configuration.Json
+// and Microsoft.Extensions.Configuration.EnvironmentVariables packages.
+IConfiguration configuration = new ConfigurationBuilder()
+    .AddJsonFile("appsettings.json")
+    .AddEnvironmentVariables()
+    .Build();
 
 var services = new ServiceCollection();
 services.AddMisaConnectESign(configuration);

@@ -72,7 +72,7 @@ The webhook is only a trigger. For each accepted webhook the SDK calls MISA's `S
 
 | ACK `errorCode` | Returned when |
 | --- | --- |
-| `webhook.malformed` | The body is missing or has an empty `messageId`, `clientId` or `transactionId`, an unknown `status`, or a `signatures` value of the wrong shape. Also the fallback for an unspecified validation failure. |
+| `webhook.malformed` | The body is missing or has an empty `messageId`, `clientId` or `transactionId`, an unknown `status`, or a null entry in `signatures` (a non-array `signatures` value fails JSON binding before the SDK sees it). Also the fallback for an unspecified validation failure. |
 | `webhook.client_id_mismatch` | The webhook's `clientId` differs from the configured `ClientId`. |
 | `webhook.unknown_transaction` | No signing session is recorded for that `transactionId`. |
 | `webhook.incomplete_success` | `status` is `SUCCESS` but `signatures[]` is empty or invalid. |

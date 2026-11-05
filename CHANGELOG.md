@@ -13,18 +13,23 @@ Minor release of `MisaConnect.ESign`: back-ports the fixes and rulings first mad
 - After a 401-triggered token refresh, the rest of the flow now uses the refreshed token instead of the stale one, and no longer refreshes again on every later call.
 - When the refresh after a 401 fails for any reason, the SDK evicts the cached token, logs in once more and retries the request once, and fails with `Authentication` only if that fails too.
 - A cached token with 30 s or less left is refreshed proactively (the skew was declared but never used).
+- Proactive refreshes run in the same single flight as 401-driven refreshes, keyed by the token cache key, so concurrent flows for one principal make one refresh call. A refresh that fails no longer evicts a token another flow has just stored, and a refresh result that is already expired counts as a failed refresh and falls back to login.
 - Any refresh-path failure, including non-SDK exceptions, leaves no stale entry in the token cache.
 - `POST Signing/hash` is no longer retried after a 5xx, a timeout, or a failure after the request may have been sent (see "Behaviour changes").
 - Every ESRM JSON response goes through the content-type guard, not only the certificate list.
 - MISA's `error` field accepts boolean, `"true"`/`"false"` strings (any case) and null, in both the flat and the nested login shape, without dropping the envelope.
-- Two-factor code `122` is recognised on any HTTP status that reaches login error mapping, in both the nested and the flat body shape.
+- Two-factor code `122` is recognised on any HTTP status that reaches login error mapping, in both the nested and the flat body shape, whatever the `error` flag says (`true`, `false`, null or missing). The same applies to the two-factor endpoint.
+- A webhook validation failure whose `IWebhookDeliveryHook` throws `OperationCanceledException` because the caller's token was cancelled now propagates that cancellation instead of swallowing it.
 - Docs: `docs/esign/getting-started.md` used a non-existent namespace, a placeholder logo, and listed `SignXmlAsync` overloads that do not exist; `configuration.md` and `sandbox-setup.md` were corrected (URL rule, override ordering, sandbox skip rules, no reachability probe).
 
 #### Added
 
-- `IWebhookCredentialsResolver` (`MisaConnect.ESign.Application.Abstractions`): supplies the credentials of the principal that began a webhook-mode transaction, so `CredentialsMode.Dynamic` now works with webhooks. The session records the `clientId` and `userName` (never secrets). The default returns the option credentials in `Static` mode and `null` in `Dynamic` mode; register your own before `AddMisaConnectESign`.
+- `IWebhookCredentialsResolver` (`MisaConnect.ESign.Application.Abstractions`): supplies the credentials of the principal that began a webhook-mode transaction, so `CredentialsMode.Dynamic` now works with webhooks. The session already recorded the `clientId`; it now also records the `userName` (never secrets). The default returns the option credentials in `Static` mode and `null` in `Dynamic` mode; register your own before `AddMisaConnectESign`.
 - `MisaESignOptions.Webhook.DeliverValidationFailuresToHook` (default `true`): whether webhook validation failures reach `IWebhookDeliveryHook` as a failure outcome. The default becomes `false` in 3.0.
-- `ISigningSessionStore.CacheTerminalAsync` (default interface method, no-op) and `SigningSession.CachedTerminal` / `SigningSession.UserName`, so a terminal state can be stored once per transaction.
+- `ISigningSessionStore.CacheTerminalAsync` (default interface method, no-op), the `SigningSessionCachedTerminal` record and `SigningSession.CachedTerminal`, so a terminal state can be stored once per transaction. `SigningSession.UserName` records the principal that began the transaction.
+- `HandleWebhook.HandleMalformedAsync`: answers a webhook body that failed to parse with ACK `webhook.malformed` and a failure outcome.
+- `EnsureAccessToken.ProactiveRefreshSkew` (30 s): a cached token with this much life left or less is refreshed rather than reused.
+- An `EnsureAccessToken` constructor overload with a trailing `ExchangeOtp.SingleFlightDelegate? singleFlight` parameter, which coalesces concurrent refreshes for one principal. The existing constructor is unchanged and refreshes without coalescing.
 
 #### Behaviour changes
 
@@ -33,7 +38,7 @@ Minor release of `MisaConnect.ESign`: back-ports the fixes and rulings first mad
 - **Guard message.** The content-type guard message reports the content type and body length and no longer includes a body snippet.
 - **Webhook outcomes are confirmed by MISA.** A webhook is a trigger: the SDK calls `Signing/status` for every accepted webhook (one extra call per webhook), and MISA's status, error code and signature decide the outcome. Webhook FAILED/CANCELLED outcomes now report MISA's status and error code (from `Signing/status`), not the webhook's.
 - **A terminal state is delivered once.** The first recorded terminal state (success, failed or cancelled) of a transaction is stored once; later webhooks for it return the original ACK and do not call `IWebhookDeliveryHook` again. A custom `ISigningSessionStore` that does not implement `CacheTerminalAsync` keeps the 2.4 behaviour for failed/cancelled terminals.
-- **Malformed webhooks.** A malformed body (missing or empty `messageId`/`clientId`/`transactionId`, unknown `status`, wrongly shaped `signatures`) now gets ACK `webhook.malformed` and a failure outcome instead of an exception. `status` is matched case-insensitively.
+- **Malformed webhooks.** A malformed body (missing or empty `messageId`/`clientId`/`transactionId`, unknown `status`, a null entry in `signatures`) now gets ACK `webhook.malformed` and a failure outcome instead of an exception. `status` is matched case-insensitively.
 - **Finalize errors.** Errors while confirming or finalizing a webhook (including a two-factor requirement, which finalize never prompts for) return ACK `webhook.finalize_failed` instead of throwing. Exceptions thrown by your `IWebhookDeliveryHook` on success/terminal delivery still propagate out of `HandleWebhookAsync`; the success is cached first, so MISA's retry gets the cached ACK.
 - **Two-factor challenges are per principal** (`clientId` + `userName`). `SignInWithOtpAsync` and `ResendOtpAsync` act on the current principal's challenge only.
 - **3.0 default flip.** `Webhook.DeliverValidationFailuresToHook` defaults to `true` in 2.x so a minor release does not silently change behaviour. It flips to `false` in 3.0, because a public webhook endpoint lets anyone trigger hook calls with forged payloads. Set it to `false` now to opt in.
