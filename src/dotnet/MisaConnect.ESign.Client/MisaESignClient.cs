@@ -7,6 +7,7 @@ using MisaConnect.ESign.Application.Validation;
 using MisaConnect.ESign.Client.Dtos;
 using MisaConnect.ESign.Client.Dtos.Webhook;
 using MisaConnect.ESign.Client.Mapping;
+using MisaConnect.ESign.Client.Webhook;
 using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Domain.Webhook;
@@ -268,8 +269,10 @@ internal sealed class MisaESignClient : IMisaESignClient
     {
         ArgumentNullException.ThrowIfNull(envelope);
 
-        var domain = ToDomain(envelope);
-        var result = await RequireHandleWebhook().HandleAsync(domain, ct).ConfigureAwait(false);
+        var handler = RequireHandleWebhook();
+        var result = WebhookEnvelopeParser.TryParse(envelope, out var domain, out var malformedField)
+            ? await handler.HandleAsync(domain, ct).ConfigureAwait(false)
+            : await handler.HandleMalformedAsync(envelope.TransactionId, malformedField, ct).ConfigureAwait(false);
 
         return new WebhookHandleResultDto(
             Ack: new WebhookAckDto(result.Ack.ErrorCode, result.Ack.DevMsg, result.Ack.UserMsg),
@@ -324,33 +327,6 @@ internal sealed class MisaESignClient : IMisaESignClient
         ?? throw new InvalidOperationException("BeginSignExcel not wired — register via AddMisaConnectESign(...).");
     private HandleWebhook RequireHandleWebhook() => _handleWebhook
         ?? throw new InvalidOperationException("HandleWebhook not wired — register via AddMisaConnectESign(...).");
-
-    private static WebhookEnvelope ToDomain(WebhookEnvelopeDto dto)
-    {
-        var status = ParseStatus(dto.Status);
-        var signatures = (dto.Signatures ?? new List<WebhookSignatureDto>())
-            .Select(s => new WebhookSignature(s.DocumentId, s.Signature))
-            .ToList();
-        IReadOnlyDictionary<string, JsonElement>? extra = dto.ExtraData is null
-            ? null
-            : new ReadOnlyDictionary<string, JsonElement>(dto.ExtraData);
-        return new WebhookEnvelope(
-            MessageId: dto.MessageId,
-            ClientId: dto.ClientId,
-            ExtraData: extra,
-            Status: status,
-            ErrorCode: dto.ErrorCode,
-            TransactionId: dto.TransactionId,
-            Signatures: signatures);
-    }
-
-    private static WebhookStatus ParseStatus(string? value) => value switch
-    {
-        "SUCCESS" => WebhookStatus.Success,
-        "FAILED" => WebhookStatus.Failed,
-        "CANCELLED" => WebhookStatus.Cancelled,
-        _ => throw new MalformedEnvelopeException("local", $"Unknown webhook status '{value ?? "<null>"}' on inbound DTO."),
-    };
 
     private static ClientWebhookOutcomeDto ToOutcomeDto(WebhookOutcome outcome) => outcome switch
     {

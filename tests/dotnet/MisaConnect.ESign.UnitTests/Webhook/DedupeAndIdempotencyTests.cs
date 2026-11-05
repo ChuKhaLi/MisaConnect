@@ -204,6 +204,7 @@ public class DedupeAndIdempotencyTests
             correlationAccessor: correlation,
             configuredClientIdAccessor: () => "client-1",
             successAckCodeAccessor: () => "0",
-            logger: NullLogger<HandleWebhook>.Instance);
+            logger: NullLogger<HandleWebhook>.Instance,
+            deliverValidationFailuresAccessor: () => true);
     }
 }

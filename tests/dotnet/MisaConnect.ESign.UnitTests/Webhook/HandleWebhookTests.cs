@@ -176,11 +176,127 @@ public class HandleWebhookTests
         Assert.Empty(hook.Outcomes);
     }
 
+    [Fact]
+    public async Task Validation_failure_is_delivered_when_option_true()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var hook = new RecordingHook();
+        var sut = BuildSut(store, hook, deliverValidationFailures: true);
+
+        var result = await sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), CancellationToken.None);
+
+        Assert.Equal("webhook.unknown_transaction", result.Ack.ErrorCode);
+        Assert.IsType<WebhookOutcome.FailureWithError>(Assert.Single(hook.Outcomes));
+    }
+
+    [Fact]
+    public async Task Validation_failure_is_not_delivered_when_option_false()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var hook = new RecordingHook();
+        var sut = BuildSut(store, hook, deliverValidationFailures: false);
+
+        var result = await sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), CancellationToken.None);
+
+        Assert.Equal("webhook.unknown_transaction", result.Ack.ErrorCode);
+        Assert.IsType<WebhookOutcome.FailureWithError>(result.Outcome);
+        Assert.Empty(hook.Outcomes);
+    }
+
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(false, 0)]
+    public async Task Malformed_is_delivered_only_when_option_true(bool deliver, int expectedHookCalls)
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var hook = new RecordingHook();
+        var sut = BuildSut(store, hook, deliverValidationFailures: deliver);
+
+        var result = await sut.HandleMalformedAsync("tx-9", "status", CancellationToken.None);
+
+        Assert.Equal("webhook.malformed", result.Ack.ErrorCode);
+        var failure = Assert.IsType<WebhookOutcome.FailureWithError>(result.Outcome);
+        Assert.Equal("tx-9", failure.TransactionId);
+        Assert.Equal(DocumentFormat.Unknown, failure.Format);
+        Assert.Equal(WebhookValidationCategory.MalformedEnvelope, failure.Category);
+        Assert.Equal(expectedHookCalls, hook.Outcomes.Count);
+    }
+
+    [Fact]
+    public async Task Malformed_with_null_transactionId_uses_empty_string()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var sut = BuildSut(store, new RecordingHook());
+
+        var result = await sut.HandleMalformedAsync(null, "transactionId", CancellationToken.None);
+
+        Assert.Equal("", Assert.IsType<WebhookOutcome.FailureWithError>(result.Outcome).TransactionId);
+    }
+
+    [Fact]
+    public async Task Unexpected_exception_becomes_finalize_failed()
+    {
+        var inner = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var hook = new RecordingHook();
+        var sut = BuildSut(new ThrowingStore(inner, new InvalidOperationException("boom")), hook, lockOwner: inner);
+
+        var result = await sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), CancellationToken.None);
+
+        Assert.Equal("webhook.finalize_failed", result.Ack.ErrorCode);
+        Assert.Equal("Finalize attempt failed; MISA may retry.", result.Ack.DevMsg);
+        Assert.Equal("Signing finalization failed; please wait for retry.", result.Ack.UserMsg);
+        var failure = Assert.IsType<WebhookOutcome.FailureWithError>(result.Outcome);
+        Assert.Equal("tx-1", failure.TransactionId);
+        Assert.Equal(DocumentFormat.Unknown, failure.Format);
+        Assert.Empty(hook.Outcomes);
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_propagates()
+    {
+        var inner = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var sut = BuildSut(new ThrowingStore(inner, null), new RecordingHook(), lockOwner: inner);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), cts.Token));
+    }
+
+    private sealed class ThrowingStore : ISigningSessionStore
+    {
+        private readonly ISigningSessionStore _inner;
+        private readonly Exception? _toThrow;
+
+        public ThrowingStore(ISigningSessionStore inner, Exception? toThrow)
+        {
+            _inner = inner;
+            _toThrow = toThrow;
+        }
+
+        public ValueTask RegisterAsync(SigningSession session, CancellationToken ct) => _inner.RegisterAsync(session, ct);
+
+        public ValueTask<SigningSession?> TryGetByTransactionIdAsync(string clientId, string transactionId, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (_toThrow is not null) throw _toThrow;
+            return _inner.TryGetByTransactionIdAsync(clientId, transactionId, ct);
+        }
+
+        public ValueTask RecordObservedMessageIdAsync(string clientId, string transactionId, string messageId, CancellationToken ct)
+            => _inner.RecordObservedMessageIdAsync(clientId, transactionId, messageId, ct);
+
+        public ValueTask CacheSuccessAsync(string clientId, string transactionId, string triggeringMessageId, WebhookAck ack, byte[] signedBytes, CancellationToken ct)
+            => _inner.CacheSuccessAsync(clientId, transactionId, triggeringMessageId, ack, signedBytes, ct);
+    }
+
     private static HandleWebhook BuildSut(
         ISigningSessionStore store,
         IWebhookDeliveryHook hook,
         string configuredClientId = "client-1",
-        string successCode = "0")
+        string successCode = "0",
+        bool deliverValidationFailures = true,
+        InMemorySigningSessionStore? lockOwner = null)
     {
         var validator = new WebhookEnvelopeValidator();
         // FinalizeFromWebhook is required by HandleWebhook ctor but only invoked when there's no cached success and validation passes;
@@ -193,7 +309,7 @@ public class HandleWebhookTests
             attachXml: null!,
             attachWordExcel: null!,
             sessionStore: store,
-            lockOwner: (IFinalizeLockOwner)store,
+            lockOwner: (IFinalizeLockOwner)(lockOwner ?? store),
             deliveryHook: hook,
             logger: NullLogger<FinalizeFromWebhook>.Instance,
             successAckCodeAccessor: () => successCode);
@@ -206,6 +322,7 @@ public class HandleWebhookTests
             correlationAccessor: correlation,
             configuredClientIdAccessor: () => configuredClientId,
             successAckCodeAccessor: () => successCode,
-            logger: NullLogger<HandleWebhook>.Instance);
+            logger: NullLogger<HandleWebhook>.Instance,
+            deliverValidationFailuresAccessor: () => deliverValidationFailures);
     }
 }

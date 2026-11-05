@@ -282,7 +282,8 @@ internal static class ServiceCollectionExtensions
                 correlationAccessor: sp.GetRequiredService<ICorrelationIdAccessor>(),
                 configuredClientIdAccessor: () => options.Value.ClientId,
                 successAckCodeAccessor: () => MisaWebhookAckCodes.Success,
-                logger: sp.GetRequiredService<ILogger<HandleWebhook>>());
+                logger: sp.GetRequiredService<ILogger<HandleWebhook>>(),
+                deliverValidationFailuresAccessor: () => options.Value.Webhook.DeliverValidationFailuresToHook);
         });
 
         services.AddScoped<SignExcel>(sp =>

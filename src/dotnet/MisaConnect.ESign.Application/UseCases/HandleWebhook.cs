@@ -19,6 +19,7 @@ public sealed class HandleWebhook
     private readonly Func<string> _configuredClientIdAccessor;
     private readonly Func<string> _successAckCodeAccessor;
     private readonly ILogger<HandleWebhook> _logger;
+    private readonly Func<bool> _deliverValidationFailuresAccessor;
 
     public HandleWebhook(
         WebhookEnvelopeValidator validator,
@@ -28,7 +29,8 @@ public sealed class HandleWebhook
         ICorrelationIdAccessor correlationAccessor,
         Func<string> configuredClientIdAccessor,
         Func<string> successAckCodeAccessor,
-        ILogger<HandleWebhook> logger)
+        ILogger<HandleWebhook> logger,
+        Func<bool> deliverValidationFailuresAccessor)
     {
         _validator = validator;
         _sessionStore = sessionStore;
@@ -38,6 +40,46 @@ public sealed class HandleWebhook
         _configuredClientIdAccessor = configuredClientIdAccessor;
         _successAckCodeAccessor = successAckCodeAccessor;
         _logger = logger;
+        _deliverValidationFailuresAccessor = deliverValidationFailuresAccessor;
+    }
+
+    /// <summary>
+    /// Answers an inbound envelope that failed shape parsing with a <c>webhook.malformed</c> ACK
+    /// instead of throwing. <paramref name="malformedField"/> is a JSON field name, safe to log.
+    /// </summary>
+    public async Task<WebhookHandleResult> HandleMalformedAsync(string? transactionId, string malformedField, CancellationToken ct)
+    {
+        var correlationId = _correlationAccessor.Current ?? Guid.NewGuid().ToString("N");
+
+        _logger.LogWarning(
+            "HandleWebhook malformed envelope field={Field} correlationId={CorrelationId}",
+            malformedField, correlationId);
+
+        var ack = ESignErrorMapper.MapWebhookValidationToAck(
+            new MalformedEnvelopeException(correlationId, $"Inbound webhook envelope field '{malformedField}' was missing or invalid."));
+        var outcome = new WebhookOutcome.FailureWithError(
+            transactionId ?? "",
+            DocumentFormat.Unknown,
+            WebhookValidationCategory.MalformedEnvelope,
+            MisaErrorCode: null,
+            correlationId);
+
+        await DeliverFailureIfEnabledAsync(outcome, correlationId, ct).ConfigureAwait(false);
+        return new WebhookHandleResult(ack, outcome);
+    }
+
+    private async Task DeliverFailureIfEnabledAsync(WebhookOutcome outcome, string correlationId, CancellationToken ct)
+    {
+        if (!_deliverValidationFailuresAccessor()) return;
+
+        try
+        {
+            await _deliveryHook.DeliverAsync(outcome, ct).ConfigureAwait(false);
+        }
+        catch (Exception hookEx)
+        {
+            _logger.LogWarning(hookEx, "Webhook delivery hook threw during failure outcome dispatch correlationId={CorrelationId}", correlationId);
+        }
     }
 
     public async Task<WebhookHandleResult> HandleAsync(WebhookEnvelope envelope, CancellationToken ct)
@@ -48,6 +90,7 @@ public sealed class HandleWebhook
             "HandleWebhook received envelope transactionId={TransactionId} status={Status} correlationId={CorrelationId}",
             envelope.TransactionId, envelope.Status, correlationId);
 
+        DocumentFormat? format = null;
         try
         {
             _validator.AssertClientIdMatch(envelope, _configuredClientIdAccessor(), correlationId);
@@ -58,6 +101,7 @@ public sealed class HandleWebhook
                 throw new UnknownTransactionException(correlationId, envelope.TransactionId, "No session recorded for inbound transactionId.");
             }
 
+            format = session.Format;
             await _sessionStore.RecordObservedMessageIdAsync(envelope.ClientId, envelope.TransactionId, envelope.MessageId, ct).ConfigureAwait(false);
 
             if (envelope.Status is WebhookStatus.Failed or WebhookStatus.Cancelled)
@@ -104,16 +148,30 @@ public sealed class HandleWebhook
                 MisaErrorCode: null,
                 correlationId);
 
-            try
-            {
-                await _deliveryHook.DeliverAsync(outcome, ct).ConfigureAwait(false);
-            }
-            catch (Exception hookEx)
-            {
-                _logger.LogWarning(hookEx, "Webhook delivery hook threw during failure outcome dispatch correlationId={CorrelationId}", correlationId);
-            }
+            await DeliverFailureIfEnabledAsync(outcome, correlationId, ct).ConfigureAwait(false);
 
             return new WebhookHandleResult(ack, outcome);
+        }
+        catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
+        {
+            // Never let an unexpected failure escape to the HTTP endpoint; answer with a retryable ACK.
+            // Log the type only: exception messages may carry document or credential content.
+            _logger.LogWarning(
+                "HandleWebhook unexpected failure transactionId={TransactionId} exType={ExType} correlationId={CorrelationId}",
+                envelope.TransactionId, ex.GetType().Name, correlationId);
+
+            var failureAck = WebhookAck.Failure(
+                "webhook.finalize_failed",
+                "Finalize attempt failed; MISA may retry.",
+                "Signing finalization failed; please wait for retry.");
+            var failure = new WebhookOutcome.FailureWithError(
+                envelope.TransactionId,
+                format ?? DocumentFormat.Unknown,
+                WebhookValidationCategory.None,
+                MisaErrorCode: (ex as ESignException)?.RawCode,
+                correlationId);
+
+            return new WebhookHandleResult(failureAck, failure);
         }
     }
 }
