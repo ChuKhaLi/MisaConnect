@@ -9,7 +9,7 @@ internal static class ResponseErrorMapper
         new(Error: dto.Error ?? false, ErrorCode: dto.ErrorCode, DevMsg: dto.DevMsg, UserMsg: dto.UserMsg);
 
     public static ResponseError FromLoginStatus(LoginStatusBlockDto dto) =>
-        new(Error: dto.Error, ErrorCode: dto.ErrorCode, DevMsg: dto.DevMsg, UserMsg: dto.UserMsg);
+        new(Error: dto.Error ?? false, ErrorCode: dto.ErrorCode, DevMsg: dto.DevMsg, UserMsg: dto.UserMsg);
 
     /// <summary>
     /// Slice 007: renders MISA's <c>validationFailures</c> to a single sanitized

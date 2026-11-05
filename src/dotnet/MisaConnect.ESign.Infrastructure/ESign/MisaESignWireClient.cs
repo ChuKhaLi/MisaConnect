@@ -57,16 +57,13 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
         var json = await ReadStringAsync(resp, ct).ConfigureAwait(false);
 
+        ThrowIfLoginError(json, resp.StatusCode, ESignHttpRoutes.AuthLoginApi, userName);
         if (!resp.IsSuccessStatusCode)
         {
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.AuthLoginApi, ct, userName).ConfigureAwait(false);
         }
 
         var dto = Deserialize<LoginResponseDto>(json);
-        if (dto?.Status is { Error: true })
-        {
-            ThrowFromLoginEnvelope(dto.Status, ESignHttpRoutes.AuthLoginApi, userName);
-        }
         if (dto?.Data is null)
         {
             throw new ESignGeneralException(
@@ -107,6 +104,11 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         if (dto?.Status is { Error: true })
         {
             ThrowFromTwoFactorStatus(dto.Status, userName);
+        }
+        var flat = Deserialize<ResponseErrorDto>(json);
+        if (flat is { Error: true } || !string.IsNullOrEmpty(flat?.ErrorCode))
+        {
+            ThrowFromTwoFactorEnvelope(json, (int)resp.StatusCode, resp.StatusCode, userName);
         }
         if (dto?.Data is null)
         {
@@ -900,6 +902,38 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             transactionId: null,
             attemptCount: null,
             lastStatusCode: resp.StatusCode);
+    }
+
+    /// <summary>
+    /// Throws the mapped login error when the body carries one in either shape — the
+    /// nested <c>status</c> block or the flat <c>error</c>/<c>errorCode</c> envelope —
+    /// regardless of the HTTP status (two-factor code 122 arrives as 200 or 400).
+    /// Returns when neither shape reports an error.
+    /// </summary>
+    private void ThrowIfLoginError(string json, HttpStatusCode status, string endpoint, string? userName)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return;
+
+        var nested = Deserialize<LoginResponseDto>(json);
+        if (nested?.Status is { Error: true })
+        {
+            ThrowFromLoginEnvelope(nested.Status, endpoint, userName);
+        }
+
+        var flat = Deserialize<ResponseErrorDto>(json);
+        if (flat is { Error: true } || !string.IsNullOrEmpty(flat?.ErrorCode))
+        {
+            throw Application.Errors.ESignErrorMapper.Map(
+                endpoint: endpoint,
+                statusCode: (int)status,
+                envelope: ResponseErrorMapper.ToDomain(flat),
+                correlationId: _correlation.Current,
+                includeRawErrorMessage: _options.Value.Errors.IncludeRawErrorMessage,
+                transactionId: null,
+                attemptCount: null,
+                lastStatusCode: status,
+                userName: userName);
+        }
     }
 
     private void ThrowFromLoginEnvelope(LoginStatusBlockDto status, string endpoint, string? userName = null)
