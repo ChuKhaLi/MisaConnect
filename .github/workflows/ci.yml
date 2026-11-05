@@ -80,6 +80,18 @@ jobs:
       - name: Integration tests (ESign, no sandbox)
         run: dotnet test tests/dotnet/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --logger "trx;LogFileName=esign-integration-tests.trx" --results-directory artifacts/test-results
 
+      # A broken skippable-fact setup does not fail: the ESign sandbox tests just vanish from
+      # discovery and CI stays green (e.g. Xunit.SkippableFact 1.5.x, or a SandboxFact
+      # constructor argument). Fail loudly if any of them stop being discovered.
+      - name: Guard ESign sandbox test discovery
+        run: |
+          listed=$(dotnet test tests/dotnet/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --list-tests)
+          missing=0
+          for t in SignXmlSandboxTests SignWordSandboxTests SignExcelSandboxTests SignViaWebhookSandboxTests TwoFactorAuthSandboxTests; do
+            if ! grep -q "Sandbox\.$t\." <<<"$listed"; then echo "::error::ESign sandbox test class $t is not discovered"; missing=1; fi
+          done
+          exit $missing
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
