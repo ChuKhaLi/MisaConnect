@@ -2,6 +2,12 @@
 
 All notable changes to `@misaconnect/einvoice` are documented here.
 
+## [0.1.4] - 2026-11-05
+
+### Fixed
+
+- Connections to MISA from outside Vietnam failed intermittently with `ETIMEDOUT` while curl worked. MISA publishes an AAAA record, so on IPv4-only hosts every connection goes through Node's happy-eyeballs (`autoSelectFamily`), whose default 250 ms per-address attempt is at or below the TCP handshake time to Vietnam (207–247 ms measured from GitHub runners, spikes to ~900 ms). The default HTTP agents now allow 2 s per attempt (`autoSelectFamilyAttemptTimeout: 2000`). Verified on GitHub runners with an extra 150 ms delay to MISA: Node's default times out at 252 ms, the new budget connects in ~390 ms. A caller-supplied `fetch` should set the same option on its agent/dispatcher (undici: `connect: { autoSelectFamilyAttemptTimeout: 2000 }`).
+
 ## [0.1.3] - 2026-11-04
 
 ### Documentation

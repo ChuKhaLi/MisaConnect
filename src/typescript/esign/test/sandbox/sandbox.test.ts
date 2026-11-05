@@ -39,7 +39,7 @@ function hostPort(): { host: string; port: number } | undefined {
  */
 function isReachable(target: { host: string; port: number }): Promise<boolean> {
   return new Promise((resolve) => {
-    const socket = connect(target);
+    const socket = connect({ ...target, autoSelectFamilyAttemptTimeout: 2_000 });
     const done = (ok: boolean): void => {
       socket.destroy();
       resolve(ok);

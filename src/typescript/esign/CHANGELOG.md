@@ -18,6 +18,10 @@ First release: a TypeScript port of the .NET `MisaConnect.ESign` package.
 
 See the README section "Differences from the .NET SDK" (token refresh, `Signing/hash` retries, token fingerprint binding, per-principal OTP challenges, webhook confirmation via `Signing/status`, and more).
 
+### Network
+
+- The default HTTP agents allow 2 s per happy-eyeballs address attempt (`autoSelectFamilyAttemptTimeout: 2000`) instead of Node's 250 ms. MISA publishes an AAAA record, and from outside Vietnam the IPv4 TCP handshake alone takes ~210–250 ms, so Node's default timed out intermittently (`ETIMEDOUT`). Same fix as `@misaconnect/einvoice` 0.1.4.
+
 ### Known limitation
 
 Signing has not been verified against the live sandbox yet (the sandbox account has no ACTIVE certificate); sign-in works.
