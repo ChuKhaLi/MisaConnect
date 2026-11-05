@@ -41,12 +41,13 @@ internal sealed class TransientFailureRetryHandler : DelegatingHandler
     {
         _options = options;
         _delayer = delayer;
-        _correlation = correlation;
+        _correlation = AmbientCorrelationId.Wrap(correlation);
         _randomBudget = randomBudget;
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        using var correlationScope = AmbientCorrelationId.PushFrom(request);
         var retry = _options.Value.TransportRetry;
         var maxAttempts = Math.Max(1, retry.MaxAttempts);
         var baseDelayMs = (int)retry.BaseDelay.TotalMilliseconds;

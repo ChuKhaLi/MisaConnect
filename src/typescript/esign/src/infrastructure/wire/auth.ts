@@ -32,11 +32,22 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 const is2xx = (status: number): boolean => status >= 200 && status < 300;
 
-/** `expiresIn` is documented as an int of seconds; anything else counts as 0 (as .NET). */
+/** Lifetime assumed when MISA omits `expiresIn` (or sends something that is not an integer). */
+export const DEFAULT_EXPIRES_IN_SECONDS = 300;
+/** Shortest lifetime accepted for a positive `expiresIn`, so the 30 s refresh skew leaves a usable window. */
+export const MIN_EXPIRES_IN_SECONDS = 60;
+
+/**
+ * `expiresIn` is documented as an int of seconds (same rule as .NET `AuthSessionMapper`):
+ * missing or non-numeric → {@link DEFAULT_EXPIRES_IN_SECONDS}; an explicit value ≤ 0 is honoured
+ * (already expired); 1–59 → {@link MIN_EXPIRES_IN_SECONDS}; anything else as-is.
+ */
 function expiresInSeconds(v: unknown): number {
-  if (typeof v === 'number' && Number.isFinite(v)) return v;
-  if (typeof v === 'string' && /^\d+$/.test(v.trim())) return Number(v);
-  return 0;
+  let n: number;
+  if (typeof v === 'number' && Number.isFinite(v)) n = v;
+  else if (typeof v === 'string' && /^-?\d+$/.test(v.trim())) n = Number(v);
+  else return DEFAULT_EXPIRES_IN_SECONDS;
+  return n > 0 && n < MIN_EXPIRES_IN_SECONDS ? MIN_EXPIRES_IN_SECONDS : n;
 }
 
 // ---- request builders -------------------------------------------------------------------------

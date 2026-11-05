@@ -4,10 +4,16 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+### `MisaConnect.ESign` — Fixed
+
+- A shared token refresh (proactive, 401-driven, or the OTP exchange) is no longer cancelled when the caller that started it cancels. Each waiter now stops on its own `CancellationToken`; the refresh completes for the others and its result is cached.
+- When the refresh after a 401 fails, the SDK reuses a fresh token another flow stored meanwhile and evicts the cache entry only while it still holds the token that was rejected, as `EnsureAccessToken` already did. This avoids an extra login (and a spurious OTP prompt for a two-factor principal). The "401 even after a fresh token" eviction follows the same rule.
+- Login, refresh and fallback calls made inside the HTTP handler pipeline now carry the flow's `X-Correlation-Id` (in the request header, the call log and exceptions) instead of a handler-scope ID (a gap that dates back to 2.4).
+- `expiresIn` lifetime: a missing `expiresIn` now means 300 s (it was 0, which refreshed the token on every request), and 1–59 s is raised to 60 s so the 30 s refresh skew leaves a usable window. An explicit 0 or less is still honoured as already expired, so an expired refresh result still falls back to login. Applies to login, two-factor and refresh, in both response shapes.
+
 ### Dependencies — `MisaConnect.EInvoice` and `MisaConnect.ESign`
 
-- `Microsoft.Extensions.Configuration`, `Microsoft.Extensions.Configuration.Binder`, `Microsoft.Extensions.DependencyInjection` and `Microsoft.Extensions.DependencyInjection.Abstractions` move from 8.x to 10.0.14 (#14, #16, #17). The packages still target `net8.0` (the 10.x packages support it), but a consuming app now resolves these four packages at ≥ 10.0.14 and cannot pin them to 8.x. `Microsoft.Extensions.Http`, `Logging.Abstractions`, `Options` and `Options.ConfigurationExtensions` stay on 8.x.
-- `System.Text.Json` 8.0.5 → 8.0.6 (#12).
+- The shipped Microsoft.Extensions dependencies move from 8.x to 10.0.14: `Configuration`, `Configuration.Binder`, `DependencyInjection` and `DependencyInjection.Abstractions` (#14, #16, #17), then `Http`, `Logging.Abstractions`, `Options` and `Options.ConfigurationExtensions`. `System.Text.Json` moves from 8.0.5 to 10.0.14 (8.0.6 via #12 on the way). The packages still target `net8.0` (the 10.x packages support it), but a consuming app now resolves these packages at ≥ 10.0.14 and cannot pin them to 8.x.
 - Test-only, not shipped: xunit 2.4.2 → 2.9.3, `Microsoft.NET.Test.Sdk` 17.14.1, `Microsoft.AspNetCore.Mvc.Testing` 8.0.33 (#12).
 
 ## [2.5.0] - 2026-11-05

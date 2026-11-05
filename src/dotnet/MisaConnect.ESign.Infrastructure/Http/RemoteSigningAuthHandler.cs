@@ -43,7 +43,7 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
         _keySelector = keySelector;
         _singleFlight = singleFlight;
         _options = options;
-        _correlation = correlation;
+        _correlation = AmbientCorrelationId.Wrap(correlation);
         _clock = clock;
     }
 
@@ -53,6 +53,9 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
         {
             return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         }
+
+        // Auth calls made below run in this handler's DI scope; keep them under the flow's ID.
+        using var correlationScope = AmbientCorrelationId.PushFrom(request);
 
         // Always use the current token: callers capture a token once and pass it to every
         // wire call, so the header they set can be stale after a refresh.
@@ -75,7 +78,7 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
         if (retryResponse.StatusCode == HttpStatusCode.Unauthorized)
         {
             retryResponse.Dispose();
-            await _cache.RemoveAsync(cacheKey, cancellationToken).ConfigureAwait(false);
+            await EvictIfHoldsAsync(cacheKey, token.Value, cancellationToken).ConfigureAwait(false);
             throw new AuthenticationFailedException(
                 rawCode: "401",
                 detail: "MISA eSign rejected the request with 401 even after a fresh access token.",
@@ -115,10 +118,29 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
         }
         catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
         {
-            // Refresh unavailable or failed: drop the entry so EnsureAccessToken logs in.
-            // Login errors (including 2FA-required) propagate unchanged.
-            await _cache.RemoveAsync(cacheKey, ct).ConfigureAwait(false);
+            // Refresh unavailable or failed. Never evict a token another flow stored meanwhile:
+            // reuse it if it is fresh, drop the entry only while it still holds the token we
+            // sent, then let EnsureAccessToken log in. Login errors (including 2FA-required)
+            // propagate unchanged.
+            var current = await _cache.TryGetAsync(cacheKey, ct).ConfigureAwait(false);
+            if (current is not null
+                && !string.Equals(current.Value, sent.Value, StringComparison.Ordinal)
+                && current.ExpiresAtUtc - EnsureAccessToken.ProactiveRefreshSkew > _clock.UtcNow)
+            {
+                return current;
+            }
+            await EvictIfHoldsAsync(cacheKey, sent.Value, ct).ConfigureAwait(false);
             return await _ensureFactory().ExecuteAsync(ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Removes the cache entry only while it still holds <paramref name="value"/>.</summary>
+    private async Task EvictIfHoldsAsync(string cacheKey, string value, CancellationToken ct)
+    {
+        var current = await _cache.TryGetAsync(cacheKey, ct).ConfigureAwait(false);
+        if (current is not null && string.Equals(current.Value, value, StringComparison.Ordinal))
+        {
+            await _cache.RemoveAsync(cacheKey, ct).ConfigureAwait(false);
         }
     }
 

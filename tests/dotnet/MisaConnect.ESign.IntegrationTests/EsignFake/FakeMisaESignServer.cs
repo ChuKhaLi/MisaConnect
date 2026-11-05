@@ -417,7 +417,7 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         {
             lock (_bearerLock) { _esrmBearers.Add((route, bearer)); }
         }
-        if (_scenario.Intercept?.Invoke(new FakeRequest(route, body, bearer)) is { } fake)
+        if (_scenario.Intercept?.Invoke(new FakeRequest(route, body, bearer, ctx.Request.Headers.TryGetValue("X-Correlation-Id", out var corr) ? corr.ToString() : null)) is { } fake)
         {
             ctx.Response.StatusCode = fake.StatusCode;
             ctx.Response.ContentType = fake.ContentType;
@@ -693,7 +693,7 @@ public enum RequestedFormat
     Excel,
 }
 
-public sealed record FakeRequest(string Route, string Body, string? Bearer);
+public sealed record FakeRequest(string Route, string Body, string? Bearer, string? CorrelationId = null);
 
 public sealed record FakeResponse(int StatusCode, string Body, string ContentType = "application/json");
 

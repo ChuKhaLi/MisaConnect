@@ -46,7 +46,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         _options = options;
         _credentials = credentials;
         _clock = clock;
-        _correlation = correlation;
+        _correlation = AmbientCorrelationId.Wrap(correlation);
         _logger = logger;
     }
 

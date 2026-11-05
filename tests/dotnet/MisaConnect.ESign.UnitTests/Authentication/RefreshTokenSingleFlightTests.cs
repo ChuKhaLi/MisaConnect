@@ -52,6 +52,72 @@ public class RefreshTokenSingleFlightTests
     }
 
     [Fact]
+    public async Task First_caller_cancelling_does_not_cancel_the_flight_for_other_waiters()
+    {
+        var slot = new SingleFlightRefresh();
+        var invocations = 0;
+        CancellationToken factoryToken = default;
+        var gate = new TaskCompletionSource<AccessToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Func<CancellationToken, Task<AccessToken>> factory = ct =>
+        {
+            Interlocked.Increment(ref invocations);
+            factoryToken = ct;
+            return gate.Task;
+        };
+
+        using var cts = new CancellationTokenSource();
+        var a = slot.RefreshAsync("k3", factory, cts.Token);
+        var b = slot.RefreshAsync("k3", factory, CancellationToken.None);
+
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => a.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.False(b.IsCompleted);
+
+        gate.SetResult(new AccessToken("rs", "raw", "rt", DateTimeOffset.UtcNow.AddMinutes(60), "u", "user"));
+        var result = await b;
+
+        Assert.Equal("rs", result.Value);
+        Assert.Equal(1, invocations);
+        Assert.False(factoryToken.CanBeCanceled);
+    }
+
+    [Fact]
+    public async Task Flight_completes_even_when_every_waiter_cancels()
+    {
+        var slot = new SingleFlightRefresh();
+        var invocations = 0;
+        var gate = new TaskCompletionSource<AccessToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<AccessToken>? firstFlight = null;
+        Func<CancellationToken, Task<AccessToken>> factory = ct =>
+        {
+            if (Interlocked.Increment(ref invocations) == 1)
+            {
+                firstFlight = gate.Task;
+                return gate.Task;
+            }
+            return Task.FromResult(new AccessToken("rs2", "raw", "rt", DateTimeOffset.UtcNow.AddMinutes(60), "u", "user"));
+        };
+
+        using var cts = new CancellationTokenSource();
+        var a = slot.RefreshAsync("k4", factory, cts.Token);
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => a.WaitAsync(TimeSpan.FromSeconds(5)));
+
+        // The flight is still in the slot until it completes: a new caller joins it.
+        var joined = slot.RefreshAsync("k4", factory, CancellationToken.None);
+        Assert.Equal(1, invocations);
+
+        gate.SetResult(new AccessToken("rs", "raw", "rt", DateTimeOffset.UtcNow.AddMinutes(60), "u", "user"));
+        Assert.Equal("rs", (await joined).Value);
+        Assert.True(firstFlight!.IsCompletedSuccessfully);
+
+        await Task.Delay(50);
+        var next = await slot.RefreshAsync("k4", factory, CancellationToken.None);
+        Assert.Equal("rs2", next.Value);
+        Assert.Equal(2, invocations);
+    }
+
+    [Fact]
     public async Task Failing_factory_propagates_to_all_waiters()
     {
         var slot = new SingleFlightRefresh();

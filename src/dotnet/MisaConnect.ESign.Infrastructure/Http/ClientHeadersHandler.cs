@@ -18,7 +18,7 @@ internal sealed class ClientHeadersHandler : DelegatingHandler
     public ClientHeadersHandler(EffectiveCredentials credentials, ICorrelationIdAccessor correlation)
     {
         _credentials = credentials;
-        _correlation = correlation;
+        _correlation = AmbientCorrelationId.Wrap(correlation);
     }
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

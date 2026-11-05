@@ -2,6 +2,12 @@
 
 All notable changes to `@misaconnect/esign` are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- `expiresIn` lifetime, same rule as .NET `MisaConnect.ESign`: missing or non-numeric now means 300 s (it was 0, which refreshed the token on every request); 1–59 s is raised to 60 s; an explicit 0 or less is honoured as already expired.
+
 ## [0.1.1] - 2026-11-05
 
 First release published from CI through npm trusted publishing, with provenance. 0.1.0 was published manually without provenance.

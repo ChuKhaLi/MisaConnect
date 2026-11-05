@@ -5,10 +5,16 @@ namespace MisaConnect.ESign.Infrastructure.Http;
 
 /// <summary>
 /// Per-cache-key single-flight token refresh. At most one in-flight refresh
-/// task per key — concurrent waiters await the same task and observe the
+/// task per key: concurrent waiters await the same task and observe the
 /// same outcome (success or exception). The slot is cleared on completion so
 /// a follow-up 401 starts a fresh attempt.
 /// </summary>
+/// <remarks>
+/// The shared flight runs on <see cref="CancellationToken.None"/>, so the caller that
+/// happened to start it cannot cancel it for the others. Each waiter observes only its
+/// own token: a cancelled waiter gets <see cref="OperationCanceledException"/> while the
+/// flight keeps running for the rest (bounded by the HTTP client's own timeout).
+/// </remarks>
 internal sealed class SingleFlightRefresh
 {
     private readonly ConcurrentDictionary<string, Lazy<Task<AccessToken>>> _slots = new();
@@ -22,7 +28,7 @@ internal sealed class SingleFlightRefresh
 
         var slot = _slots.GetOrAdd(cacheKey, _ =>
         {
-            installed = new Lazy<Task<AccessToken>>(() => factory(ct), LazyThreadSafetyMode.ExecutionAndPublication);
+            installed = new Lazy<Task<AccessToken>>(() => factory(CancellationToken.None), LazyThreadSafetyMode.ExecutionAndPublication);
             return installed;
         });
 
@@ -37,6 +43,6 @@ internal sealed class SingleFlightRefresh
             }, TaskContinuationOptions.ExecuteSynchronously);
         }
 
-        return task;
+        return task.WaitAsync(ct);
     }
 }
