@@ -24,6 +24,7 @@ public class ModeGuardTests
             exchangeOtp: null!,
             resendOtp: null!,
             otpSubmissionValidator: null!,
+            credentials: null!,
             options: options);
     }
 

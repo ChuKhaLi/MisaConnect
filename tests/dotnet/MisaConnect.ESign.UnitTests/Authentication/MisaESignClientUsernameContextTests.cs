@@ -4,6 +4,7 @@ using MisaConnect.ESign.Application.Validation;
 using MisaConnect.ESign.Client;
 using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Infrastructure.Caching;
+using MisaConnect.ESign.Infrastructure.Credentials;
 using MisaConnect.ESign.UnitTests.TestSupport;
 using Xunit;
 
@@ -38,13 +39,13 @@ public class MisaESignClientUsernameContextTests
         var exchange = new ExchangeOtp(wire, cache, selector, (k, f, ct) => f(ct));
         var resend = new ResendOtp(wire, () => "en-US");
         var otpValidator = new OtpSubmissionValidator(correlation);
-        return new MisaESignClient(signPdf, signXml: null!, signWord: null!, signExcel: null!, exchange, resend, otpValidator);
+        return new MisaESignClient(signPdf, signXml: null!, signWord: null!, signExcel: null!, exchange, resend, otpValidator,
+            new EffectiveCredentials(new StubMisaCredentialsAccessor()));
     }
 
     [Fact]
     public async Task SignInWithOtpAsync_throws_when_no_pending_challenge_captured()
     {
-        MisaESignClient.ClearPendingUserNameForTests();
         var wire = new StubWireClient();
         var cache = new InMemoryTokenCache();
         var client = BuildClient(wire, cache);
@@ -56,7 +57,6 @@ public class MisaESignClientUsernameContextTests
     [Fact]
     public async Task ResendOtpAsync_throws_when_no_pending_challenge_captured()
     {
-        MisaESignClient.ClearPendingUserNameForTests();
         var wire = new StubWireClient();
         var cache = new InMemoryTokenCache();
         var client = BuildClient(wire, cache);

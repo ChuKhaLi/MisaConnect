@@ -25,7 +25,7 @@ public class DefaultTokenCacheKeySelectorTests
     public void Static_default_composes_username_clientid_host_from_options()
     {
         var options = Options(userName: "user", clientId: "cid");
-        var selector = new DefaultTokenCacheKeySelector(options, new OptionsMisaCredentialsAccessor(options));
+        var selector = new DefaultTokenCacheKeySelector(options, new EffectiveCredentials(new OptionsMisaCredentialsAccessor(options)));
 
         Assert.Equal("user|cid|sandbox.example.com", selector.Compose());
     }
@@ -35,7 +35,7 @@ public class DefaultTokenCacheKeySelectorTests
     {
         var options = Options();
         var current = new MisaCredentials("cid-A", "ck", "alice", "pw");
-        var selector = new DefaultTokenCacheKeySelector(options, new StubMisaCredentialsAccessor(() => current));
+        var selector = new DefaultTokenCacheKeySelector(options, new EffectiveCredentials(new StubMisaCredentialsAccessor(() => current)));
 
         var keyA = selector.Compose();
         current = new MisaCredentials("cid-B", "ck", "bob", "pw");
@@ -50,7 +50,7 @@ public class DefaultTokenCacheKeySelectorTests
     public void Empty_username_throws_invalid_operation()
     {
         var options = Options();
-        var selector = new DefaultTokenCacheKeySelector(options, new StubMisaCredentialsAccessor(userName: "", clientId: "cid"));
+        var selector = new DefaultTokenCacheKeySelector(options, new EffectiveCredentials(new StubMisaCredentialsAccessor(userName: "", clientId: "cid")));
 
         Assert.Throws<InvalidOperationException>(() => selector.Compose());
     }
@@ -59,7 +59,7 @@ public class DefaultTokenCacheKeySelectorTests
     public void Empty_clientid_throws_invalid_operation()
     {
         var options = Options();
-        var selector = new DefaultTokenCacheKeySelector(options, new StubMisaCredentialsAccessor(userName: "user", clientId: ""));
+        var selector = new DefaultTokenCacheKeySelector(options, new EffectiveCredentials(new StubMisaCredentialsAccessor(userName: "user", clientId: "")));
 
         Assert.Throws<InvalidOperationException>(() => selector.Compose());
     }

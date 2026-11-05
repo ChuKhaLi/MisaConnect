@@ -25,7 +25,7 @@ dotnet add package MisaConnect.ESign
 | Method | Purpose |
 | --- | --- |
 | `SignPdfAsync` | One-shot synchronous PDF signature. |
-| `SignXmlAsync` (string + bytes overloads) | One-shot synchronous XML signature. |
+| `SignXmlAsync` | One-shot synchronous XML signature. |
 | `SignWordAsync`, `SignExcelAsync` | One-shot synchronous Office-document signature. |
 | `SignInWithOtpAsync` | Submit an OTP returned to the signer's device (2FA flow). |
 | `ResendOtpAsync` | Re-request an OTP if the previous one expired. |

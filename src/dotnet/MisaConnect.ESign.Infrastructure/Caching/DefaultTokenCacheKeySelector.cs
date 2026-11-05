@@ -1,15 +1,16 @@
 using Microsoft.Extensions.Options;
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Infrastructure.Configuration;
+using MisaConnect.ESign.Infrastructure.Credentials;
 
 namespace MisaConnect.ESign.Infrastructure.Caching;
 
 internal sealed class DefaultTokenCacheKeySelector : ITokenCacheKeySelector
 {
     private readonly IOptions<MisaESignOptions> _options;
-    private readonly IMisaCredentialsAccessor _credentials;
+    private readonly EffectiveCredentials _credentials;
 
-    public DefaultTokenCacheKeySelector(IOptions<MisaESignOptions> options, IMisaCredentialsAccessor credentials)
+    public DefaultTokenCacheKeySelector(IOptions<MisaESignOptions> options, EffectiveCredentials credentials)
     {
         _options = options;
         _credentials = credentials;

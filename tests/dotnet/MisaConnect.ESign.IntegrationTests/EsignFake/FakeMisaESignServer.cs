@@ -30,6 +30,9 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
     private readonly object _twoFactorLock = new();
     private readonly object _formatLock = new();
     private readonly object _loginLock = new();
+    private readonly List<(string Route, string? Bearer)> _esrmBearers = new();
+    private readonly object _bearerLock = new();
+    private int _certsCompleted;
 
     public string BaseUrl { get; }
     public Counters Calls => _counters;
@@ -47,6 +50,13 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
     /// (e.g. <c>/api/auth/...</c> vs <c>/webdev/api/auth/...</c>), for asserting
     /// the resolved auth topology.</summary>
     public string? LastLoginPath { get; private set; }
+
+    /// <summary>The <c>AuthorizationRM</c> bearer (without the "Bearer " prefix) seen on
+    /// every ESRM request, in arrival order, keyed by route.</summary>
+    public IReadOnlyList<(string Route, string? Bearer)> EsrmBearers
+    {
+        get { lock (_bearerLock) { return _esrmBearers.ToArray(); } }
+    }
 
     /// <summary>The request path most recently seen on the two-factor endpoint,
     /// for asserting the resolved auth topology end-to-end.</summary>
@@ -97,11 +107,10 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         // mapping both keeps the fake agnostic to that choice.
         async Task LoginHandler(HttpContext ctx)
         {
-            self!._counters.Login++;
+            var loginNo = Interlocked.Increment(ref self!._counters.Login);
             self.LastLoginPath = ctx.Request.Path.Value;
-            using (var reader = new StreamReader(ctx.Request.Body))
+            var loginBody = await ReadBodyAsync(ctx);
             {
-                var loginBody = await reader.ReadToEndAsync();
                 var cid = ctx.Request.Headers.TryGetValue("x-clientId", out var c) ? c.ToString() : null;
                 var ckey = ctx.Request.Headers.TryGetValue("x-clientKey", out var k) ? k.ToString() : null;
                 lock (self._loginLock)
@@ -109,6 +118,7 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
                     self._loginRequests.Add(new RecordedLoginRequest(loginBody, cid, ckey));
                 }
             }
+            if (await self.TryInterceptAsync(ctx, "login", loginBody, esrm: false)) return;
             if (self._scenario.LoginAlways401)
             {
                 ctx.Response.StatusCode = 401;
@@ -125,7 +135,7 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
             }
             ctx.Response.StatusCode = 200;
             ctx.Response.ContentType = "application/json";
-            var body = "{\"status\":{\"code\":200,\"error\":false},\"data\":{\"accessToken\":\"raw-token\",\"remoteSigningAccessToken\":\"rs-token\",\"refreshToken\":\"refresh-token\",\"expiresIn\":3600,\"tokenType\":\"Bearer\",\"user\":{\"id\":\"user-id\",\"username\":\"alice\"}}}";
+            var body = "{\"status\":{\"code\":200,\"error\":false},\"data\":{\"accessToken\":\"raw-token\",\"remoteSigningAccessToken\":\"" + (loginNo == 1 ? "rs-token" : "rs-token-relogin") + "\",\"refreshToken\":\"refresh-token\",\"expiresIn\":3600,\"tokenType\":\"Bearer\",\"user\":{\"id\":\"user-id\",\"username\":\"alice\"}}}";
             await ctx.Response.WriteAsync(body);
         }
         app.MapPost("/api/auth/api/v1/auth/login-api", LoginHandler);
@@ -135,8 +145,8 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         {
             self!._counters.TwoFactorAuth++;
             self.LastTwoFactorPath = ctx.Request.Path.Value;
-            using var reader = new StreamReader(ctx.Request.Body);
-            var body = await reader.ReadToEndAsync();
+            var body = await ReadBodyAsync(ctx);
+            if (await self.TryInterceptAsync(ctx, "two-factor", body, esrm: false)) return;
             var hasAuthorizationRm = ctx.Request.Headers.ContainsKey("AuthorizationRM");
             lock (self._twoFactorLock)
             {
@@ -161,8 +171,8 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         app.MapPost("/webdev/api/auth/api/v1/auth/resend-otp-auth", async (HttpContext ctx) =>
         {
             self!._counters.ResendOtp++;
-            using var reader = new StreamReader(ctx.Request.Body);
-            var body = await reader.ReadToEndAsync();
+            var body = await ReadBodyAsync(ctx);
+            if (await self.TryInterceptAsync(ctx, "resend-otp", body, esrm: false)) return;
             var hasAuthorizationRm = ctx.Request.Headers.ContainsKey("AuthorizationRM");
             lock (self._twoFactorLock)
             {
@@ -203,6 +213,7 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         app.MapPost("/webdev/api/auth/api/v1/auth/refreshtoken", async (HttpContext ctx) =>
         {
             self!._counters.Refresh++;
+            if (await self.TryInterceptAsync(ctx, "refresh", await ReadBodyAsync(ctx), esrm: false)) return;
             ctx.Response.StatusCode = 200;
             ctx.Response.ContentType = "application/json";
             var body = "{\"accessToken\":\"raw-token-2\",\"remoteSigningAccessToken\":\"rs-token-2\",\"refreshToken\":\"refresh-token-2\",\"expiresIn\":3600}";
@@ -211,20 +222,20 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
 
         app.MapGet("/external/esrm/service/general/api/v1/Certificates/by-userId", async (HttpContext ctx) =>
         {
+            self!._counters.Certificates++;
+            if (await self.TryInterceptAsync(ctx, "certificates", string.Empty, esrm: true)) return;
             var headerAuth = ctx.Request.Headers["AuthorizationRM"].ToString();
             const string bearerPrefix = "Bearer ";
-            self!.LastCertificatesBearer = headerAuth.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)
+            self.LastCertificatesBearer = headerAuth.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)
                 ? headerAuth.Substring(bearerPrefix.Length)
                 : headerAuth;
             if (self._scenario.CertsForce401Once && Interlocked.Exchange(ref self._scenario._certs401Consumed, 1) == 0)
             {
-                self._counters.Certificates++;
                 ctx.Response.StatusCode = 401;
                 ctx.Response.ContentType = "application/json";
                 await ctx.Response.WriteAsync("{\"error\":true,\"errorCode\":\"TokenExpired\"}");
                 return;
             }
-            self._counters.Certificates++;
             if (self._scenario.CertsReturnHtml200)
             {
                 ctx.Response.StatusCode = 200;
@@ -256,6 +267,7 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
                 await ctx.Response.WriteAsync("[]");
                 return;
             }
+            Volatile.Write(ref self._certsCompleted, 1);
             var body = "[{\"userId\":\"user-id\",\"keyAlias\":\"key-alias-1\",\"appName\":\"misa\",\"keyStatus\":\"ACTIVE\",\"certStatus\":\"ACTIVE\",\"certificate\":\"BASE64CERT\",\"certiticateChain\":[\"SIGN\",\"INTERMEDIATE\",\"ROOT\"],\"effectiveDate\":\"2026-01-01T00:00:00Z\",\"expirationDate\":\"2027-01-01T00:00:00Z\",\"emailName\":\"alice@example.com\",\"isAutoSign\":false}]";
             await ctx.Response.WriteAsync(body);
         });
@@ -263,8 +275,8 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         app.MapPost("/external/esrm/service/document/api/v1/documents/hash", async (HttpContext ctx) =>
         {
             self!._counters.Hash++;
-            using var reader = new StreamReader(ctx.Request.Body);
-            var bodyText = await reader.ReadToEndAsync();
+            var bodyText = await ReadBodyAsync(ctx);
+            if (await self.TryInterceptAsync(ctx, "hash", bodyText, esrm: true)) return;
             var requested = DetectFormat(bodyText);
             lock (self._formatLock) { self._hashRequests.Add(new RecordedFormatRequest(bodyText, requested)); }
 
@@ -296,6 +308,7 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         app.MapPost("/external/esrm/service/signing/api/v1/Signing/hash", async (HttpContext ctx) =>
         {
             self!._counters.SignHash++;
+            if (await self.TryInterceptAsync(ctx, "signing-hash", await ReadBodyAsync(ctx), esrm: true)) return;
             ctx.Response.StatusCode = 200;
             ctx.Response.ContentType = "application/json";
             await ctx.Response.WriteAsync("{\"transactionId\":\"tx-fake-1\"}");
@@ -304,6 +317,7 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         app.MapGet("/external/esrm/service/signing/api/v1/Signing/status/{tx}", async (HttpContext ctx, string tx) =>
         {
             self!._counters.SignStatus++;
+            if (await self.TryInterceptAsync(ctx, "signing-status", string.Empty, esrm: true)) return;
             var calls = self._statusCallsByTx.AddOrUpdate(tx, 1, (_, v) => v + 1);
             ctx.Response.StatusCode = 200;
             ctx.Response.ContentType = "application/json";
@@ -330,14 +344,14 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
                 await ctx.Response.WriteAsync($"{{\"status\":\"PENDING\",\"transactionId\":\"{tx}\"}}");
                 return;
             }
-            await ctx.Response.WriteAsync($"{{\"status\":\"SUCCESS\",\"transactionId\":\"{tx}\",\"signatures\":[{{\"documentId\":\"doc-1\",\"signature\":\"SIGNATURE-BYTES\"}}]}}");
+            await ctx.Response.WriteAsync($"{{\"status\":\"SUCCESS\",\"transactionId\":\"{tx}\",\"signatures\":[{{\"documentId\":\"doc-1\",\"signature\":\"misa-signature\"}}]}}");
         });
 
         app.MapPost("/external/esrm/service/document/api/v1/documents/attachment", async (HttpContext ctx) =>
         {
             self!._counters.Attachment++;
-            using var reader = new StreamReader(ctx.Request.Body);
-            var bodyText = await reader.ReadToEndAsync();
+            var bodyText = await ReadBodyAsync(ctx);
+            if (await self.TryInterceptAsync(ctx, "attachment", bodyText, esrm: true)) return;
             var requested = DetectFormat(bodyText);
             lock (self._formatLock) { self._attachmentRequests.Add(new RecordedFormatRequest(bodyText, requested)); }
 
@@ -373,6 +387,52 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         self = new FakeMisaESignServer(app, address.TrimEnd('/') + "/");
         SetSelf(app, self);
         return self;
+    }
+
+    private static async Task<string> ReadBodyAsync(HttpContext ctx)
+    {
+        ctx.Request.EnableBuffering();
+        using var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8, false, 1024, leaveOpen: true);
+        var text = await reader.ReadToEndAsync();
+        ctx.Request.Body.Position = 0;
+        return text;
+    }
+
+    private static string? BearerOf(HttpContext ctx)
+    {
+        if (!ctx.Request.Headers.TryGetValue("AuthorizationRM", out var v)) return null;
+        var raw = v.ToString();
+        const string prefix = "Bearer ";
+        return raw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? raw.Substring(prefix.Length) : raw;
+    }
+
+    /// <summary>Evaluates <see cref="Scenario.Intercept"/> first (its result is written
+    /// verbatim), then, for ESRM routes, the bearer recording and revocation scenario.
+    /// Returns true when the response has been written. The caller has already bumped
+    /// the route's counter.</summary>
+    private async Task<bool> TryInterceptAsync(HttpContext ctx, string route, string body, bool esrm)
+    {
+        var bearer = BearerOf(ctx);
+        if (esrm)
+        {
+            lock (_bearerLock) { _esrmBearers.Add((route, bearer)); }
+        }
+        if (_scenario.Intercept?.Invoke(new FakeRequest(route, body, bearer)) is { } fake)
+        {
+            ctx.Response.StatusCode = fake.StatusCode;
+            ctx.Response.ContentType = fake.ContentType;
+            await ctx.Response.WriteAsync(fake.Body);
+            return true;
+        }
+        if (esrm && _scenario.RevokeInitialBearerAfterCertificates
+            && Volatile.Read(ref _certsCompleted) == 1 && bearer == "rs-token")
+        {
+            ctx.Response.StatusCode = 401;
+            ctx.Response.ContentType = "application/json";
+            await ctx.Response.WriteAsync("{\"error\":true,\"errorCode\":\"TokenExpired\"}");
+            return true;
+        }
+        return false;
     }
 
     private static RequestedFormat DetectFormat(string body)
@@ -603,6 +663,11 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
         public string? NextTwoFactorErrorCode { get; set; }
         public ResendOtpResponseMode ResendOtpMode { get; set; } = ResendOtpResponseMode.Success200;
         public bool MultiArrayResponse { get; set; }
+        /// <summary>Evaluated first by every route; a non-null result is written verbatim.</summary>
+        public Func<FakeRequest, FakeResponse?>? Intercept { get; set; }
+        /// <summary>After the first certificates call completes, ESRM requests carrying
+        /// bearer <c>rs-token</c> get 401.</summary>
+        public bool RevokeInitialBearerAfterCertificates { get; set; }
         public RequestedFormat? AttachmentMissingFormatArrayFor { get; set; }
         public (RequestedFormat format, int statusCode, string errorCode, string devMsg, string userMsg)? HashRejectionForFormat { get; set; }
         public (RequestedFormat format, int statusCode, string errorCode, string devMsg, string userMsg)? AttachmentRejectionForFormat { get; set; }
@@ -627,6 +692,10 @@ public enum RequestedFormat
     Word,
     Excel,
 }
+
+public sealed record FakeRequest(string Route, string Body, string? Bearer);
+
+public sealed record FakeResponse(int StatusCode, string Body, string ContentType = "application/json");
 
 internal sealed record RecordedTwoFactorRequest(string Body, bool HasAuthorizationRm);
 
