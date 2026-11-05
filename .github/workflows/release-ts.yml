@@ -1,12 +1,15 @@
 name: release-ts
 
-# Publishes @misaconnect/einvoice to npm when an `einvoice-ts-v*` tag is pushed.
+# Publishes @misaconnect/einvoice (tag `einvoice-ts-v<version>`) or @misaconnect/esign
+# (tag `esign-ts-v<version>`) to npm; the package and its directory come from the tag prefix
+# (.github/scripts/ts-release-target.sh, self-test: `bash .github/scripts/ts-release-target.sh --self-test`).
 # Tag-push only: there is deliberately no workflow_dispatch, so a manual run from a
 # branch can never publish whatever version happens to be on that ref.
 on:
   push:
     tags:
       - "einvoice-ts-v*"
+      - "esign-ts-v*"
 
 permissions:
   contents: read
@@ -20,6 +23,22 @@ jobs:
       id-token: write # npm trusted publishing (OIDC) + provenance
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve package from tag
+        id: target
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/einvoice-ts-v* | refs/tags/esign-ts-v*) ;;
+            *) echo "Refusing to publish from ref '$GITHUB_REF' (expected refs/tags/einvoice-ts-v* or refs/tags/esign-ts-v*)." >&2; exit 1 ;;
+          esac
+          target="$(bash .github/scripts/ts-release-target.sh "$TAG")"
+          read -r package dir prefix <<< "$target"
+          {
+            echo "package=$package"
+            echo "dir=$dir"
+            echo "prefix=$prefix"
+          } >> "$GITHUB_OUTPUT"
       # No `registry-url`: setup-node would then write an .npmrc auth line and a placeholder
       # NODE_AUTH_TOKEN, which overrides OIDC. The default registry is registry.npmjs.org.
       - uses: actions/setup-node@v4
@@ -28,31 +47,31 @@ jobs:
           cache: npm
       - name: npm CLI with trusted + staged publishing support (>= 11.15.0)
         run: npm install -g "npm@>=11.15.0 <12" && npm --version
+      - name: Self-test tag mapping
+        run: bash .github/scripts/ts-release-target.sh --self-test
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test -w @misaconnect/einvoice
+      - run: npm test -w "${{ steps.target.outputs.package }}"
       - name: Verify tag matches package version
         env:
           TAG: ${{ github.ref_name }}
+          DIR: ${{ steps.target.outputs.dir }}
+          PREFIX: ${{ steps.target.outputs.prefix }}
         run: |
-          case "$GITHUB_REF" in
-            refs/tags/einvoice-ts-v*) ;;
-            *) echo "Refusing to publish from ref '$GITHUB_REF' (expected refs/tags/einvoice-ts-v*)." >&2; exit 1 ;;
-          esac
-          version="$(node -p "require('./src/typescript/einvoice/package.json').version")"
-          if [ "$TAG" != "einvoice-ts-v$version" ]; then
-            echo "Tag '$TAG' does not match package version '$version' (expected einvoice-ts-v$version)." >&2
+          version="$(node -p "require('./$DIR/package.json').version")"
+          if [ "$TAG" != "$PREFIX$version" ]; then
+            echo "Tag '$TAG' does not match package version '$version' (expected $PREFIX$version)." >&2
             exit 1
           fi
-      - run: npm run build -w @misaconnect/einvoice
+      - run: npm run build -w "${{ steps.target.outputs.package }}"
       # Trusted publishing: npm exchanges the GitHub OIDC token for a short-lived publish
       # credential — no NPM_TOKEN secret. Requires the trusted publisher to be configured on
       # npmjs.com (owner ChuKhaLi, repo MisaConnect, workflow release-ts.yml, environment
-      # npm-publish). Provenance is attached automatically. The trusted publisher is allowed
+      # npm-publish), once per package. Provenance is attached automatically. The trusted publisher is allowed
       # to *stage* only (plain `npm publish` is rejected with 403 "OIDC permission denied"):
       # the version stays non-public until a maintainer approves it with 2FA
       # (`npm stage approve <id>` or the Staged Packages tab on npmjs.com).
-      - if: startsWith(github.ref, 'refs/tags/einvoice-ts-v')
-        working-directory: src/typescript/einvoice
+      - if: startsWith(github.ref, 'refs/tags/einvoice-ts-v') || startsWith(github.ref, 'refs/tags/esign-ts-v')
+        working-directory: ${{ steps.target.outputs.dir }}
         run: npm stage publish --access public

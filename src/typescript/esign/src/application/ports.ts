@@ -1,0 +1,112 @@
+import type {
+  Certificate,
+  MisaCredentials,
+  WebhookAckDto,
+  WebhookOutcomeDto,
+} from '../domain/dtos.js';
+import type { DocumentFormat, OtpDeliveryChannel } from '../domain/enums.js';
+import type { HashOutput } from './hash-output.js';
+
+export interface Logger {
+  debug(message: string, fields?: Record<string, unknown>): void;
+  info(message: string, fields?: Record<string, unknown>): void;
+  warn(message: string, fields?: Record<string, unknown>): void;
+  error(message: string, fields?: Record<string, unknown>): void;
+}
+
+export interface Clock {
+  now(): Date;
+}
+
+export type Delay = (ms: number, signal?: AbortSignal) => Promise<void>;
+
+export interface AccessToken {
+  /** The `remoteSigningAccessToken`. */
+  value: string;
+  refreshToken?: string;
+  expiresAt: Date;
+  userId: string;
+  username: string;
+  /**
+   * Salted hash binding the token to the credential secrets it was obtained with. Opaque plain
+   * data: custom caches must store and return it unchanged. Never log it. A cached token without
+   * a matching fingerprint is treated as a miss.
+   */
+  credentialFingerprint?: string;
+}
+
+export interface TokenCache {
+  get(key: string): AccessToken | undefined | Promise<AccessToken | undefined>;
+  set(key: string, token: AccessToken): void | Promise<void>;
+  delete(key: string): void | Promise<void>;
+}
+
+export type CertificateSelector = (
+  certs: readonly Certificate[],
+) => Certificate | Promise<Certificate>;
+
+export interface OtpProvider {
+  provide(challenge: {
+    userName: string;
+    correlationId: string;
+  }): Promise<{ code: string; otpType: OtpDeliveryChannel; remember: boolean }>;
+}
+
+export type MisaCredentialsProvider = (ctx: {
+  clientId?: string;
+  userName?: string;
+  signal?: AbortSignal;
+}) => MisaCredentials | Promise<MisaCredentials>;
+
+/**
+ * One webhook-mode signing transaction, registered by `beginSign*` after `Signing/hash`. Plain JSON
+ * data: a shared store may serialize it as is. Holds the caller's `clientId` and `userName` only,
+ * never `clientKey` or `password`.
+ */
+export interface SigningSession {
+  clientId: string;
+  userName: string;
+  transactionId: string;
+  format: Exclude<DocumentFormat, 'Unknown'>;
+  /** Per-format `documents/hash` output, needed to attach the signature on finalize. */
+  hash: HashOutput;
+  recordedDocumentIds: string[];
+  /** ISO-8601 UTC instant; the session expires at `createdAt + ttlMs`. */
+  createdAt: string;
+  ttlMs: number;
+  observedMessageIds: string[];
+  /** `signed` is base64. Once set, every later delivery is answered from it (no MISA call). */
+  cachedSuccess?: { ack: WebhookAckDto; signed: string };
+  /**
+   * MISA-confirmed FAILED/CANCELLED. Once set, every later delivery is answered ACK "0" with a
+   * `TerminalWithoutFinalize` rebuilt from it (no MISA call, no hook).
+   */
+  terminal?: SigningTerminal;
+}
+
+export interface SigningTerminal {
+  status: 'Failed' | 'Cancelled';
+  misaErrorCode?: string;
+}
+
+/**
+ * Webhook session store, keyed by (clientId, transactionId). The default is in-memory and
+ * process-local: hosts running several instances behind a load balancer must supply a shared
+ * store. `withFinalizeLock` serializes finalizers of one transaction (across instances for a
+ * shared store) and throws `UnknownTransactionException` when no session exists.
+ */
+export interface SigningSessionStore {
+  register(s: SigningSession): Promise<void>;
+  get(clientId: string, transactionId: string): Promise<SigningSession | undefined>;
+  recordMessageId(clientId: string, transactionId: string, messageId: string): Promise<void>;
+  cacheSuccess(
+    clientId: string,
+    transactionId: string,
+    ack: WebhookAckDto,
+    signedBase64: string,
+  ): Promise<void>;
+  recordTerminal(clientId: string, transactionId: string, terminal: SigningTerminal): Promise<void>;
+  withFinalizeLock<T>(clientId: string, transactionId: string, fn: () => Promise<T>): Promise<T>;
+}
+
+export type WebhookDeliveryHook = (o: WebhookOutcomeDto) => void | Promise<void>;

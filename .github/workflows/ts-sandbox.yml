@@ -1,6 +1,6 @@
 name: ts-sandbox
 
-# Live MISA sandbox tests for @misaconnect/einvoice (test/sandbox/**).
+# Live MISA sandbox tests for @misaconnect/einvoice and @misaconnect/esign (test/sandbox/**).
 # Uses the same `misa-sandbox` environment secrets as the .NET integration.yml.
 # Not part of ts-ci: they talk to the real sandbox, create drafts and clean them up.
 on:
@@ -58,3 +58,37 @@ jobs:
           # Fail instead of skipping when credentials are missing or the host is unreachable.
           MISACONNECT_SANDBOX_REQUIRED: '1'
         run: npm run test:sandbox -w @misaconnect/einvoice
+
+  esign-sandbox:
+    name: esign-sandbox (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    environment: misa-sandbox
+    strategy:
+      fail-fast: false
+      # One leg at a time: both legs sign against the same sandbox account.
+      max-parallel: 1
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @misaconnect/esign
+      # Same path-MTU blackhole to MISA as the einvoice job above.
+      - name: Lower MTU (path-MTU blackhole to MISA)
+        run: sudo ip link set dev eth0 mtu 1280
+      - name: Sandbox tests
+        env:
+          MISACONNECT_ESIGN_SANDBOX_BASE_URL: ${{ secrets.MISA_ESIGN_BASE_URL }}
+          MISACONNECT_ESIGN_SANDBOX_CLIENT_ID: ${{ secrets.MISA_ESIGN_CLIENT_ID }}
+          MISACONNECT_ESIGN_SANDBOX_CLIENT_KEY: ${{ secrets.MISA_ESIGN_CLIENT_KEY }}
+          MISACONNECT_ESIGN_SANDBOX_USERNAME: ${{ secrets.MISA_ESIGN_USERNAME }}
+          MISACONNECT_ESIGN_SANDBOX_PASSWORD: ${{ secrets.MISA_ESIGN_PASSWORD }}
+          # Not required yet: the sandbox account has no ACTIVE remote-signing certificate. Without
+          # REQUIRED, the sign tests skip (not fail) on NoActiveCertificateException, as they do
+          # when credentials are missing or the host is unreachable. Add
+          # MISACONNECT_ESIGN_SANDBOX_REQUIRED: '1' (every skip becomes a failure) once it has one.
+        run: npm run test:sandbox -w @misaconnect/esign
