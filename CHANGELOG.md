@@ -4,6 +4,12 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+### Dependencies — `MisaConnect.EInvoice` and `MisaConnect.ESign`
+
+- `Microsoft.Extensions.Configuration`, `Microsoft.Extensions.Configuration.Binder`, `Microsoft.Extensions.DependencyInjection` and `Microsoft.Extensions.DependencyInjection.Abstractions` move from 8.x to 10.0.14 (#14, #16, #17). The packages still target `net8.0` (the 10.x packages support it), but a consuming app now resolves these four packages at ≥ 10.0.14 and cannot pin them to 8.x. `Microsoft.Extensions.Http`, `Logging.Abstractions`, `Options` and `Options.ConfigurationExtensions` stay on 8.x.
+- `System.Text.Json` 8.0.5 → 8.0.6 (#12).
+- Test-only, not shipped: xunit 2.4.2 → 2.9.3, `Microsoft.NET.Test.Sdk` 17.14.1, `Microsoft.AspNetCore.Mvc.Testing` 8.0.33 (#12).
+
 ## [2.5.0] - 2026-11-05
 
 ### `MisaConnect.ESign` 2.5.0
