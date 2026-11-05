@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Microsoft.Extensions.Logging;
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Application.Sessions;
@@ -26,6 +27,48 @@ public sealed class BeginSignExcel
     private readonly ICorrelationIdAccessor? _correlation;
     private readonly ILogger<BeginSignExcel> _logger;
     private readonly Func<string?>? _userNameAccessor;
+
+    /// <summary>
+    /// The 2.4 constructor, kept for 2.4 source and binary compatibility; it records no
+    /// principal user name on the session. Use cases are normally resolved through
+    /// <c>AddMisaConnectESign</c>, not constructed directly.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public BeginSignExcel(
+        EnsureAccessToken ensureToken,
+        ListActiveCertificates listCerts,
+        ICertificateSelector certSelector,
+        HashExcelDocument hashExcel,
+        SubmitSignHash submitSignHash,
+        ISigningSessionStore sessionStore,
+        ISystemClock clock,
+        SignExcelRequestValidator validator,
+        Func<string> clientIdAccessor,
+        Func<TimeSpan> ttlAccessor,
+        ILogger<BeginSignExcel> logger,
+        IOtpProvider? otpProvider,
+        ExchangeOtp? exchangeOtp,
+        OtpSubmissionValidator? otpSubmissionValidator,
+        ICorrelationIdAccessor? correlation)
+        : this(
+            ensureToken,
+            listCerts,
+            certSelector,
+            hashExcel,
+            submitSignHash,
+            sessionStore,
+            clock,
+            validator,
+            clientIdAccessor,
+            ttlAccessor,
+            logger,
+            otpProvider,
+            exchangeOtp,
+            otpSubmissionValidator,
+            correlation,
+            userNameAccessor: null)
+    {
+    }
 
     public BeginSignExcel(
         EnsureAccessToken ensureToken,

@@ -6,7 +6,7 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ### `MisaConnect.ESign` 2.5.0
 
-Minor release of `MisaConnect.ESign`: back-ports the fixes and rulings first made in the TypeScript package `@misaconnect/esign` (see `docs/superpowers/specs/2026-11-05-esign-dotnet-ts-parity-design.md`), and corrects the eSign docs. Public changes are additive. `MisaConnect.EInvoice` ships unchanged; its project version is only aligned to 2.5.0 because the release pipeline packs both families together.
+Minor release of `MisaConnect.ESign`: back-ports the fixes and rulings first made in the TypeScript package `@misaconnect/esign` (see `docs/superpowers/specs/2026-11-05-esign-dotnet-ts-parity-design.md`), and corrects the eSign docs. Public changes are additive except for one constructor: `FinalizeFromWebhook`'s 2.4 constructor is removed (see "Public use-case constructors" under "Behaviour changes"). Code that builds the SDK through `AddMisaConnectESign` is unaffected. `MisaConnect.EInvoice` ships unchanged; its project version is only aligned to 2.5.0 because the release pipeline packs both families together.
 
 #### Fixed
 
@@ -37,7 +37,7 @@ Minor release of `MisaConnect.ESign`: back-ports the fixes and rulings first mad
 - **Finalize errors.** Errors while confirming or finalizing a webhook (including a two-factor requirement, which finalize never prompts for) return ACK `webhook.finalize_failed` instead of throwing. Exceptions thrown by your `IWebhookDeliveryHook` on success/terminal delivery still propagate out of `HandleWebhookAsync`; the success is cached first, so MISA's retry gets the cached ACK.
 - **Two-factor challenges are per principal** (`clientId` + `userName`). `SignInWithOtpAsync` and `ResendOtpAsync` act on the current principal's challenge only.
 - **3.0 default flip.** `Webhook.DeliverValidationFailuresToHook` defaults to `true` in 2.x so a minor release does not silently change behaviour. It flips to `false` in 3.0, because a public webhook endpoint lets anyone trigger hook calls with forged payloads. Set it to `false` now to opt in.
-- **Internal constructors.** The constructors of the Application use-case classes `FinalizeFromWebhook` (new required parameters), `HandleWebhook` (new trailing parameter) and `BeginSign*` (new optional parameter) changed. They are built by DI and are not a supported extension point.
+- **Public use-case constructors (not a supported extension point).** The Application use-case classes are public but built by DI. `HandleWebhook` (new trailing `deliverValidationFailuresAccessor`) and `BeginSign{Pdf,Xml,Word,Excel}` (new optional `userNameAccessor`) keep their 2.4 constructors as compatibility overloads, so 2.4 source and binaries still work: the `HandleWebhook` overload delivers validation failures to the hook, and the `BeginSign*` overloads record no user name. `FinalizeFromWebhook`'s 2.4 constructor is removed, because it now requires the wire client, the credentials resolver, the credentials scope and the mode accessor. That is a source and binary break for code that constructs `FinalizeFromWebhook` directly instead of through `AddMisaConnectESign`.
 
 ## [2.4.0] - 2026-11-04
 

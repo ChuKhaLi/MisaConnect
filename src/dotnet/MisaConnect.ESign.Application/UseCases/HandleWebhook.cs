@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Microsoft.Extensions.Logging;
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Application.Errors;
@@ -20,6 +21,34 @@ public sealed class HandleWebhook
     private readonly Func<string> _successAckCodeAccessor;
     private readonly ILogger<HandleWebhook> _logger;
     private readonly Func<bool> _deliverValidationFailuresAccessor;
+
+    /// <summary>
+    /// The 2.4 constructor, kept for 2.4 source and binary compatibility. Validation failures
+    /// are delivered to the hook (<c>DeliverValidationFailuresToHook = true</c>). Use cases are
+    /// normally resolved through <c>AddMisaConnectESign</c>, not constructed directly.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public HandleWebhook(
+        WebhookEnvelopeValidator validator,
+        ISigningSessionStore sessionStore,
+        FinalizeFromWebhook finalizeFromWebhook,
+        IWebhookDeliveryHook deliveryHook,
+        ICorrelationIdAccessor correlationAccessor,
+        Func<string> configuredClientIdAccessor,
+        Func<string> successAckCodeAccessor,
+        ILogger<HandleWebhook> logger)
+        : this(
+            validator,
+            sessionStore,
+            finalizeFromWebhook,
+            deliveryHook,
+            correlationAccessor,
+            configuredClientIdAccessor,
+            successAckCodeAccessor,
+            logger,
+            deliverValidationFailuresAccessor: () => true)
+    {
+    }
 
     public HandleWebhook(
         WebhookEnvelopeValidator validator,
