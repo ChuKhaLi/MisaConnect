@@ -132,6 +132,24 @@ public class DedupeAndIdempotencyTests
         Assert.Single(hook.Outcomes);
     }
 
+    private sealed class ThrowingHook : IWebhookDeliveryHook
+    {
+        public Task DeliverAsync(WebhookOutcome outcome, CancellationToken ct) => throw new InvalidOperationException("hook boom");
+    }
+
+    [Fact]
+    public async Task Hook_exception_on_success_delivery_propagates()
+    {
+        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var store = new InMemorySigningSessionStore(clock);
+        await store.RegisterAsync(SampleSession(), CancellationToken.None);
+        var sut = BuildSut(BuildWire(clock), store, new ThrowingHook());
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.HandleAsync(Envelope(), CancellationToken.None));
+        Assert.Equal("hook boom", ex.Message);
+    }
+
     [Fact]
     public async Task Cached_success_short_circuits_when_messageId_is_brand_new()
     {
@@ -176,34 +194,16 @@ public class DedupeAndIdempotencyTests
     private static HandleWebhook BuildSut(StubWireClient wire, InMemorySigningSessionStore store, IWebhookDeliveryHook hook)
     {
         var clock = new FakeClock(DateTimeOffset.UtcNow);
-        var cache = new InMemoryTokenCache();
-        var keySelector = new BeginSignFixtures.StaticKeySelector();
-        var correlation = new StubCorrelationIdAccessor("cid");
-        var ensureToken = new EnsureAccessToken(wire, cache, keySelector, clock, () => ("alice", "pass"));
-        var listCerts = new ListActiveCertificates(wire, correlation);
-        var attachPdf = new AttachSignature(wire);
-        var attachXml = new AttachSignatureToXml(wire, correlation);
-        var attachWordExcel = new AttachSignatureToWordExcel(wire, correlation);
-        var finalize = new FinalizeFromWebhook(
-            ensureToken: ensureToken,
-            listCerts: listCerts,
-            certSelector: new BeginSignFixtures.FirstCertSelector(),
-            attachPdf: attachPdf,
-            attachXml: attachXml,
-            attachWordExcel: attachWordExcel,
-            sessionStore: store,
-            lockOwner: store,
-            deliveryHook: hook,
-            logger: NullLogger<FinalizeFromWebhook>.Instance,
-            successAckCodeAccessor: () => "0");
+        var finalize = BeginSignFixtures.BuildFinalize(wire, store, store, hook, clock);
         return new HandleWebhook(
             validator: new WebhookEnvelopeValidator(),
             sessionStore: store,
             finalizeFromWebhook: finalize,
             deliveryHook: hook,
-            correlationAccessor: correlation,
+            correlationAccessor: new StubCorrelationIdAccessor("cid"),
             configuredClientIdAccessor: () => "client-1",
             successAckCodeAccessor: () => "0",
-            logger: NullLogger<HandleWebhook>.Instance);
+            logger: NullLogger<HandleWebhook>.Instance,
+            deliverValidationFailuresAccessor: () => true);
     }
 }

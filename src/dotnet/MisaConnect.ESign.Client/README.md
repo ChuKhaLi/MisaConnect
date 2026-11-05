@@ -94,7 +94,7 @@ For per-person credentials (each signer carries their own MISA credential set), 
 | 2FA / OTP — explicit completion of a captured challenge | `IMisaESignClient.SignInWithOtpAsync` |
 | 2FA / OTP — request re-delivery | `IMisaESignClient.ResendOtpAsync` |
 | 2FA / OTP — transparent (DI-registered `IOtpProvider`) | `Application.Abstractions.IOtpProvider` |
-| Sign XML (XAdES) end-to-end (string + bytes overloads) | `IMisaESignClient.SignXmlAsync` |
+| Sign XML (XAdES) end-to-end | `IMisaESignClient.SignXmlAsync` |
 | Sign Word (OOXML `.docx`) end-to-end | `IMisaESignClient.SignWordAsync` |
 | Sign Excel (OOXML `.xlsx`) end-to-end | `IMisaESignClient.SignExcelAsync` |
 | Begin webhook-mode sign (no polling) | `IMisaESignClient.BeginSign{Pdf,Xml,Word,Excel}Async` |

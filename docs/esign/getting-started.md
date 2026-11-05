@@ -44,13 +44,20 @@ Sandbox credentials come from MISA — see [sandbox-setup.md](sandbox-setup.md).
 ## 3. Wire DI
 
 ```csharp
-using MisaConnect.ESign.Infrastructure.DependencyInjection;
+using MisaConnect.ESign.Client.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
+// In ASP.NET or the Generic Host, use builder.Configuration instead.
+// AddJsonFile and AddEnvironmentVariables need the Microsoft.Extensions.Configuration.Json
+// and Microsoft.Extensions.Configuration.EnvironmentVariables packages.
+IConfiguration configuration = new ConfigurationBuilder()
+    .AddJsonFile("appsettings.json")
+    .AddEnvironmentVariables()
+    .Build();
+
 var services = new ServiceCollection();
-services.AddLogging();
-services.AddMisaConnectESign(builder.Configuration);
+services.AddMisaConnectESign(configuration);
 ```
 
 In a hosted application (ASP.NET, Generic Host, Worker Service), call it on `builder.Services` like any other DI registration. That single call binds `MisaESignOptions`, registers all default port adapters, wires the typed `HttpClient` pipeline (transient-retry → bearer-auth → client-headers), and registers the `IMisaESignClient` facade.
@@ -61,6 +68,9 @@ In a hosted application (ASP.NET, Generic Host, Worker Service), call it on `bui
 using MisaConnect.ESign.Client;
 using MisaConnect.ESign.Client.Dtos;
 using MisaConnect.ESign.Domain.Errors;
+
+const string LogoPngBase64 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
 await using var scope = services.BuildServiceProvider().CreateAsyncScope();
 var esign = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
@@ -74,7 +84,7 @@ try
         Location: "Hà Nội",
         Reason: "Phê duyệt hợp đồng",
         Contact: "nguyenvana@example.com",
-        LogoImageBase64: null,
+        LogoImageBase64: LogoPngBase64, // base64 of a PNG (this is a 1x1 placeholder)
         DataToBeDisplayed: "<p>Phê duyệt hợp đồng số 2026/05/18-01</p>",
         Page: 1,
         PositionX: 100, PositionY: 100, Width: 200, Height: 80,
@@ -85,7 +95,7 @@ try
 }
 catch (NoActiveCertificateException)        { /* user has no ACTIVE remote-signing cert */ }
 catch (AuthenticationFailedException ex)    when (ex.Requires2FA) { /* MISA wants OTP */ }
-catch (SignTerminalStateException ex)       { /* FAILED / CANCELLED on MISA's side */ }
+catch (SignTerminalStateException)          { /* FAILED / CANCELLED on MISA's side */ }
 catch (SignTimeoutException)                { /* user didn't confirm within Polling.TotalTimeout */ }
 catch (ESignTransportException)             { /* transient — back off and retry later */ }
 ```
@@ -105,11 +115,11 @@ Two flavors:
 
 ## 7. Multi-format signing
 
-`SignXmlAsync` (string + bytes overloads), `SignWordAsync`, and `SignExcelAsync` mirror the `SignPdfAsync` shape for XML (XAdES), OOXML `.docx`, and OOXML `.xlsx` documents.
+`SignXmlAsync`, `SignWordAsync`, and `SignExcelAsync` (each takes one request DTO; for XML build it with `SignXmlRequest.FromString(...)` or `SignXmlRequest.FromUtf8Bytes(...)`) mirror the `SignPdfAsync` shape for XML (XAdES), OOXML `.docx`, and OOXML `.xlsx` documents.
 
 ## 8. Webhook-mode (non-blocking) signing
 
-For long-running document signs, use `BeginSign{Pdf,Xml,Word,Excel}Async` to initiate without polling. MISA then POSTs the completion envelope to your webhook endpoint; the SDK's `HandleWebhookAsync` validates and routes it to your registered `IWebhookDeliveryHook`. See [specs/004-misa-esign-webhook/quickstart.md](../../specs/004-misa-esign-webhook/quickstart.md) for the end-to-end webhook setup (mode config, sample-API transport-layer auth, ngrok-based local-dev flow).
+For long-running document signs, use `BeginSign{Pdf,Xml,Word,Excel}Async` to initiate without polling. MISA then POSTs the completion envelope to your webhook endpoint; the SDK's `HandleWebhookAsync` validates it, confirms the outcome with MISA (`Signing/status`) and routes it to your registered `IWebhookDeliveryHook`. See [configuration.md](configuration.md#webhook-ack-codes) for the ACK codes. See [specs/004-misa-esign-webhook/quickstart.md](../../specs/004-misa-esign-webhook/quickstart.md) for the end-to-end webhook setup (mode config, sample-API transport-layer auth, ngrok-based local-dev flow).
 
 ## Next steps
 

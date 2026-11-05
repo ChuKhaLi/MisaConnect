@@ -61,6 +61,8 @@ internal static class ServiceCollectionExtensions
         services.TryAddSingleton<ITokenCacheKeySelector, DefaultTokenCacheKeySelector>();
         services.TryAddSingleton<ICertificateSelector, FirstActiveCertificateSelector>();
         services.TryAddSingleton<IMisaCredentialsAccessor, OptionsMisaCredentialsAccessor>();
+        services.TryAddSingleton<EffectiveCredentials>();
+        services.TryAddSingleton<IWebhookCredentialsResolver, OptionsWebhookCredentialsResolver>();
         services.AddSingleton<SingleFlightRefresh>();
 
         services.AddScoped<RefreshAccessToken>();
@@ -70,7 +72,7 @@ internal static class ServiceCollectionExtensions
             // body is sourced per-call: the closure is invoked lazily inside
             // EnsureAccessToken.ExecuteAsync, so a consumer's per-call ambient
             // flows in. The EnsureAccessToken ctor Func parameter is preserved.
-            var credentials = sp.GetRequiredService<IMisaCredentialsAccessor>();
+            var credentials = sp.GetRequiredService<EffectiveCredentials>();
             return new EnsureAccessToken(
                 wire: sp.GetRequiredService<IMisaESignWireClient>(),
                 cache: sp.GetRequiredService<ITokenCache>(),
@@ -81,7 +83,9 @@ internal static class ServiceCollectionExtensions
                     var c = credentials.Get();
                     return (c.UserName, c.Password);
                 },
-                refreshUseCase: sp.GetRequiredService<RefreshAccessToken>());
+                refreshUseCase: sp.GetRequiredService<RefreshAccessToken>(),
+                singleFlight: (cacheKey, factory, ct) =>
+                    sp.GetRequiredService<SingleFlightRefresh>().RefreshAsync(cacheKey, factory, ct));
         });
         services.AddScoped<ListActiveCertificates>();
         services.AddScoped<HashPdfDocument>();
@@ -181,6 +185,7 @@ internal static class ServiceCollectionExtensions
         services.AddScoped<BeginSignPdf>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<MisaESignOptions>>();
+            var effective = sp.GetRequiredService<EffectiveCredentials>();
             return new BeginSignPdf(
                 ensureToken: sp.GetRequiredService<EnsureAccessToken>(),
                 listCerts: sp.GetRequiredService<ListActiveCertificates>(),
@@ -190,17 +195,19 @@ internal static class ServiceCollectionExtensions
                 sessionStore: sp.GetRequiredService<ISigningSessionStore>(),
                 clock: sp.GetRequiredService<ISystemClock>(),
                 validator: sp.GetRequiredService<SignPdfRequestValidator>(),
-                clientIdAccessor: () => options.Value.ClientId,
+                clientIdAccessor: () => effective.Get().ClientId,
                 ttlAccessor: () => options.Value.Webhook.Session.Ttl,
                 logger: sp.GetRequiredService<ILogger<BeginSignPdf>>(),
                 otpProvider: sp.GetService<IOtpProvider>(),
                 exchangeOtp: sp.GetService<ExchangeOtp>(),
                 otpSubmissionValidator: sp.GetService<OtpSubmissionValidator>(),
-                correlation: sp.GetService<ICorrelationIdAccessor>());
+                correlation: sp.GetService<ICorrelationIdAccessor>(),
+                userNameAccessor: () => effective.Get().UserName);
         });
         services.AddScoped<BeginSignXml>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<MisaESignOptions>>();
+            var effective = sp.GetRequiredService<EffectiveCredentials>();
             return new BeginSignXml(
                 ensureToken: sp.GetRequiredService<EnsureAccessToken>(),
                 listCerts: sp.GetRequiredService<ListActiveCertificates>(),
@@ -210,17 +217,19 @@ internal static class ServiceCollectionExtensions
                 sessionStore: sp.GetRequiredService<ISigningSessionStore>(),
                 clock: sp.GetRequiredService<ISystemClock>(),
                 validator: sp.GetRequiredService<SignXmlRequestValidator>(),
-                clientIdAccessor: () => options.Value.ClientId,
+                clientIdAccessor: () => effective.Get().ClientId,
                 ttlAccessor: () => options.Value.Webhook.Session.Ttl,
                 logger: sp.GetRequiredService<ILogger<BeginSignXml>>(),
                 otpProvider: sp.GetService<IOtpProvider>(),
                 exchangeOtp: sp.GetService<ExchangeOtp>(),
                 otpSubmissionValidator: sp.GetService<OtpSubmissionValidator>(),
-                correlation: sp.GetService<ICorrelationIdAccessor>());
+                correlation: sp.GetService<ICorrelationIdAccessor>(),
+                userNameAccessor: () => effective.Get().UserName);
         });
         services.AddScoped<BeginSignWord>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<MisaESignOptions>>();
+            var effective = sp.GetRequiredService<EffectiveCredentials>();
             return new BeginSignWord(
                 ensureToken: sp.GetRequiredService<EnsureAccessToken>(),
                 listCerts: sp.GetRequiredService<ListActiveCertificates>(),
@@ -230,17 +239,19 @@ internal static class ServiceCollectionExtensions
                 sessionStore: sp.GetRequiredService<ISigningSessionStore>(),
                 clock: sp.GetRequiredService<ISystemClock>(),
                 validator: sp.GetRequiredService<SignWordRequestValidator>(),
-                clientIdAccessor: () => options.Value.ClientId,
+                clientIdAccessor: () => effective.Get().ClientId,
                 ttlAccessor: () => options.Value.Webhook.Session.Ttl,
                 logger: sp.GetRequiredService<ILogger<BeginSignWord>>(),
                 otpProvider: sp.GetService<IOtpProvider>(),
                 exchangeOtp: sp.GetService<ExchangeOtp>(),
                 otpSubmissionValidator: sp.GetService<OtpSubmissionValidator>(),
-                correlation: sp.GetService<ICorrelationIdAccessor>());
+                correlation: sp.GetService<ICorrelationIdAccessor>(),
+                userNameAccessor: () => effective.Get().UserName);
         });
         services.AddScoped<BeginSignExcel>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<MisaESignOptions>>();
+            var effective = sp.GetRequiredService<EffectiveCredentials>();
             return new BeginSignExcel(
                 ensureToken: sp.GetRequiredService<EnsureAccessToken>(),
                 listCerts: sp.GetRequiredService<ListActiveCertificates>(),
@@ -250,26 +261,36 @@ internal static class ServiceCollectionExtensions
                 sessionStore: sp.GetRequiredService<ISigningSessionStore>(),
                 clock: sp.GetRequiredService<ISystemClock>(),
                 validator: sp.GetRequiredService<SignExcelRequestValidator>(),
-                clientIdAccessor: () => options.Value.ClientId,
+                clientIdAccessor: () => effective.Get().ClientId,
                 ttlAccessor: () => options.Value.Webhook.Session.Ttl,
                 logger: sp.GetRequiredService<ILogger<BeginSignExcel>>(),
                 otpProvider: sp.GetService<IOtpProvider>(),
                 exchangeOtp: sp.GetService<ExchangeOtp>(),
                 otpSubmissionValidator: sp.GetService<OtpSubmissionValidator>(),
-                correlation: sp.GetService<ICorrelationIdAccessor>());
+                correlation: sp.GetService<ICorrelationIdAccessor>(),
+                userNameAccessor: () => effective.Get().UserName);
         });
-        services.AddScoped<FinalizeFromWebhook>(sp => new FinalizeFromWebhook(
-            ensureToken: sp.GetRequiredService<EnsureAccessToken>(),
-            listCerts: sp.GetRequiredService<ListActiveCertificates>(),
-            certSelector: sp.GetRequiredService<ICertificateSelector>(),
-            attachPdf: sp.GetRequiredService<AttachSignature>(),
-            attachXml: sp.GetRequiredService<AttachSignatureToXml>(),
-            attachWordExcel: sp.GetRequiredService<AttachSignatureToWordExcel>(),
-            sessionStore: sp.GetRequiredService<ISigningSessionStore>(),
-            lockOwner: sp.GetRequiredService<IFinalizeLockOwner>(),
-            deliveryHook: sp.GetRequiredService<IWebhookDeliveryHook>(),
-            logger: sp.GetRequiredService<ILogger<FinalizeFromWebhook>>(),
-            successAckCodeAccessor: () => MisaWebhookAckCodes.Success));
+        services.AddScoped<FinalizeFromWebhook>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<MisaESignOptions>>();
+            var effective = sp.GetRequiredService<EffectiveCredentials>();
+            return new FinalizeFromWebhook(
+                ensureToken: sp.GetRequiredService<EnsureAccessToken>(),
+                listCerts: sp.GetRequiredService<ListActiveCertificates>(),
+                certSelector: sp.GetRequiredService<ICertificateSelector>(),
+                attachPdf: sp.GetRequiredService<AttachSignature>(),
+                attachXml: sp.GetRequiredService<AttachSignatureToXml>(),
+                attachWordExcel: sp.GetRequiredService<AttachSignatureToWordExcel>(),
+                sessionStore: sp.GetRequiredService<ISigningSessionStore>(),
+                lockOwner: sp.GetRequiredService<IFinalizeLockOwner>(),
+                deliveryHook: sp.GetRequiredService<IWebhookDeliveryHook>(),
+                logger: sp.GetRequiredService<ILogger<FinalizeFromWebhook>>(),
+                successAckCodeAccessor: () => MisaWebhookAckCodes.Success,
+                wire: sp.GetRequiredService<IMisaESignWireClient>(),
+                credentialsResolver: sp.GetRequiredService<IWebhookCredentialsResolver>(),
+                useCredentials: effective.Use,
+                isDynamicMode: () => options.Value.CredentialsMode == CredentialsMode.Dynamic);
+        });
         services.AddScoped<HandleWebhook>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<MisaESignOptions>>();
@@ -281,7 +302,8 @@ internal static class ServiceCollectionExtensions
                 correlationAccessor: sp.GetRequiredService<ICorrelationIdAccessor>(),
                 configuredClientIdAccessor: () => options.Value.ClientId,
                 successAckCodeAccessor: () => MisaWebhookAckCodes.Success,
-                logger: sp.GetRequiredService<ILogger<HandleWebhook>>());
+                logger: sp.GetRequiredService<ILogger<HandleWebhook>>(),
+                deliverValidationFailuresAccessor: () => options.Value.Webhook.DeliverValidationFailuresToHook);
         });
 
         services.AddScoped<SignExcel>(sp =>
@@ -314,7 +336,8 @@ internal static class ServiceCollectionExtensions
             keySelector: sp.GetRequiredService<ITokenCacheKeySelector>(),
             singleFlight: sp.GetRequiredService<SingleFlightRefresh>(),
             options: sp.GetRequiredService<IOptions<MisaESignOptions>>(),
-            correlation: sp.GetRequiredService<ICorrelationIdAccessor>()));
+            correlation: sp.GetRequiredService<ICorrelationIdAccessor>(),
+            clock: sp.GetRequiredService<ISystemClock>()));
 
         services
             .AddHttpClient<MisaESignWireClient>((sp, http) =>

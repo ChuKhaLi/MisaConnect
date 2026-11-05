@@ -37,7 +37,7 @@ dotnet user-secrets set "Misa:ESign:Password" "<your-misa-password>"
 
 ## 3. Integration test secrets
 
-Sandbox tests use `[SandboxFact]`, which reads the `MISACONNECT_ESIGN_SANDBOX_*` env vars and skips cleanly when any are missing or the sandbox host is unreachable.
+Sandbox tests use `[SandboxFact]`, which reads the `MISACONNECT_ESIGN_SANDBOX_*` env vars and skips cleanly when any are missing. There is no reachability probe: with the variables set and an unreachable host, the tests fail. Tests that sign also skip when the sandbox account has no `ACTIVE` certificate (`NoActiveCertificate`) unless `MISACONNECT_ESIGN_SANDBOX_REQUIRED=1`, which turns that skip into a failure.
 
 ```bash
 # Sandbox credentials read by [SandboxFact]

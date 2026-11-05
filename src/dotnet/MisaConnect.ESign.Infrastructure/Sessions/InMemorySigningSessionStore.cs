@@ -65,6 +65,24 @@ internal sealed class InMemorySigningSessionStore : ISigningSessionStore, IFinal
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask CacheTerminalAsync(string clientId, string transactionId, string triggeringMessageId, WebhookAck ack, WebhookStatus status, string? misaErrorCode, CancellationToken ct)
+    {
+        if (!_store.TryGetValue((clientId, transactionId), out var entry))
+        {
+            return ValueTask.CompletedTask;
+        }
+        lock (entry.WriteLock)
+        {
+            // First write wins: a recorded terminal state is never replaced.
+            if (entry.Record.CachedTerminal is null)
+            {
+                var terminal = new SigningSessionCachedTerminal(triggeringMessageId, ack, status, misaErrorCode);
+                entry.Record = entry.Record with { CachedTerminal = terminal };
+            }
+        }
+        return ValueTask.CompletedTask;
+    }
+
     public async ValueTask<IAsyncDisposable> AcquireFinalizeLockAsync(string clientId, string transactionId, CancellationToken ct)
     {
         if (!_store.TryGetValue((clientId, transactionId), out var entry))

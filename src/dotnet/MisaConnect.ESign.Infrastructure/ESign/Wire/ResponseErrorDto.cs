@@ -9,6 +9,7 @@ internal sealed class ResponseErrorDto
     // the whole envelope (errorCode, devMsg, validationFailures) was swallowed and
     // the error surfaced as errorCode=<none>. Nullable lets the body parse.
     [JsonPropertyName("error")]
+    [JsonConverter(typeof(LooseNullableBooleanConverter))]
     public bool? Error { get; set; }
 
     [JsonPropertyName("errorCode")]

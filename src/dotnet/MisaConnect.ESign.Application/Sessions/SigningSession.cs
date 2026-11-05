@@ -49,6 +49,19 @@ public sealed record SigningSession
     public IReadOnlySet<string> ObservedMessageIds { get; init; }
     public SigningSessionCachedSuccess? CachedSuccess { get; init; }
 
+    /// <summary>
+    /// The MISA user name of the principal that began the transaction. Webhook
+    /// finalize resolves this principal's credentials in <c>CredentialsMode.Dynamic</c>;
+    /// <c>null</c> for sessions registered without a user name.
+    /// </summary>
+    public string? UserName { get; init; }
+
+    /// <summary>
+    /// The terminal (FAILED/CANCELLED) state MISA confirmed for this transaction, recorded
+    /// once; later deliveries are answered from it. <c>null</c> until recorded.
+    /// </summary>
+    public SigningSessionCachedTerminal? CachedTerminal { get; init; }
+
     private static bool FormatMatchesPayload(DocumentFormat format, PerFormatHashPayload payload) => (format, payload) switch
     {
         (DocumentFormat.Pdf, PerFormatHashPayload.Pdf) => true,

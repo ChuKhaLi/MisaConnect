@@ -32,7 +32,8 @@ internal sealed class LoginStatusBlockDto
     public string? Message { get; set; }
 
     [JsonPropertyName("error")]
-    public bool Error { get; set; }
+    [JsonConverter(typeof(LooseNullableBooleanConverter))]
+    public bool? Error { get; set; }
 
     [JsonPropertyName("errorCode")]
     [JsonConverter(typeof(LooseStringConverter))]

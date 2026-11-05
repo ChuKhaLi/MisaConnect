@@ -322,24 +322,31 @@ DTO property names are the camelCase of the .NET names; wire field names match M
 
 ## Differences from the .NET SDK
 
-These are .NET defects or deliberate choices that the TypeScript SDK does not reproduce (the .NET follow-ups are tracked in the design document).
+Since .NET `MisaConnect.ESign` 2.5.0 the two SDKs agree on token handling, retries, response guards, 2FA detection and webhook handling. Two differences remain: the default of the validation-failure delivery option, and how webhook credentials are found in static credentials mode.
 
-1. **Token after a 401 refresh.** The transport owns the current token, so after a refresh the rest of the flow uses the new token. (.NET keeps using the stale one and refreshes again on every later call.)
-2. **Login fallback.** If refreshing fails on a 401, the SDK evicts the token and logs in once more before failing with `Authentication`. (.NET fails.)
-3. **`Signing/hash` retries.** It is retried only on 429 and on errors where the connection was never established (`ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`), never on 5xx, timeouts or resets, because a retry could start a second signing transaction (a second approval on the signer's phone). The other calls keep .NET's retry rules.
-4. **Content-type guard on every eSign (ESRM) JSON response**, not just the certificate list (`UnexpectedContentType` / `UnparseableResponse`; the error reports the content type and body length, never the body). The auth calls (login, two-factor, refresh, resend OTP) parse JSON whatever the content type, as .NET does.
+- **Validation-failure delivery default.** `handleWebhook` answers validation failures (malformed body, unknown transaction, client id or document mismatch) to the caller only and never calls your delivery hook. .NET 2.x delivers them to `IWebhookDeliveryHook` by default (`Webhook.DeliverValidationFailuresToHook = true`) so a minor release does not change behaviour; set it to `false` for the TypeScript behaviour. The .NET default becomes `false` in 3.0.
+- **Webhook credentials in static mode.** When `credentials` is a provider function, `handleWebhook` always calls it with the session's `clientId` and `userName` to finalize a webhook. .NET in `CredentialsMode.Static` never calls `IWebhookCredentialsResolver`, even a custom one; it uses the credentials from its options. Only `CredentialsMode.Dynamic` calls the resolver.
+
+### Fixed in .NET 2.5.0
+
+These were .NET defects or deliberate TypeScript choices that .NET 2.5.0 now matches:
+
+1. **Token after a 401 refresh.** The rest of the flow uses the refreshed token.
+2. **Login fallback.** If refreshing fails on a 401, the SDK evicts the token and logs in once more before failing with `Authentication`.
+3. **`Signing/hash` retries.** Retried only on 429 and on errors where the connection was never established (`ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`), never on 5xx, timeouts or resets, because a retry could start a second signing transaction (a second approval on the signer's phone). The other calls keep their retry rules.
+4. **Content-type guard on every eSign (ESRM) JSON response** (`UnexpectedContentType` / `UnparseableResponse`; the error reports the content type and body length, never the body). The auth calls (login, two-factor, refresh, resend OTP) parse JSON whatever the content type.
 5. **`error` field typed loosely.** MISA's `error` accepts `boolean | string | null` (`"true"` / `"false"` are parsed), so a string never drops the envelope.
 6. **Malformed webhooks** are answered with ACK `webhook.malformed` and a `FailureWithError` outcome instead of escaping as an exception (`messageId`, `clientId`, `transactionId`, `status` (case-insensitive) and `signatures` are validated).
 7. **2FA code `122`** is recognised on any HTTP status, in both the nested `{status:{...}}` and the flat body shape.
-8. **Proactive token refresh** happens when the token has under 30 s left (.NET declares a skew but never uses it).
-9. **Dynamic credentials work in webhook mode** (.NET slice 008 leaves it unusable): the session stores `clientId` and `userName`, and finalize calls your provider with them.
+8. **Proactive token refresh** happens when the token has under 30 s left.
+9. **Dynamic credentials work in webhook mode**: the session stores `clientId` and `userName`, and finalize calls your provider with them (.NET: `IWebhookCredentialsResolver`).
+
+The webhook rulings also match: webhooks are a trigger, not a source of truth (confirmed with `Signing/status`); the terminal state is stored once; finalize never prompts for OTP; OTP challenges are per principal.
 
 Further behaviour decided while implementing:
 
 - **Token binding.** Cached tokens carry a salted fingerprint of password + clientKey; see [Swappable collaborators](#swappable-collaborators).
 - **XML bytes keep a BOM.** XML passed as bytes keeps a leading UTF-8 BOM, the same as .NET.
-- **OTP challenges are per principal**, not one pending username per client.
-- **Webhooks are a trigger, not a source of truth** (confirmed with `Signing/status`); the terminal state is stored once; finalize never prompts for OTP. See [Webhook mode](#webhook-mode).
 - **No DI scope.** One client object plays the role of one .NET DI scope; use per-call credentials to serve several users from one client.
 
 ## Sandbox tests

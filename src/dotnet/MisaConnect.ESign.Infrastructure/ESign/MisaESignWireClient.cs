@@ -10,8 +10,10 @@ using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Domain.Signing;
 using MisaConnect.ESign.Infrastructure.Configuration;
+using MisaConnect.ESign.Infrastructure.Credentials;
 using MisaConnect.ESign.Infrastructure.ESign.Mapping;
 using MisaConnect.ESign.Infrastructure.ESign.Wire;
+using MisaConnect.ESign.Infrastructure.Http;
 using DomainCert = MisaConnect.ESign.Domain.Certificates.Certificate;
 using WireCertDto = MisaConnect.ESign.Infrastructure.ESign.Wire.CertificateDto;
 
@@ -23,10 +25,11 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
     internal const string ClientIdHeader = "x-clientId";
     internal const string ClientKeyHeader = "x-clientKey";
     internal const string CorrelationIdHeader = "X-Correlation-Id";
+    private const string TwoFactorRequiredCode = "122";
 
     private readonly HttpClient _http;
     private readonly IOptions<MisaESignOptions> _options;
-    private readonly IMisaCredentialsAccessor _credentials;
+    private readonly EffectiveCredentials _credentials;
     private readonly ISystemClock _clock;
     private readonly ICorrelationIdAccessor _correlation;
     private readonly ILogger<MisaESignWireClient> _logger;
@@ -34,7 +37,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
     public MisaESignWireClient(
         HttpClient http,
         IOptions<MisaESignOptions> options,
-        IMisaCredentialsAccessor credentials,
+        EffectiveCredentials credentials,
         ISystemClock clock,
         ICorrelationIdAccessor correlation,
         ILogger<MisaESignWireClient> logger)
@@ -56,16 +59,13 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
         var json = await ReadStringAsync(resp, ct).ConfigureAwait(false);
 
+        ThrowIfLoginError(json, resp.StatusCode, ESignHttpRoutes.AuthLoginApi, userName);
         if (!resp.IsSuccessStatusCode)
         {
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.AuthLoginApi, ct, userName).ConfigureAwait(false);
         }
 
         var dto = Deserialize<LoginResponseDto>(json);
-        if (dto?.Status is { Error: true })
-        {
-            ThrowFromLoginEnvelope(dto.Status, ESignHttpRoutes.AuthLoginApi, userName);
-        }
         if (dto?.Data is null)
         {
             throw new ESignGeneralException(
@@ -103,9 +103,14 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         }
 
         var dto = Deserialize<LoginResponseDto>(json);
-        if (dto?.Status is { Error: true })
+        if (dto?.Status is { } twoFactorStatus && IsLoginStatusError(twoFactorStatus))
         {
-            ThrowFromTwoFactorStatus(dto.Status, userName);
+            ThrowFromTwoFactorStatus(twoFactorStatus, userName);
+        }
+        var flat = Deserialize<ResponseErrorDto>(json);
+        if (flat is { Error: true } || !string.IsNullOrEmpty(flat?.ErrorCode))
+        {
+            ThrowFromTwoFactorEnvelope(json, (int)resp.StatusCode, resp.StatusCode, userName);
         }
         if (dto?.Data is null)
         {
@@ -299,7 +304,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsHash, ct, requestedFormat: DocumentFormat.Pdf).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<HashResponseDto>(json);
+        var dto = ReadEsrmJson<HashResponseDto>(resp, json, ESignHttpRoutes.DocumentsHash);
         if (dto?.PdfDocs is not { Count: > 0 })
         {
             throw new ESignGeneralException(
@@ -354,7 +359,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsHash, ct, requestedFormat: DocumentFormat.Xml).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<HashResponseDto>(json);
+        var dto = ReadEsrmJson<HashResponseDto>(resp, json, ESignHttpRoutes.DocumentsHash);
         if (dto?.XmlDocs is not { Count: > 0 })
         {
             throw new ESignGeneralException(
@@ -442,7 +447,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsHash, ct, requestedFormat: format).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<HashResponseDto>(json);
+        var dto = ReadEsrmJson<HashResponseDto>(resp, json, ESignHttpRoutes.DocumentsHash);
         if (format == DocumentFormat.Word)
         {
             if (dto?.WordDocs is not { Count: > 0 })
@@ -509,6 +514,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         };
 
         var req = NewRequest(HttpMethod.Post, ESignHttpRoutes.SigningHash);
+        req.Options.Set(ESignRequestOptions.NotRetryableAfterSend, true);
         ApplyAuth(req, accessToken);
         req.Content = JsonContent.Create(body, options: ESignJsonOptions.Wire);
 
@@ -520,7 +526,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.SigningHash, ct).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<SignHashResponseDto>(json);
+        var dto = ReadEsrmJson<SignHashResponseDto>(resp, json, ESignHttpRoutes.SigningHash);
         if (dto is null || string.IsNullOrEmpty(dto.TransactionId))
         {
             throw new ESignGeneralException(
@@ -546,7 +552,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.SigningStatus, ct).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<SignStatusResponseDto>(json);
+        var dto = ReadEsrmJson<SignStatusResponseDto>(resp, json, ESignHttpRoutes.SigningStatus);
         if (dto is null)
         {
             throw new ESignGeneralException(
@@ -596,7 +602,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsAttachment, ct, requestedFormat: DocumentFormat.Pdf).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<AttachmentResponseDto>(json);
+        var dto = ReadEsrmJson<AttachmentResponseDto>(resp, json, ESignHttpRoutes.DocumentsAttachment);
         var doc = dto?.PdfDocs is { Count: > 0 } ? dto.PdfDocs[0].Document : null;
         if (string.IsNullOrEmpty(doc))
         {
@@ -649,7 +655,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsAttachment, ct, requestedFormat: DocumentFormat.Xml).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<AttachmentResponseDto>(json);
+        var dto = ReadEsrmJson<AttachmentResponseDto>(resp, json, ESignHttpRoutes.DocumentsAttachment);
         var doc = dto?.XmlDocs is { Count: > 0 } ? dto.XmlDocs[0].Document : null;
         if (string.IsNullOrEmpty(doc))
         {
@@ -717,7 +723,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsAttachment, ct, requestedFormat: format).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<AttachmentResponseDto>(json);
+        var dto = ReadEsrmJson<AttachmentResponseDto>(resp, json, ESignHttpRoutes.DocumentsAttachment);
         string? doc;
         if (format == DocumentFormat.Word)
         {
@@ -787,8 +793,6 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         }
     }
 
-    private const int BodySnippetMax = 256;
-
     private static bool IsJsonMediaType(string? mediaType) =>
         mediaType is not null
         && (mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
@@ -799,8 +803,8 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
     /// JSON (Defect D). MISA serves its SPA <c>index.html</c> (<c>200 text/html</c>)
     /// when an ESRM path is mis-routed; without this guard that silently
     /// deserializes to an empty result and reads as a business state. The error
-    /// names the endpoint, the content type, and a truncated body snippet — never a
-    /// request header or token.
+    /// names the endpoint, the content type, and the body length — never the body
+    /// content, a request header or a token.
     /// </summary>
     private void EnsureEsrmJsonResponse(HttpResponseMessage resp, string body, string endpoint)
     {
@@ -809,13 +813,34 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         {
             return;
         }
-        var snippet = body.Length > BodySnippetMax ? body.Substring(0, BodySnippetMax) : body;
         throw new ESignGeneralException(
             ESignErrorCategory.MisaUnknown,
             "UnexpectedContentType",
-            $"MISA {endpoint} returned a {(int)resp.StatusCode} success with a non-JSON response " +
-            $"(content-type '{mediaType ?? "(none)"}'). This usually means the request was routed to the wrong host or path. Body snippet: {snippet}",
+            $"MISA {endpoint} returned a {(int)resp.StatusCode} success with a non-JSON response. " +
+            $"This usually means the request was routed to the wrong host or path " +
+            $"(content-type '{mediaType ?? "(none)"}', body {body.Length} bytes).",
             _correlation.Current);
+    }
+
+    /// <summary>
+    /// Guards the content type of a successful ESRM response, then deserialises it.
+    /// A blank body yields <c>null</c> so callers keep their own <c>EmptyResponse</c>
+    /// errors; a non-blank body that does not parse is reported by length only.
+    /// </summary>
+    private T? ReadEsrmJson<T>(HttpResponseMessage resp, string body, string endpoint)
+        where T : class
+    {
+        EnsureEsrmJsonResponse(resp, body, endpoint);
+        var dto = Deserialize<T>(body);
+        if (dto is null && !string.IsNullOrWhiteSpace(body))
+        {
+            throw new ESignGeneralException(
+                ESignErrorCategory.MisaUnknown,
+                "UnparseableResponse",
+                $"MISA {endpoint} returned a {(int)resp.StatusCode} success with a JSON content-type but a body ({body.Length} bytes) that could not be parsed.",
+                _correlation.Current);
+        }
+        return dto;
     }
 
     private async Task ThrowMappedAsync(
@@ -880,6 +905,47 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             attemptCount: null,
             lastStatusCode: resp.StatusCode);
     }
+
+    /// <summary>
+    /// Throws the mapped login error when the body carries one in either shape - the
+    /// nested <c>status</c> block or the flat <c>error</c>/<c>errorCode</c> envelope -
+    /// regardless of the HTTP status (two-factor code 122 arrives as 200 or 400).
+    /// Returns when neither shape reports an error.
+    /// </summary>
+    private void ThrowIfLoginError(string json, HttpStatusCode status, string endpoint, string? userName)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return;
+
+        var nested = Deserialize<LoginResponseDto>(json);
+        if (nested?.Status is { } loginStatus && IsLoginStatusError(loginStatus))
+        {
+            ThrowFromLoginEnvelope(loginStatus, endpoint, userName);
+        }
+
+        var flat = Deserialize<ResponseErrorDto>(json);
+        if (flat is { Error: true } || !string.IsNullOrEmpty(flat?.ErrorCode))
+        {
+            throw Application.Errors.ESignErrorMapper.Map(
+                endpoint: endpoint,
+                statusCode: (int)status,
+                envelope: ResponseErrorMapper.ToDomain(flat),
+                correlationId: _correlation.Current,
+                includeRawErrorMessage: _options.Value.Errors.IncludeRawErrorMessage,
+                transactionId: null,
+                attemptCount: null,
+                lastStatusCode: status,
+                userName: userName);
+        }
+    }
+
+    /// <summary>
+    /// A nested login/two-factor status block reports an error when its <c>error</c> flag is
+    /// <c>true</c>, or - whatever the flag (true, false, null or missing) - when it carries the
+    /// two-factor-required code <c>122</c> (FR-008, TS parity: 122 is checked first).
+    /// </summary>
+    private static bool IsLoginStatusError(LoginStatusBlockDto status) =>
+        status.Error == true
+        || string.Equals(status.ErrorCode, TwoFactorRequiredCode, StringComparison.OrdinalIgnoreCase);
 
     private void ThrowFromLoginEnvelope(LoginStatusBlockDto status, string endpoint, string? userName = null)
     {

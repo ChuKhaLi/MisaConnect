@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Client;
 using MisaConnect.ESign.Client.DependencyInjection;
+using MisaConnect.ESign.Domain.Authentication;
+using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Infrastructure.Configuration;
 using MisaConnect.ESign.IntegrationTests.EsignFake;
 using Xunit;
@@ -118,5 +120,59 @@ public class DynamicCredentialsFakeServerTests
         Assert.Equal("alice|cid-A|sandbox.example.com", keyA);
         Assert.Equal("bob|cid-B|sandbox.example.com", keyB);
         Assert.NotEqual(keyA, keyB);
+    }
+
+    [Fact]
+    public async Task Otp_challenge_is_per_principal()
+    {
+        var otpExchanged = false;
+        await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.Intercept = req =>
+            {
+                if (req.Route == "two-factor") otpExchanged = true;
+                if (req.Route == "login" && !otpExchanged
+                    && (req.Body.Contains("\"userA\"", StringComparison.Ordinal) || req.Body.Contains("\"userB\"", StringComparison.Ordinal)))
+                {
+                    return new FakeResponse(200, "{\"status\":{\"code\":200,\"error\":true,\"errorCode\":\"122\"}}");
+                }
+                return null;
+            };
+        await using var sp = BuildDynamic(server.BaseUrl);
+        var a = new MisaCredentials("cid-A", "ckey-A", "userA", "pw-A");
+        var b = new MisaCredentials("cid-B", "ckey-B", "userB", "pw-B");
+        var c = new MisaCredentials("cid-C", "ckey-C", "userC", "pw-C");
+
+        await using var scope = sp.CreateAsyncScope();
+        var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
+
+        using (Use(a))
+        {
+            var ex = await Assert.ThrowsAsync<AuthenticationFailedException>(() =>
+                client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
+            Assert.True(ex.Requires2FA);
+        }
+        using (Use(b))
+        {
+            var ex = await Assert.ThrowsAsync<AuthenticationFailedException>(() =>
+                client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
+            Assert.True(ex.Requires2FA);
+        }
+
+        using (Use(a))
+        {
+            await client.SignInWithOtpAsync("123456", OtpDeliveryChannel.SmsOrEmail, false, CancellationToken.None);
+        }
+        Assert.Contains("\"userName\":\"userA\"", Assert.Single(server.TwoFactorBodies).Body, StringComparison.Ordinal);
+
+        using (Use(b))
+        {
+            await client.ResendOtpAsync(ct: CancellationToken.None);
+        }
+
+        using (Use(c))
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                client.SignInWithOtpAsync("123456", OtpDeliveryChannel.SmsOrEmail, false, CancellationToken.None));
+        }
     }
 }

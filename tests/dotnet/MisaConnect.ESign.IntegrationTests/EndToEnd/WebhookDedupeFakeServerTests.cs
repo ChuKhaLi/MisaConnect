@@ -32,6 +32,7 @@ public class WebhookDedupeFakeServerTests
     public async Task Five_identical_deliveries_call_attachment_exactly_once()
     {
         await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.PendingsBeforeSuccess = 0;
         var hook = new CapturingHook();
         await using var sp = BuildSp(server.BaseUrl, hook);
 
@@ -55,6 +56,7 @@ public class WebhookDedupeFakeServerTests
     public async Task Eight_parallel_deliveries_call_attachment_exactly_once()
     {
         await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.PendingsBeforeSuccess = 0;
         var hook = new CapturingHook();
         await using var sp = BuildSp(server.BaseUrl, hook);
 

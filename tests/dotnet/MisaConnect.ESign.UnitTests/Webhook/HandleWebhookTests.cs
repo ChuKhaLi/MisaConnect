@@ -6,6 +6,7 @@ using MisaConnect.ESign.Application.Validation;
 using MisaConnect.ESign.Application.Webhook;
 using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
+using MisaConnect.ESign.Domain.Signing;
 using MisaConnect.ESign.Domain.Webhook;
 using MisaConnect.ESign.Infrastructure.Sessions;
 using MisaConnect.ESign.UnitTests.TestSupport;
@@ -89,20 +90,37 @@ public class HandleWebhookTests
     }
 
     [Fact]
+    public async Task HandleAsync_blank_configured_client_id_skips_match_and_uses_session_lookup()
+    {
+        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var store = new InMemorySigningSessionStore(clock);
+        await store.RegisterAsync(SampleSession(clientId: "client-A"), CancellationToken.None);
+        var hook = new RecordingHook();
+        var sut = BuildSut(store, hook, configuredClientId: "", wire: TerminalWire(SignStatus.FAILED, null));
+
+        var known = await sut.HandleAsync(BuildEnvelope(WebhookStatus.Failed, clientId: "client-A"), CancellationToken.None);
+        var spoofed = await sut.HandleAsync(BuildEnvelope(WebhookStatus.Failed, clientId: "client-X"), CancellationToken.None);
+
+        Assert.Equal("0", known.Ack.ErrorCode);
+        Assert.Equal("webhook.unknown_transaction", spoofed.Ack.ErrorCode);
+    }
+
+    [Fact]
     public async Task HandleAsync_terminal_failed_returns_success_ack_with_TerminalWithoutFinalize_outcome()
     {
         var clock = new FakeClock(DateTimeOffset.UtcNow);
         var store = new InMemorySigningSessionStore(clock);
         await store.RegisterAsync(SampleSession(), CancellationToken.None);
         var hook = new RecordingHook();
-        var sut = BuildSut(store, hook);
+        var sut = BuildSut(store, hook, wire: TerminalWire(SignStatus.FAILED, "MisaErr-99"));
 
-        var envelope = BuildEnvelope(WebhookStatus.Failed, errorCode: "MisaErr-99");
+        var envelope = BuildEnvelope(WebhookStatus.Failed, errorCode: "EnvelopeErr");
         var result = await sut.HandleAsync(envelope, CancellationToken.None);
 
         Assert.Equal("0", result.Ack.ErrorCode);
         var terminal = Assert.IsType<WebhookOutcome.TerminalWithoutFinalize>(result.Outcome);
         Assert.Equal(WebhookStatus.Failed, terminal.Status);
+        // The terminal status and error code now come from MISA's Signing/status.
         Assert.Equal("MisaErr-99", terminal.MisaErrorCode);
         Assert.Single(hook.Outcomes);
     }
@@ -114,7 +132,7 @@ public class HandleWebhookTests
         var store = new InMemorySigningSessionStore(clock);
         await store.RegisterAsync(SampleSession(), CancellationToken.None);
         var hook = new RecordingHook();
-        var sut = BuildSut(store, hook);
+        var sut = BuildSut(store, hook, wire: TerminalWire(SignStatus.CANCELLED, null));
 
         var envelope = BuildEnvelope(WebhookStatus.Cancelled);
         var result = await sut.HandleAsync(envelope, CancellationToken.None);
@@ -176,36 +194,228 @@ public class HandleWebhookTests
         Assert.Empty(hook.Outcomes);
     }
 
+    [Fact]
+    public async Task Validation_failure_is_delivered_when_option_true()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var hook = new RecordingHook();
+        var sut = BuildSut(store, hook, deliverValidationFailures: true);
+
+        var result = await sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), CancellationToken.None);
+
+        Assert.Equal("webhook.unknown_transaction", result.Ack.ErrorCode);
+        Assert.IsType<WebhookOutcome.FailureWithError>(Assert.Single(hook.Outcomes));
+    }
+
+    [Fact]
+    public async Task Validation_failure_is_not_delivered_when_option_false()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var hook = new RecordingHook();
+        var sut = BuildSut(store, hook, deliverValidationFailures: false);
+
+        var result = await sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), CancellationToken.None);
+
+        Assert.Equal("webhook.unknown_transaction", result.Ack.ErrorCode);
+        Assert.IsType<WebhookOutcome.FailureWithError>(result.Outcome);
+        Assert.Empty(hook.Outcomes);
+    }
+
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(false, 0)]
+    public async Task Malformed_is_delivered_only_when_option_true(bool deliver, int expectedHookCalls)
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var hook = new RecordingHook();
+        var sut = BuildSut(store, hook, deliverValidationFailures: deliver);
+
+        var result = await sut.HandleMalformedAsync("tx-9", "status", CancellationToken.None);
+
+        Assert.Equal("webhook.malformed", result.Ack.ErrorCode);
+        var failure = Assert.IsType<WebhookOutcome.FailureWithError>(result.Outcome);
+        Assert.Equal("tx-9", failure.TransactionId);
+        Assert.Equal(DocumentFormat.Unknown, failure.Format);
+        Assert.Equal(WebhookValidationCategory.MalformedEnvelope, failure.Category);
+        Assert.Equal(expectedHookCalls, hook.Outcomes.Count);
+    }
+
+    [Fact]
+    public async Task Malformed_with_null_transactionId_uses_empty_string()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var sut = BuildSut(store, new RecordingHook());
+
+        var result = await sut.HandleMalformedAsync(null, "transactionId", CancellationToken.None);
+
+        Assert.Equal("", Assert.IsType<WebhookOutcome.FailureWithError>(result.Outcome).TransactionId);
+    }
+
+    [Fact]
+    public async Task Unexpected_exception_becomes_finalize_failed()
+    {
+        var inner = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var hook = new RecordingHook();
+        var sut = BuildSut(new ThrowingStore(inner, new InvalidOperationException("boom")), hook, lockOwner: inner);
+
+        var result = await sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), CancellationToken.None);
+
+        Assert.Equal("webhook.finalize_failed", result.Ack.ErrorCode);
+        Assert.Equal("Finalize attempt failed; MISA may retry.", result.Ack.DevMsg);
+        Assert.Equal("Signing finalization failed; please wait for retry.", result.Ack.UserMsg);
+        var failure = Assert.IsType<WebhookOutcome.FailureWithError>(result.Outcome);
+        Assert.Equal("tx-1", failure.TransactionId);
+        Assert.Equal(DocumentFormat.Unknown, failure.Format);
+        Assert.Empty(hook.Outcomes);
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_propagates()
+    {
+        var inner = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var sut = BuildSut(new ThrowingStore(inner, null), new RecordingHook(), lockOwner: inner);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), cts.Token));
+    }
+
+    /// <summary>Cancels the caller's token, then throws <see cref="OperationCanceledException"/> for it.</summary>
+    private sealed class CancellingHook : IWebhookDeliveryHook
+    {
+        private readonly CancellationTokenSource _caller;
+        private readonly bool _cancelCaller;
+
+        public CancellingHook(CancellationTokenSource caller, bool cancelCaller)
+        {
+            _caller = caller;
+            _cancelCaller = cancelCaller;
+        }
+
+        public Task DeliverAsync(WebhookOutcome outcome, CancellationToken ct)
+        {
+            if (_cancelCaller)
+            {
+                _caller.Cancel();
+                throw new OperationCanceledException(ct);
+            }
+            throw new OperationCanceledException("hook's own timeout");
+        }
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_inside_the_hook_propagates_on_malformed_delivery()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        using var cts = new CancellationTokenSource();
+        var sut = BuildSut(store, new CancellingHook(cts, cancelCaller: true));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.HandleMalformedAsync("tx-9", "status", cts.Token));
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_inside_the_hook_propagates_on_validation_failure_delivery()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        using var cts = new CancellationTokenSource();
+        var sut = BuildSut(store, new CancellingHook(cts, cancelCaller: true));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), cts.Token));
+    }
+
+    [Fact]
+    public async Task Hook_cancellation_without_caller_cancellation_is_still_swallowed_on_validation_failure()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        using var cts = new CancellationTokenSource();
+        var sut = BuildSut(store, new CancellingHook(cts, cancelCaller: false));
+
+        var result = await sut.HandleMalformedAsync("tx-9", "status", cts.Token);
+
+        Assert.Equal("webhook.malformed", result.Ack.ErrorCode);
+    }
+
+    private sealed class ThrowingHook : IWebhookDeliveryHook
+    {
+        public Task DeliverAsync(WebhookOutcome outcome, CancellationToken ct) => throw new InvalidOperationException("hook boom");
+    }
+
+    [Fact]
+    public async Task Hook_exception_on_terminal_delivery_propagates()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        await store.RegisterAsync(SampleSession(), CancellationToken.None);
+        var sut = BuildSut(store, new ThrowingHook(), wire: TerminalWire(SignStatus.FAILED, "E"));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.HandleAsync(BuildEnvelope(WebhookStatus.Failed, errorCode: "E"), CancellationToken.None));
+        Assert.Equal("hook boom", ex.Message);
+    }
+
+    private sealed class ThrowingStore : ISigningSessionStore
+    {
+        private readonly ISigningSessionStore _inner;
+        private readonly Exception? _toThrow;
+
+        public ThrowingStore(ISigningSessionStore inner, Exception? toThrow)
+        {
+            _inner = inner;
+            _toThrow = toThrow;
+        }
+
+        public ValueTask RegisterAsync(SigningSession session, CancellationToken ct) => _inner.RegisterAsync(session, ct);
+
+        public ValueTask<SigningSession?> TryGetByTransactionIdAsync(string clientId, string transactionId, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (_toThrow is not null) throw _toThrow;
+            return _inner.TryGetByTransactionIdAsync(clientId, transactionId, ct);
+        }
+
+        public ValueTask RecordObservedMessageIdAsync(string clientId, string transactionId, string messageId, CancellationToken ct)
+            => _inner.RecordObservedMessageIdAsync(clientId, transactionId, messageId, ct);
+
+        public ValueTask CacheSuccessAsync(string clientId, string transactionId, string triggeringMessageId, WebhookAck ack, byte[] signedBytes, CancellationToken ct)
+            => _inner.CacheSuccessAsync(clientId, transactionId, triggeringMessageId, ack, signedBytes, ct);
+    }
+
+    private static StubWireClient TerminalWire(SignStatus status, string? errorCode)
+    {
+        var wire = new StubWireClient();
+        wire.OnGetStatus = (_, tx, _) => Task.FromResult(new SignStatusSnapshot(status, errorCode, null, tx, null));
+        return wire;
+    }
+
     private static HandleWebhook BuildSut(
         ISigningSessionStore store,
         IWebhookDeliveryHook hook,
         string configuredClientId = "client-1",
-        string successCode = "0")
+        string successCode = "0",
+        bool deliverValidationFailures = true,
+        InMemorySigningSessionStore? lockOwner = null,
+        StubWireClient? wire = null)
     {
-        var validator = new WebhookEnvelopeValidator();
-        // FinalizeFromWebhook is required by HandleWebhook ctor but only invoked when there's no cached success and validation passes;
-        // for the failure/short-circuit tests below it's never reached.
-        var finalize = new FinalizeFromWebhook(
-            ensureToken: null!,
-            listCerts: null!,
-            certSelector: null!,
-            attachPdf: null!,
-            attachXml: null!,
-            attachWordExcel: null!,
-            sessionStore: store,
-            lockOwner: (IFinalizeLockOwner)store,
-            deliveryHook: hook,
-            logger: NullLogger<FinalizeFromWebhook>.Instance,
-            successAckCodeAccessor: () => successCode);
+        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var finalize = BeginSignFixtures.BuildFinalize(
+            wire ?? new StubWireClient(),
+            store,
+            (IFinalizeLockOwner)(lockOwner ?? store),
+            hook,
+            clock,
+            successCode: successCode);
         var correlation = new StubCorrelationIdAccessor("cid-test");
         return new HandleWebhook(
-            validator: validator,
+            validator: new WebhookEnvelopeValidator(),
             sessionStore: store,
             finalizeFromWebhook: finalize,
             deliveryHook: hook,
             correlationAccessor: correlation,
             configuredClientIdAccessor: () => configuredClientId,
             successAckCodeAccessor: () => successCode,
-            logger: NullLogger<HandleWebhook>.Instance);
+            logger: NullLogger<HandleWebhook>.Instance,
+            deliverValidationFailuresAccessor: () => deliverValidationFailures);
     }
 }

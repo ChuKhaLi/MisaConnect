@@ -3,6 +3,7 @@ using MisaConnect.ESign.Application.Abstractions;
 using MisaConnect.ESign.Application.Sessions;
 using MisaConnect.ESign.Application.UseCases;
 using MisaConnect.ESign.Application.Validation;
+using MisaConnect.ESign.Application.Webhook;
 using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Domain.Certificates;
 using MisaConnect.ESign.Domain.Documents;
@@ -101,7 +102,7 @@ internal static class BeginSignFixtures
             Reason: "Test",
             Contact: "alice@example.com"));
 
-    public static BeginSignPdf BuildBeginSignPdf(StubWireClient wire, StubSigningSessionStore store, FakeClock clock, string clientId = "client-1", TimeSpan? ttl = null)
+    public static BeginSignPdf BuildBeginSignPdf(StubWireClient wire, StubSigningSessionStore store, FakeClock clock, string clientId = "client-1", TimeSpan? ttl = null, string? userName = null)
     {
         var selector = new StaticKeySelector();
         var cache = new InMemoryTokenCache();
@@ -123,10 +124,11 @@ internal static class BeginSignFixtures
             clientIdAccessor: () => clientId,
             ttlAccessor: () => ttl ?? TimeSpan.FromHours(24),
             logger: NullLogger<BeginSignPdf>.Instance,
-            correlation: correlation);
+            correlation: correlation,
+            userNameAccessor: userName is null ? null : () => userName);
     }
 
-    public static BeginSignXml BuildBeginSignXml(StubWireClient wire, StubSigningSessionStore store, FakeClock clock, string clientId = "client-1", TimeSpan? ttl = null)
+    public static BeginSignXml BuildBeginSignXml(StubWireClient wire, StubSigningSessionStore store, FakeClock clock, string clientId = "client-1", TimeSpan? ttl = null, string? userName = null)
     {
         var selector = new StaticKeySelector();
         var cache = new InMemoryTokenCache();
@@ -148,10 +150,11 @@ internal static class BeginSignFixtures
             clientIdAccessor: () => clientId,
             ttlAccessor: () => ttl ?? TimeSpan.FromHours(24),
             logger: NullLogger<BeginSignXml>.Instance,
-            correlation: correlation);
+            correlation: correlation,
+            userNameAccessor: userName is null ? null : () => userName);
     }
 
-    public static BeginSignWord BuildBeginSignWord(StubWireClient wire, StubSigningSessionStore store, FakeClock clock, string clientId = "client-1", TimeSpan? ttl = null)
+    public static BeginSignWord BuildBeginSignWord(StubWireClient wire, StubSigningSessionStore store, FakeClock clock, string clientId = "client-1", TimeSpan? ttl = null, string? userName = null)
     {
         var selector = new StaticKeySelector();
         var cache = new InMemoryTokenCache();
@@ -173,10 +176,11 @@ internal static class BeginSignFixtures
             clientIdAccessor: () => clientId,
             ttlAccessor: () => ttl ?? TimeSpan.FromHours(24),
             logger: NullLogger<BeginSignWord>.Instance,
-            correlation: correlation);
+            correlation: correlation,
+            userNameAccessor: userName is null ? null : () => userName);
     }
 
-    public static BeginSignExcel BuildBeginSignExcel(StubWireClient wire, StubSigningSessionStore store, FakeClock clock, string clientId = "client-1", TimeSpan? ttl = null)
+    public static BeginSignExcel BuildBeginSignExcel(StubWireClient wire, StubSigningSessionStore store, FakeClock clock, string clientId = "client-1", TimeSpan? ttl = null, string? userName = null)
     {
         var selector = new StaticKeySelector();
         var cache = new InMemoryTokenCache();
@@ -198,7 +202,8 @@ internal static class BeginSignFixtures
             clientIdAccessor: () => clientId,
             ttlAccessor: () => ttl ?? TimeSpan.FromHours(24),
             logger: NullLogger<BeginSignExcel>.Instance,
-            correlation: correlation);
+            correlation: correlation,
+            userNameAccessor: userName is null ? null : () => userName);
     }
 
     public static void WireDefaults(StubWireClient wire, FakeClock clock)
@@ -231,5 +236,65 @@ internal static class BeginSignFixtures
             Digest: "DIGEST",
             MainDom: "EXCELMAIN"));
         wire.OnSubmitSignHash = (_, _, _, _, _, _, _) => Task.FromResult(new SignTransaction("tx-fake-1", clock.UtcNow));
+    }
+
+    /// <summary>Stub <see cref="IWebhookCredentialsResolver"/> backed by a delegate.</summary>
+    public sealed class StubResolver : IWebhookCredentialsResolver
+    {
+        private readonly Func<string, string, MisaCredentials?> _resolve;
+        public StubResolver(Func<string, string, MisaCredentials?> resolve) => _resolve = resolve;
+        public ValueTask<MisaCredentials?> ResolveAsync(string clientId, string userName, CancellationToken ct) =>
+            ValueTask.FromResult(_resolve(clientId, userName));
+    }
+
+    /// <summary>Records the credentials passed to <c>useCredentials</c>.</summary>
+    public sealed class RecordingUse
+    {
+        public List<MisaCredentials> Used { get; } = new();
+        public IDisposable Use(MisaCredentials c)
+        {
+            Used.Add(c);
+            return new Noop();
+        }
+        private sealed class Noop : IDisposable { public void Dispose() { } }
+    }
+
+    /// <summary>MISA <c>Signing/status</c> SUCCESS snapshot carrying <paramref name="signature"/>.</summary>
+    public static SignStatusSnapshot StatusSuccess(string signature = "MISA-SIG") =>
+        new(SignStatus.SUCCESS, null, null, "tx-1", signature);
+
+    /// <summary>Builds a <see cref="FinalizeFromWebhook"/> over <paramref name="wire"/> (Static mode unless a resolver is given).</summary>
+    public static FinalizeFromWebhook BuildFinalize(
+        StubWireClient wire,
+        ISigningSessionStore store,
+        IFinalizeLockOwner lockOwner,
+        IWebhookDeliveryHook hook,
+        FakeClock clock,
+        IWebhookCredentialsResolver? dynamicResolver = null,
+        RecordingUse? use = null,
+        string successCode = "0")
+    {
+        wire.OnLogin ??= (_, _, _) => Task.FromResult(ActiveSession(clock.UtcNow));
+        wire.OnListCerts ??= (_, _) => Task.FromResult<IReadOnlyList<Certificate>>(new[] { ActiveCert() });
+        wire.OnGetStatus ??= (_, _, _) => Task.FromResult(StatusSuccess());
+        var correlation = new StubCorrelationIdAccessor("cid-test");
+        var ensureToken = new EnsureAccessToken(wire, new InMemoryTokenCache(), new StaticKeySelector(), clock, () => ("alice", "pass"));
+        use ??= new RecordingUse();
+        return new FinalizeFromWebhook(
+            ensureToken: ensureToken,
+            listCerts: new ListActiveCertificates(wire, correlation),
+            certSelector: new FirstCertSelector(),
+            attachPdf: new AttachSignature(wire),
+            attachXml: new AttachSignatureToXml(wire, correlation),
+            attachWordExcel: new AttachSignatureToWordExcel(wire, correlation),
+            sessionStore: store,
+            lockOwner: lockOwner,
+            deliveryHook: hook,
+            logger: NullLogger<FinalizeFromWebhook>.Instance,
+            successAckCodeAccessor: () => successCode,
+            wire: wire,
+            credentialsResolver: dynamicResolver ?? new StubResolver((_, _) => null),
+            useCredentials: use.Use,
+            isDynamicMode: () => dynamicResolver is not null);
     }
 }

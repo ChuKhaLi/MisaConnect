@@ -18,7 +18,7 @@ public class ClientHeadersHandlerTests
     private static async Task<HttpRequestMessage> CaptureAsync(IMisaCredentialsAccessor accessor)
     {
         var capturing = new CapturingHandler();
-        using var handler = new ClientHeadersHandler(accessor, new StubCorrelationIdAccessor("cid"))
+        using var handler = new ClientHeadersHandler(new MisaConnect.ESign.Infrastructure.Credentials.EffectiveCredentials(accessor), new StubCorrelationIdAccessor("cid"))
         {
             InnerHandler = capturing,
         };

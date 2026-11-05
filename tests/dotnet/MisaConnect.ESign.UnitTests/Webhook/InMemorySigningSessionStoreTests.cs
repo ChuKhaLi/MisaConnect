@@ -93,6 +93,32 @@ public class InMemorySigningSessionStoreTests
     }
 
     [Fact]
+    public async Task CacheTerminal_first_write_wins()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        var session = Sample();
+        await store.RegisterAsync(session, CancellationToken.None);
+
+        var ack = WebhookAck.Success("0");
+        await store.CacheTerminalAsync(session.ClientId, session.TransactionId, "m1", ack, WebhookStatus.Failed, "E1", CancellationToken.None);
+        await store.CacheTerminalAsync(session.ClientId, session.TransactionId, "m2", ack, WebhookStatus.Cancelled, "E2", CancellationToken.None);
+
+        var refreshed = await store.TryGetByTransactionIdAsync(session.ClientId, session.TransactionId, CancellationToken.None);
+        var terminal = Assert.IsType<SigningSessionCachedTerminal>(refreshed!.CachedTerminal);
+        Assert.Equal("m1", terminal.TriggeringMessageId);
+        Assert.Equal(WebhookStatus.Failed, terminal.Status);
+        Assert.Equal("E1", terminal.MisaErrorCode);
+        Assert.Equal(ack, terminal.Ack);
+    }
+
+    [Fact]
+    public async Task Default_interface_CacheTerminal_is_a_no_op()
+    {
+        ISigningSessionStore store = new BeginSignFixtures.StubSigningSessionStore();
+        await store.CacheTerminalAsync("c", "tx", "m1", WebhookAck.Success("0"), WebhookStatus.Failed, null, CancellationToken.None);
+    }
+
+    [Fact]
     public async Task FinalizeLock_serializes_concurrent_callers()
     {
         var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));

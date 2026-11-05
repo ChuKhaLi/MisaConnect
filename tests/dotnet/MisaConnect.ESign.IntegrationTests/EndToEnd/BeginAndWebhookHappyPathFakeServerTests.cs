@@ -31,6 +31,7 @@ public class BeginAndWebhookHappyPathFakeServerTests
     public async Task Pdf_begin_then_webhook_returns_signed_bytes_without_polling()
     {
         await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.PendingsBeforeSuccess = 0;
         var hook = new CapturingHook();
         await using var sp = BuildSp(server.BaseUrl, hook);
 
@@ -48,7 +49,8 @@ public class BeginAndWebhookHappyPathFakeServerTests
 
         Assert.Equal("0", result.Ack.ErrorCode);
         Assert.Equal(1, server.Calls.Attachment);
-        Assert.Equal(0, server.Calls.SignStatus);
+        // One Signing/status call confirms the webhook (no polling loop).
+        Assert.Equal(1, server.Calls.SignStatus);
         var outcome = Assert.IsType<WebhookOutcomeDto.SuccessWithSignedBytes>(result.Outcome);
         Assert.Equal(server.SignedPdfBytes, outcome.SignedBytes);
         Assert.Single(hook.Outcomes);
@@ -58,6 +60,7 @@ public class BeginAndWebhookHappyPathFakeServerTests
     public async Task Xml_begin_then_webhook_returns_signed_xml_bytes()
     {
         await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.PendingsBeforeSuccess = 0;
         var hook = new CapturingHook();
         await using var sp = BuildSp(server.BaseUrl, hook);
 
@@ -77,6 +80,7 @@ public class BeginAndWebhookHappyPathFakeServerTests
     public async Task Word_begin_then_webhook_returns_signed_word_bytes()
     {
         await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.PendingsBeforeSuccess = 0;
         var hook = new CapturingHook();
         await using var sp = BuildSp(server.BaseUrl, hook);
 
@@ -96,6 +100,7 @@ public class BeginAndWebhookHappyPathFakeServerTests
     public async Task Excel_begin_then_webhook_returns_signed_excel_bytes()
     {
         await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.PendingsBeforeSuccess = 0;
         var hook = new CapturingHook();
         await using var sp = BuildSp(server.BaseUrl, hook);
 
