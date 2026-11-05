@@ -8,21 +8,30 @@ permissions:
 jobs:
   diag:
     runs-on: ubuntu-latest
+    environment: misa-sandbox
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22, 24]
-        mtu: ['1500', '1280']
+        node: [20, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - name: Set MTU
-        run: sudo ip link set dev eth0 mtu ${{ matrix.mtu }}
-      - name: IPv6 route
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @misaconnect/einvoice
+      - name: MTU 1280 + 150 ms extra delay (RTT above Node's 250 ms attempt budget)
         run: |
-          ip -6 route show default || true
-          curl -6 -sS --max-time 5 -o /dev/null -w "curl -6: %{http_code}\n" https://testapi.meinvoice.vn/ || echo "curl -6 failed $?"
-          curl -4 -sS --max-time 10 -o /dev/null -w "curl -4: %{http_code} connect=%{time_connect}s\n" https://testapi.meinvoice.vn/
-      - run: node .github/diag/connect-diag.mjs
+          sudo ip link set dev eth0 mtu 1280
+          sudo tc qdisc add dev eth0 root netem delay 150ms
+      - name: Raw connect, default vs 2 s budget
+        run: node .github/diag/connect-diag.mjs
+      - name: einvoice sandbox suite with the fix, under the extra delay
+        env:
+          MISACONNECT_SANDBOX_TAXCODE: ${{ secrets.MISA_TAX_CODE }}
+          MISACONNECT_SANDBOX_USERNAME: ${{ secrets.MISA_USERNAME }}
+          MISACONNECT_SANDBOX_PASSWORD: ${{ secrets.MISA_PASSWORD }}
+          MISACONNECT_SANDBOX_APPID: ${{ secrets.MISA_APP_ID }}
+          MISACONNECT_SANDBOX_REQUIRED: '1'
+        run: npm run test:sandbox -w @misaconnect/einvoice

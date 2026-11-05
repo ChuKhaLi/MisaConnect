@@ -4,6 +4,7 @@ import { createServer as createNetServer, Socket, type AddressInfo } from 'node:
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CLASSICAL_ECDH_CURVES,
+  CONNECT_ATTEMPT_TIMEOUT_MS,
   createNodeHttpsFetch,
   DEFAULT_IDLE_TIMEOUT_MS,
   type NodeHttpsFetch,
@@ -319,6 +320,13 @@ describe('createNodeHttpsFetch TLS settings', () => {
     expect(CLASSICAL_ECDH_CURVES).toBe('X25519:P-256:P-384');
   });
 
+  // Node's happy-eyeballs default (250 ms per attempt) is shorter than the TCP handshake to
+  // MISA from outside Vietnam (207–247 ms measured on GitHub runners, spikes to ~900 ms) when
+  // the host also publishes an AAAA record the client cannot reach.
+  it('allows 2 s per address attempt instead of the Node default of 250 ms', () => {
+    expect(CONNECT_ATTEMPT_TIMEOUT_MS).toBe(2_000);
+  });
+
   it('creates one lazy keep-alive https agent with ecdhCurve X25519:P-256:P-384', async () => {
     const created: Created[] = [];
     const f = client({ agentFactory: refusingFactory(created) });
@@ -331,6 +339,7 @@ describe('createNodeHttpsFetch TLS settings', () => {
       keepAlive: true,
       timeout: 4_000,
       ecdhCurve: 'X25519:P-256:P-384',
+      autoSelectFamilyAttemptTimeout: 2_000,
     });
     expect((created[0]?.agent as https.Agent).options.ecdhCurve).toBe('X25519:P-256:P-384');
   });

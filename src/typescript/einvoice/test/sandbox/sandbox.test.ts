@@ -30,7 +30,7 @@ const hasSandboxEnv = !!taxCode && !!userName && !!password && !!appId;
  */
 function isReachable(): Promise<boolean> {
   return new Promise((resolve) => {
-    const socket = connect({ host: HOST, port: PORT });
+    const socket = connect({ host: HOST, port: PORT, autoSelectFamilyAttemptTimeout: 2_000 });
     const done = (ok: boolean): void => {
       socket.destroy();
       resolve(ok);

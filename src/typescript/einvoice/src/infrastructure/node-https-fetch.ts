@@ -10,6 +10,14 @@ import https from 'node:https';
 export const CLASSICAL_ECDH_CURVES = 'X25519:P-256:P-384';
 
 /**
+ * Per-address connect attempt budget for Node's happy-eyeballs (`autoSelectFamily`). Node's
+ * default is 250 ms, but MISA publishes an AAAA record that IPv4-only hosts cannot reach, so
+ * every connection goes through happy-eyeballs, and the TCP handshake to Vietnam from abroad
+ * takes ~210-250 ms (spikes to ~900 ms): connections failed with ETIMEDOUT at ~250 ms.
+ */
+export const CONNECT_ATTEMPT_TIMEOUT_MS = 2_000;
+
+/**
  * Idle keep-alive sockets are closed after this long (undici's default keep-alive is 4 s;
  * IIS in front of MISA would otherwise hold them for ~120 s).
  */
@@ -74,7 +82,14 @@ export function createNodeHttpsFetch(opts: NodeHttpsFetchOptions = {}): NodeHttp
   const owned = new Map<Protocol, http.Agent>();
 
   const agentOptions = (protocol: Protocol): https.AgentOptions =>
-    protocol === 'https:' ? { keepAlive: true, timeout, ecdhCurve } : { keepAlive: true, timeout };
+    protocol === 'https:'
+      ? {
+          keepAlive: true,
+          timeout,
+          ecdhCurve,
+          autoSelectFamilyAttemptTimeout: CONNECT_ATTEMPT_TIMEOUT_MS,
+        }
+      : { keepAlive: true, timeout, autoSelectFamilyAttemptTimeout: CONNECT_ATTEMPT_TIMEOUT_MS };
 
   const agentFor = (protocol: Protocol): http.Agent => {
     if (factory !== undefined) {
