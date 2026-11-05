@@ -12,6 +12,7 @@ using MisaConnect.ESign.Domain.Signing;
 using MisaConnect.ESign.Infrastructure.Configuration;
 using MisaConnect.ESign.Infrastructure.ESign.Mapping;
 using MisaConnect.ESign.Infrastructure.ESign.Wire;
+using MisaConnect.ESign.Infrastructure.Http;
 using DomainCert = MisaConnect.ESign.Domain.Certificates.Certificate;
 using WireCertDto = MisaConnect.ESign.Infrastructure.ESign.Wire.CertificateDto;
 
@@ -509,6 +510,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         };
 
         var req = NewRequest(HttpMethod.Post, ESignHttpRoutes.SigningHash);
+        req.Options.Set(ESignRequestOptions.NotRetryableAfterSend, true);
         ApplyAuth(req, accessToken);
         req.Content = JsonContent.Create(body, options: ESignJsonOptions.Wire);
 

@@ -125,6 +125,21 @@ public class TokenLifecycleFakeServerTests
     }
 
     [Fact]
+    public async Task Signing_hash_500_is_sent_once()
+    {
+        await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.Intercept = r => r.Route == "signing-hash" ? new FakeResponse(500, "{}") : null;
+        await using var sp = TestServiceProvider.Build(server.BaseUrl);
+
+        using var scope = sp.CreateAsyncScope();
+        var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
+        await Assert.ThrowsAsync<ESignTransportException>(() =>
+            client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
+
+        Assert.Equal(1, server.Calls.SignHash);
+    }
+
+    [Fact]
     public async Task Concurrent_401s_cause_one_refresh()
     {
         await using var server = await FakeMisaESignServer.StartAsync();

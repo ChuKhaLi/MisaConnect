@@ -13,6 +13,10 @@ namespace MisaConnect.ESign.Infrastructure.Http;
 /// header, the header value (clamped to <c>MaxDelay</c>) replaces the computed
 /// backoff. Caller cancellation propagates unchanged. On exhausted budget,
 /// surfaces <see cref="ESignTransportException"/> per FR-025.
+/// Requests flagged with <see cref="ESignRequestOptions.NotRetryableAfterSend"/>
+/// (Signing/hash) are retried only on 429, DNS failure or connection failure,
+/// i.e. when the request provably did not take effect at MISA; any other 5xx,
+/// timeout or transport error is surfaced after a single attempt.
 /// </summary>
 internal sealed class TransientFailureRetryHandler : DelegatingHandler
 {
@@ -48,6 +52,8 @@ internal sealed class TransientFailureRetryHandler : DelegatingHandler
         var baseDelayMs = (int)retry.BaseDelay.TotalMilliseconds;
         var maxDelayMs = (int)retry.MaxDelay.TotalMilliseconds;
 
+        var notRetryableAfterSend = request.Options.TryGetValue(ESignRequestOptions.NotRetryableAfterSend, out var flag) && flag;
+
         HttpResponseMessage? lastResponse = null;
         Exception? lastException = null;
 
@@ -67,6 +73,17 @@ internal sealed class TransientFailureRetryHandler : DelegatingHandler
                     return resp;
                 }
 
+                if (notRetryableAfterSend && resp.StatusCode != HttpStatusCode.TooManyRequests)
+                {
+                    var status = resp.StatusCode;
+                    resp.Dispose();
+                    throw new ESignTransportException(
+                        lastStatusCode: status,
+                        attemptCount: attempt,
+                        detail: BuildExhaustedDetail(status, null, attempt),
+                        correlationId: _correlation.Current);
+                }
+
                 lastResponse = resp;
             }
             catch (TaskCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -75,10 +92,15 @@ internal sealed class TransientFailureRetryHandler : DelegatingHandler
             }
             catch (TaskCanceledException ex)
             {
+                if (notRetryableAfterSend) throw NotRetryable(ex, attempt);
                 lastException = ex;
             }
             catch (HttpRequestException ex)
             {
+                if (notRetryableAfterSend && ex.HttpRequestError is not (HttpRequestError.NameResolutionError or HttpRequestError.ConnectionError))
+                {
+                    throw NotRetryable(ex, attempt);
+                }
                 lastException = ex;
             }
 
@@ -97,6 +119,14 @@ internal sealed class TransientFailureRetryHandler : DelegatingHandler
             correlationId: _correlation.Current,
             inner: lastException);
     }
+
+    private ESignTransportException NotRetryable(Exception ex, int attempt) =>
+        new(
+            lastStatusCode: null,
+            attemptCount: attempt,
+            detail: BuildExhaustedDetail(null, ex, attempt),
+            correlationId: _correlation.Current,
+            inner: ex);
 
     private int ComputeBackoffMs(int attempt, int baseDelayMs, int maxDelayMs, HttpResponseMessage? response)
     {
