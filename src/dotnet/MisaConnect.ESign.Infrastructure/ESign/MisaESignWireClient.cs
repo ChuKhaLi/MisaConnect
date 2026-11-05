@@ -905,8 +905,8 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
     }
 
     /// <summary>
-    /// Throws the mapped login error when the body carries one in either shape — the
-    /// nested <c>status</c> block or the flat <c>error</c>/<c>errorCode</c> envelope —
+    /// Throws the mapped login error when the body carries one in either shape - the
+    /// nested <c>status</c> block or the flat <c>error</c>/<c>errorCode</c> envelope -
     /// regardless of the HTTP status (two-factor code 122 arrives as 200 or 400).
     /// Returns when neither shape reports an error.
     /// </summary>
