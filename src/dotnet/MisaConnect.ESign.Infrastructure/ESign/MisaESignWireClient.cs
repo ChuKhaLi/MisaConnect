@@ -300,7 +300,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsHash, ct, requestedFormat: DocumentFormat.Pdf).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<HashResponseDto>(json);
+        var dto = ReadEsrmJson<HashResponseDto>(resp, json, ESignHttpRoutes.DocumentsHash);
         if (dto?.PdfDocs is not { Count: > 0 })
         {
             throw new ESignGeneralException(
@@ -355,7 +355,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsHash, ct, requestedFormat: DocumentFormat.Xml).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<HashResponseDto>(json);
+        var dto = ReadEsrmJson<HashResponseDto>(resp, json, ESignHttpRoutes.DocumentsHash);
         if (dto?.XmlDocs is not { Count: > 0 })
         {
             throw new ESignGeneralException(
@@ -443,7 +443,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsHash, ct, requestedFormat: format).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<HashResponseDto>(json);
+        var dto = ReadEsrmJson<HashResponseDto>(resp, json, ESignHttpRoutes.DocumentsHash);
         if (format == DocumentFormat.Word)
         {
             if (dto?.WordDocs is not { Count: > 0 })
@@ -522,7 +522,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.SigningHash, ct).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<SignHashResponseDto>(json);
+        var dto = ReadEsrmJson<SignHashResponseDto>(resp, json, ESignHttpRoutes.SigningHash);
         if (dto is null || string.IsNullOrEmpty(dto.TransactionId))
         {
             throw new ESignGeneralException(
@@ -548,7 +548,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.SigningStatus, ct).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<SignStatusResponseDto>(json);
+        var dto = ReadEsrmJson<SignStatusResponseDto>(resp, json, ESignHttpRoutes.SigningStatus);
         if (dto is null)
         {
             throw new ESignGeneralException(
@@ -598,7 +598,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsAttachment, ct, requestedFormat: DocumentFormat.Pdf).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<AttachmentResponseDto>(json);
+        var dto = ReadEsrmJson<AttachmentResponseDto>(resp, json, ESignHttpRoutes.DocumentsAttachment);
         var doc = dto?.PdfDocs is { Count: > 0 } ? dto.PdfDocs[0].Document : null;
         if (string.IsNullOrEmpty(doc))
         {
@@ -651,7 +651,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsAttachment, ct, requestedFormat: DocumentFormat.Xml).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<AttachmentResponseDto>(json);
+        var dto = ReadEsrmJson<AttachmentResponseDto>(resp, json, ESignHttpRoutes.DocumentsAttachment);
         var doc = dto?.XmlDocs is { Count: > 0 } ? dto.XmlDocs[0].Document : null;
         if (string.IsNullOrEmpty(doc))
         {
@@ -719,7 +719,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
             await ThrowMappedAsync(resp, json, ESignHttpRoutes.DocumentsAttachment, ct, requestedFormat: format).ConfigureAwait(false);
         }
 
-        var dto = Deserialize<AttachmentResponseDto>(json);
+        var dto = ReadEsrmJson<AttachmentResponseDto>(resp, json, ESignHttpRoutes.DocumentsAttachment);
         string? doc;
         if (format == DocumentFormat.Word)
         {
@@ -789,8 +789,6 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         }
     }
 
-    private const int BodySnippetMax = 256;
-
     private static bool IsJsonMediaType(string? mediaType) =>
         mediaType is not null
         && (mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
@@ -801,8 +799,8 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
     /// JSON (Defect D). MISA serves its SPA <c>index.html</c> (<c>200 text/html</c>)
     /// when an ESRM path is mis-routed; without this guard that silently
     /// deserializes to an empty result and reads as a business state. The error
-    /// names the endpoint, the content type, and a truncated body snippet — never a
-    /// request header or token.
+    /// names the endpoint, the content type, and the body length — never the body
+    /// content, a request header or a token.
     /// </summary>
     private void EnsureEsrmJsonResponse(HttpResponseMessage resp, string body, string endpoint)
     {
@@ -811,13 +809,34 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         {
             return;
         }
-        var snippet = body.Length > BodySnippetMax ? body.Substring(0, BodySnippetMax) : body;
         throw new ESignGeneralException(
             ESignErrorCategory.MisaUnknown,
             "UnexpectedContentType",
-            $"MISA {endpoint} returned a {(int)resp.StatusCode} success with a non-JSON response " +
-            $"(content-type '{mediaType ?? "(none)"}'). This usually means the request was routed to the wrong host or path. Body snippet: {snippet}",
+            $"MISA {endpoint} returned a {(int)resp.StatusCode} success with a non-JSON response. " +
+            $"This usually means the request was routed to the wrong host or path " +
+            $"(content-type '{mediaType ?? "(none)"}', body {body.Length} bytes).",
             _correlation.Current);
+    }
+
+    /// <summary>
+    /// Guards the content type of a successful ESRM response, then deserialises it.
+    /// A blank body yields <c>null</c> so callers keep their own <c>EmptyResponse</c>
+    /// errors; a non-blank body that does not parse is reported by length only.
+    /// </summary>
+    private T? ReadEsrmJson<T>(HttpResponseMessage resp, string body, string endpoint)
+        where T : class
+    {
+        EnsureEsrmJsonResponse(resp, body, endpoint);
+        var dto = Deserialize<T>(body);
+        if (dto is null && !string.IsNullOrWhiteSpace(body))
+        {
+            throw new ESignGeneralException(
+                ESignErrorCategory.MisaUnknown,
+                "UnparseableResponse",
+                $"MISA {endpoint} returned a {(int)resp.StatusCode} success with a JSON content-type but a body ({body.Length} bytes) that could not be parsed.",
+                _correlation.Current);
+        }
+        return dto;
     }
 
     private async Task ThrowMappedAsync(
