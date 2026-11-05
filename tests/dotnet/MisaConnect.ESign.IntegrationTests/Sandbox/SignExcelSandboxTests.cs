@@ -30,7 +30,7 @@ public class SignExcelSandboxTests
         using var scope = sp.CreateAsyncScope();
         var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
 
-        var result = await client.SignExcelAsync(TestPerFormatFixtures.SampleExcelRequest(), CancellationToken.None);
+        var result = await SandboxSigning.SignOrSkipAsync(() => client.SignExcelAsync(TestPerFormatFixtures.SampleExcelRequest(), CancellationToken.None));
         Assert.Equal(DocumentFormat.Excel, result.Format);
         Assert.NotNull(result.SignedExcel);
         Assert.True(result.SignedExcel.Length > 0);
