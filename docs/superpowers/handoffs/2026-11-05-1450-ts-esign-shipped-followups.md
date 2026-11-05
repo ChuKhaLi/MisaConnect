@@ -26,7 +26,7 @@ Read first:
 - `dotnet format --verify-no-changes` gate added to ci.yml (PR #2).
 - `@misaconnect/esign`: full port (sign ×4 formats, 2FA, OTP resend, webhook begin/handle/finalize), 14 SDD tasks each reviewed + final whole-branch review + fix wave; PRs #3 and #5 merged. Security rulings R5/R9/R10/R11/R12 implemented (see design + README).
 - `tokenFingerprintSecret` (owner choice B) shipped — note it went out in esign 0.1.0 because 0.1.0 was published from the feature branch; main now matches (PR #5).
-- npm trusted publishing for esign validated (CI stage via OIDC succeeded).
+- CI authenticated to npm via OIDC and staged esign 0.1.1 (trusted publisher config works for staging). Whether npm counts a *stage* as the validating publish is NOT verified — see Next actions #1.
 
 ## Done but NOT verified
 - **Live eSign signing** (both .NET and TS): sandbox login works, but the sandbox account has no ACTIVE remote-signing certificate, so no document was ever signed live. Prove: get a certificate on the account, set `MISACONNECT_ESIGN_SANDBOX_REQUIRED: '1'` in `.github/workflows/ts-sandbox.yml` (esign job), run `gh workflow run ts-sandbox.yml --ref main` and `gh workflow run integration.yml --ref main -f test_filter="FullyQualifiedName~Sandbox"`.
@@ -37,7 +37,7 @@ Read first:
 - esign 0.1.1 staged, not yet approved (owner action).
 
 ## Next actions
-1. Owner approves staged `@misaconnect/esign@0.1.1` on npmjs.com (Staged Packages tab), then verify: `npm view @misaconnect/esign dist-tags.latest` → 0.1.1 and `npm audit signatures` in a scratch install shows a verified attestation.
+1. **Before 2026-11-07 04:36 UTC** (npm's deadline to validate the new trusted-publisher config), owner approves staged `@misaconnect/esign@0.1.1` on npmjs.com (Staged Packages tab); then check the package Settings page no longer says "not yet validated", and verify: `npm view @misaconnect/esign dist-tags.latest` → 0.1.1 and `npm audit signatures` in a scratch install shows a verified attestation.
 2. Stop the weekly `.NET integration.yml` from going red: ESign sandbox tests (`tests/dotnet/MisaConnect.ESign.IntegrationTests/Sandbox/Sign{Xml,Word,Excel}SandboxTests.cs`) fail with `NoActiveCertificateException`. Mirror TS ruling R13: skip on NoActiveCertificate unless an env flag (e.g. `MISACONNECT_ESIGN_SANDBOX_REQUIRED=1`) is set. Test-only change; Spec Kit slice optional (small).
 3. New .NET Spec Kit slice 010 (via `/speckit-specify`): back-port the TS esign fixes to `MisaConnect.ESign` — design §9 items 1–9 (stale token after 401 refresh, no login fallback, Signing/hash retried on 5xx/timeout, content-type guard only on certificates, ResponseError.error bool, webhook malformed input escapes, 122 missed on 4xx, unused refresh skew, dynamic creds unusable in webhook) plus the security rulings worth porting (webhook confirmation via Signing/status = R10, validation failures not delivered to hook = R12, no OTP in finalize = R11) and the docs errors listed in design §9 ("Docs-only"). Likely a minor version (behaviour changes).
 4. Add `.github/dependabot.yml` (npm root workspace, NuGet, github-actions). `npm audit`: minimatch (moderate, ESLint dev-only) and multer (high, via `@nestjs/platform-express` in samples/typescript/nestjs only) — published packages have zero runtime deps and are unaffected; bump the NestJS sample.
