@@ -25,6 +25,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
     internal const string ClientIdHeader = "x-clientId";
     internal const string ClientKeyHeader = "x-clientKey";
     internal const string CorrelationIdHeader = "X-Correlation-Id";
+    private const string TwoFactorRequiredCode = "122";
 
     private readonly HttpClient _http;
     private readonly IOptions<MisaESignOptions> _options;
@@ -102,9 +103,9 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         }
 
         var dto = Deserialize<LoginResponseDto>(json);
-        if (dto?.Status is { Error: true })
+        if (dto?.Status is { } twoFactorStatus && IsLoginStatusError(twoFactorStatus))
         {
-            ThrowFromTwoFactorStatus(dto.Status, userName);
+            ThrowFromTwoFactorStatus(twoFactorStatus, userName);
         }
         var flat = Deserialize<ResponseErrorDto>(json);
         if (flat is { Error: true } || !string.IsNullOrEmpty(flat?.ErrorCode))
@@ -916,9 +917,9 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
         if (string.IsNullOrWhiteSpace(json)) return;
 
         var nested = Deserialize<LoginResponseDto>(json);
-        if (nested?.Status is { Error: true })
+        if (nested?.Status is { } loginStatus && IsLoginStatusError(loginStatus))
         {
-            ThrowFromLoginEnvelope(nested.Status, endpoint, userName);
+            ThrowFromLoginEnvelope(loginStatus, endpoint, userName);
         }
 
         var flat = Deserialize<ResponseErrorDto>(json);
@@ -936,6 +937,15 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
                 userName: userName);
         }
     }
+
+    /// <summary>
+    /// A nested login/two-factor status block reports an error when its <c>error</c> flag is
+    /// <c>true</c>, or - whatever the flag (true, false, null or missing) - when it carries the
+    /// two-factor-required code <c>122</c> (FR-008, TS parity: 122 is checked first).
+    /// </summary>
+    private static bool IsLoginStatusError(LoginStatusBlockDto status) =>
+        status.Error == true
+        || string.Equals(status.ErrorCode, TwoFactorRequiredCode, StringComparison.OrdinalIgnoreCase);
 
     private void ThrowFromLoginEnvelope(LoginStatusBlockDto status, string endpoint, string? userName = null)
     {

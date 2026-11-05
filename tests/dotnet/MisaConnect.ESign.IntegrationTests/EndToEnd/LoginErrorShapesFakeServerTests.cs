@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using MisaConnect.ESign.Client;
+using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.IntegrationTests.EsignFake;
 using Xunit;
@@ -21,6 +22,10 @@ public class LoginErrorShapesFakeServerTests
     [InlineData(200, "{\"status\":{\"code\":200,\"error\":\"true\",\"errorCode\":\"122\"}}")]
     [InlineData(400, "{\"status\":{\"code\":400,\"error\":true,\"errorCode\":\"122\"}}")]
     [InlineData(400, "{\"error\":true,\"errorCode\":\"122\"}")]
+    [InlineData(200, "{\"status\":{\"code\":200,\"error\":null,\"errorCode\":\"122\"}}")]
+    [InlineData(400, "{\"status\":{\"code\":400,\"error\":null,\"errorCode\":\"122\"}}")]
+    [InlineData(200, "{\"status\":{\"code\":200,\"error\":false,\"errorCode\":\"122\"}}")]
+    [InlineData(400, "{\"status\":{\"code\":400,\"error\":false,\"errorCode\":\"122\"}}")]
     public async Task Code_122_is_detected(int status, string body)
     {
         await using var server = await FakeMisaESignServer.StartAsync();
@@ -31,6 +36,32 @@ public class LoginErrorShapesFakeServerTests
         var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
         var ex = await Assert.ThrowsAsync<AuthenticationFailedException>(
             () => client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
+
+        Assert.True(ex.Requires2FA);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("false")]
+    public async Task Code_122_on_a_200_two_factor_response_is_detected_whatever_the_error_flag(string errorFlag)
+    {
+        await using var server = await FakeMisaESignServer.StartAsync();
+        var twoFactorBody = "{\"status\":{\"code\":200,\"error\":" + errorFlag + ",\"errorCode\":\"122\"}}";
+        server.Configure.Intercept = r => r.Route switch
+        {
+            "login" => new FakeResponse(200, "{\"error\":true,\"errorCode\":\"122\"}"),
+            "two-factor" => new FakeResponse(200, twoFactorBody),
+            _ => null,
+        };
+        await using var sp = TestServiceProvider.Build(server.BaseUrl);
+
+        using var scope = sp.CreateAsyncScope();
+        var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
+        await Assert.ThrowsAsync<AuthenticationFailedException>(
+            () => client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
+
+        var ex = await Assert.ThrowsAsync<AuthenticationFailedException>(
+            () => client.SignInWithOtpAsync("123456", OtpDeliveryChannel.SmsOrEmail, false, CancellationToken.None));
 
         Assert.True(ex.Requires2FA);
     }
