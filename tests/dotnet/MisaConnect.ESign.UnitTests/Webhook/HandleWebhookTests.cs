@@ -281,6 +281,63 @@ public class HandleWebhookTests
             () => sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), cts.Token));
     }
 
+    /// <summary>Cancels the caller's token, then throws <see cref="OperationCanceledException"/> for it.</summary>
+    private sealed class CancellingHook : IWebhookDeliveryHook
+    {
+        private readonly CancellationTokenSource _caller;
+        private readonly bool _cancelCaller;
+
+        public CancellingHook(CancellationTokenSource caller, bool cancelCaller)
+        {
+            _caller = caller;
+            _cancelCaller = cancelCaller;
+        }
+
+        public Task DeliverAsync(WebhookOutcome outcome, CancellationToken ct)
+        {
+            if (_cancelCaller)
+            {
+                _caller.Cancel();
+                throw new OperationCanceledException(ct);
+            }
+            throw new OperationCanceledException("hook's own timeout");
+        }
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_inside_the_hook_propagates_on_malformed_delivery()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        using var cts = new CancellationTokenSource();
+        var sut = BuildSut(store, new CancellingHook(cts, cancelCaller: true));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.HandleMalformedAsync("tx-9", "status", cts.Token));
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_inside_the_hook_propagates_on_validation_failure_delivery()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        using var cts = new CancellationTokenSource();
+        var sut = BuildSut(store, new CancellingHook(cts, cancelCaller: true));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), cts.Token));
+    }
+
+    [Fact]
+    public async Task Hook_cancellation_without_caller_cancellation_is_still_swallowed_on_validation_failure()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        using var cts = new CancellationTokenSource();
+        var sut = BuildSut(store, new CancellingHook(cts, cancelCaller: false));
+
+        var result = await sut.HandleMalformedAsync("tx-9", "status", cts.Token);
+
+        Assert.Equal("webhook.malformed", result.Ack.ErrorCode);
+    }
+
     private sealed class ThrowingHook : IWebhookDeliveryHook
     {
         public Task DeliverAsync(WebhookOutcome outcome, CancellationToken ct) => throw new InvalidOperationException("hook boom");

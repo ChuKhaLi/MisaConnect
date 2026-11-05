@@ -105,8 +105,9 @@ public sealed class HandleWebhook
         {
             await _deliveryHook.DeliverAsync(outcome, ct).ConfigureAwait(false);
         }
-        catch (Exception hookEx)
+        catch (Exception hookEx) when (!(hookEx is OperationCanceledException && ct.IsCancellationRequested))
         {
+            // Caller cancellation surfacing from the hook propagates; any other hook failure is logged.
             _logger.LogWarning(hookEx, "Webhook delivery hook threw during failure outcome dispatch correlationId={CorrelationId}", correlationId);
         }
     }
