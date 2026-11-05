@@ -45,10 +45,10 @@ jobs:
       einvoice: ${{ steps.filter.outputs.einvoice }}
       esign: ${{ steps.filter.outputs.esign }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: filter
         if: github.event_name != 'workflow_dispatch'
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             shared: &shared
@@ -74,8 +74,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -94,8 +94,8 @@ jobs:
       matrix:
         node: [ 22, 24 ]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -103,7 +103,7 @@ jobs:
       - run: npm run typecheck -w @misaconnect/einvoice
       - run: npm test -w @misaconnect/einvoice
       - run: npm run smoke -w @misaconnect/einvoice
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: matrix.node == 22
         with:
           name: einvoice-dist
@@ -116,12 +116,12 @@ jobs:
     needs: einvoice
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: einvoice-dist
           path: src/typescript/einvoice/dist
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - name: Link workspace package without installing dev tooling
@@ -137,8 +137,8 @@ jobs:
       matrix:
         node: [ 22, 24 ]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -146,7 +146,7 @@ jobs:
       - run: npm run typecheck -w @misaconnect/esign
       - run: npm test -w @misaconnect/esign
       - run: npm run smoke -w @misaconnect/esign
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: matrix.node == 22
         with:
           name: esign-dist
@@ -158,12 +158,12 @@ jobs:
     needs: esign
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: esign-dist
           path: src/typescript/esign/dist
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - name: Link workspace package without installing dev tooling
