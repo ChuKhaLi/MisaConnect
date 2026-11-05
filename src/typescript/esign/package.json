@@ -1,6 +1,6 @@
 {
   "name": "@misaconnect/esign",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript SDK for MISA eSign RemoteSigning.",
   "license": "MIT",
   "homepage": "https://github.com/ChuKhaLi/MisaConnect/tree/main/src/typescript/esign#readme",

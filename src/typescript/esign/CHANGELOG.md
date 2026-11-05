@@ -2,6 +2,15 @@
 
 All notable changes to `@misaconnect/esign` are documented here.
 
+## [0.1.1] - 2026-11-05
+
+First release published from CI through npm trusted publishing, with provenance. 0.1.0 was published manually without provenance.
+
+### Changed
+
+- `package.json` `repository.url` uses the `git+https://` form npm expects.
+- CHANGELOG: `tokenFingerprintSecret` is listed under 0.1.0, where it actually shipped.
+
 ## [0.1.0] - 2026-11-04
 
 First release: a TypeScript port of the .NET `MisaConnect.ESign` package.
