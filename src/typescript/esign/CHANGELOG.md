@@ -2,6 +2,12 @@
 
 All notable changes to `@misaconnect/esign` are documented here.
 
+## [Unreleased]
+
+### Added
+
+- `tokenFingerprintSecret` option (at least 32 characters). Hosts that share a `tokenCache` (e.g. Redis) and set the same secret now reuse each other's cached tokens: the token's credential fingerprint becomes HMAC-SHA256(secret, password + clientKey) instead of a random per-instance salt. Without the option the behaviour is unchanged (no reuse across processes or restarts). A wrong password still never matches a cached token.
+
 ## [0.1.0] - 2026-11-04
 
 First release: a TypeScript port of the .NET `MisaConnect.ESign` package.

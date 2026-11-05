@@ -100,7 +100,7 @@ export function createMisaESignClientInternal(
   // One transport and one token manager per client: every method shares the token cache and the
   // single-flight login/refresh.
   const transport = createTransport(resolved, deps.transport);
-  const fingerprint = createCredentialFingerprinter();
+  const fingerprint = createCredentialFingerprinter(resolved.tokenFingerprintSecret);
   const cacheKeyOf = resolved.tokenCacheKey ?? defaultTokenCacheKey;
   /** Identity of a caller: token-cache key plus secret fingerprint (never the secrets themselves). */
   const principalOf = (c: MisaCredentials): string | undefined =>
