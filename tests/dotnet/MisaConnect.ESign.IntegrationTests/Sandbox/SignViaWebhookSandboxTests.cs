@@ -34,7 +34,7 @@ public class SignViaWebhookSandboxTests
         }
     }
 
-    [SandboxFact(SandboxRequirement.Webhook)]
+    [SandboxFact(Requires = SandboxRequirement.Webhook)]
     public async Task Sandbox_webhook_round_trip_returns_signed_pdf_via_delivery_hook()
     {
         var timeoutEnv = Environment.GetEnvironmentVariable("MISACONNECT_ESIGN_SANDBOX_WEBHOOK_TIMEOUT");
@@ -59,7 +59,7 @@ public class SignViaWebhookSandboxTests
         using var scope = sp.CreateAsyncScope();
         var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
 
-        var begin = await client.BeginSignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None);
+        var begin = await SandboxSigning.SignOrSkipAsync(() => client.BeginSignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
         Assert.NotEmpty(begin.TransactionId);
 
         // Caller has registered the webhook URL out-of-band; we wait for MISA

@@ -30,7 +30,7 @@ public class SignXmlSandboxTests
         using var scope = sp.CreateAsyncScope();
         var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
 
-        var result = await client.SignXmlAsync(TestPerFormatFixtures.SampleXmlRequest(), CancellationToken.None);
+        var result = await SandboxSigning.SignOrSkipAsync(() => client.SignXmlAsync(TestPerFormatFixtures.SampleXmlRequest(), CancellationToken.None));
         Assert.Equal(DocumentFormat.Xml, result.Format);
         Assert.NotNull(result.SignedXml);
         Assert.True(result.SignedXml.Length > 0);

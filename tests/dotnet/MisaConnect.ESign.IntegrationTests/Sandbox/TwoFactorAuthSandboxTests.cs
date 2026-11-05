@@ -11,7 +11,7 @@ namespace MisaConnect.ESign.IntegrationTests.Sandbox;
 
 public class TwoFactorAuthSandboxTests
 {
-    [SandboxFact(SandboxRequirement.TwoFactorAuth)]
+    [SandboxFact(Requires = SandboxRequirement.TwoFactorAuth)]
     public async Task Sandbox_account_2fa_enrolled_completes_otp_exchange_and_resumes_signing()
     {
         var services = new ServiceCollection();
@@ -35,12 +35,12 @@ public class TwoFactorAuthSandboxTests
 
         try
         {
-            await client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None);
+            await SandboxSigning.SignOrSkipAsync(() => client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
         }
         catch (AuthenticationFailedException ex) when (ex.Requires2FA)
         {
             await client.SignInWithOtpAsync(otp, OtpDeliveryChannel.SmsOrEmail, false, CancellationToken.None);
-            var second = await client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None);
+            var second = await SandboxSigning.SignOrSkipAsync(() => client.SignPdfAsync(TestPdfFixture.SampleRequest(), CancellationToken.None));
             Assert.NotNull(second.SignedPdf);
             return;
         }

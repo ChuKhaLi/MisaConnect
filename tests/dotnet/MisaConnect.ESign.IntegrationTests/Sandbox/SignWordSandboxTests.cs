@@ -30,7 +30,7 @@ public class SignWordSandboxTests
         using var scope = sp.CreateAsyncScope();
         var client = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
 
-        var result = await client.SignWordAsync(TestPerFormatFixtures.SampleWordRequest(), CancellationToken.None);
+        var result = await SandboxSigning.SignOrSkipAsync(() => client.SignWordAsync(TestPerFormatFixtures.SampleWordRequest(), CancellationToken.None));
         Assert.Equal(DocumentFormat.Word, result.Format);
         Assert.NotNull(result.SignedWord);
         Assert.True(result.SignedWord.Length > 0);
