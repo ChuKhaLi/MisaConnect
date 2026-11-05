@@ -83,7 +83,9 @@ internal static class ServiceCollectionExtensions
                     var c = credentials.Get();
                     return (c.UserName, c.Password);
                 },
-                refreshUseCase: sp.GetRequiredService<RefreshAccessToken>());
+                refreshUseCase: sp.GetRequiredService<RefreshAccessToken>(),
+                singleFlight: (cacheKey, factory, ct) =>
+                    sp.GetRequiredService<SingleFlightRefresh>().RefreshAsync(cacheKey, factory, ct));
         });
         services.AddScoped<ListActiveCertificates>();
         services.AddScoped<HashPdfDocument>();

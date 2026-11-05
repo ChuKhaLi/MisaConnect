@@ -160,4 +160,30 @@ public class TokenLifecycleFakeServerTests
         Assert.All(results, r => Assert.NotNull(r.SignedPdf));
         Assert.Equal(1, server.Calls.Refresh);
     }
+    [Fact]
+    public async Task Concurrent_flows_crossing_the_proactive_refresh_mark_cause_one_refresh()
+    {
+        await using var server = await FakeMisaESignServer.StartAsync();
+        await using var sp = TestServiceProvider.Build(server.BaseUrl);
+        await SignAsync(sp);
+
+        // Move the cached token inside the 30 s proactive-refresh window.
+        var cache = sp.GetRequiredService<ITokenCache>();
+        var key = sp.GetRequiredService<ITokenCacheKeySelector>().Compose();
+        var cached = await cache.TryGetAsync(key, CancellationToken.None);
+        Assert.NotNull(cached);
+        await cache.SetAsync(key, cached! with { ExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(10) }, CancellationToken.None);
+
+        // Hold the refresh open so both flows overlap it.
+        server.Configure.Intercept = r =>
+        {
+            if (r.Route == "refresh") Thread.Sleep(300);
+            return null;
+        };
+
+        await Task.WhenAll(SignAsync(sp), SignAsync(sp));
+
+        Assert.Equal(1, server.Calls.Refresh);
+        Assert.Equal(1, server.Calls.Login);
+    }
 }
