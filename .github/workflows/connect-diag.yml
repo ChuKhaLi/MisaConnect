@@ -21,5 +21,8 @@ jobs:
       - name: Set MTU
         run: sudo ip link set dev eth0 mtu ${{ matrix.mtu }}
       - name: IPv6 route
-        run: ip -6 route show default || true; curl -6 -sS --max-time 5 -o /dev/null -w "curl -6: %{http_code}\n" https://testapi.meinvoice.vn/ || echo "curl -6 failed $?"; curl -4 -sS --max-time 10 -o /dev/null -w "curl -4: %{http_code} connect=%{time_connect}s\n" https://testapi.meinvoice.vn/
+        run: |
+          ip -6 route show default || true
+          curl -6 -sS --max-time 5 -o /dev/null -w "curl -6: %{http_code}\n" https://testapi.meinvoice.vn/ || echo "curl -6 failed $?"
+          curl -4 -sS --max-time 10 -o /dev/null -w "curl -4: %{http_code} connect=%{time_connect}s\n" https://testapi.meinvoice.vn/
       - run: node .github/diag/connect-diag.mjs
