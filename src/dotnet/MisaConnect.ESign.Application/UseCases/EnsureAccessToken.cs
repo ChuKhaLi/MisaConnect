@@ -10,12 +10,14 @@ namespace MisaConnect.ESign.Application.UseCases;
 /// </summary>
 public sealed class EnsureAccessToken
 {
+    /// <summary>A cached token with this much life left or less is refreshed rather than reused.</summary>
+    public static readonly TimeSpan ProactiveRefreshSkew = TimeSpan.FromSeconds(30);
+
     private readonly IMisaESignWireClient _wire;
     private readonly ITokenCache _cache;
     private readonly ITokenCacheKeySelector _keySelector;
     private readonly ISystemClock _clock;
     private readonly Func<(string userName, string password)> _credentialsAccessor;
-    private readonly Func<(TimeSpan? proactiveRefreshSkew, string? refreshTokenOverride)> _refreshHintAccessor;
     private readonly RefreshAccessToken? _refreshUseCase;
 
     public EnsureAccessToken(
@@ -32,7 +34,6 @@ public sealed class EnsureAccessToken
         _clock = clock;
         _credentialsAccessor = credentialsAccessor;
         _refreshUseCase = refreshUseCase;
-        _refreshHintAccessor = () => (TimeSpan.FromSeconds(30), null);
     }
 
     public async Task<AccessToken> ExecuteAsync(CancellationToken ct)
@@ -41,7 +42,7 @@ public sealed class EnsureAccessToken
         var existing = await _cache.TryGetAsync(key, ct).ConfigureAwait(false);
         var now = _clock.UtcNow;
 
-        if (existing is not null && existing.ExpiresAtUtc > now)
+        if (existing is not null && existing.ExpiresAtUtc - ProactiveRefreshSkew > now)
         {
             return existing;
         }

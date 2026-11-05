@@ -314,7 +314,8 @@ internal static class ServiceCollectionExtensions
             keySelector: sp.GetRequiredService<ITokenCacheKeySelector>(),
             singleFlight: sp.GetRequiredService<SingleFlightRefresh>(),
             options: sp.GetRequiredService<IOptions<MisaESignOptions>>(),
-            correlation: sp.GetRequiredService<ICorrelationIdAccessor>()));
+            correlation: sp.GetRequiredService<ICorrelationIdAccessor>(),
+            clock: sp.GetRequiredService<ISystemClock>()));
 
         services
             .AddHttpClient<MisaESignWireClient>((sp, http) =>

@@ -130,4 +130,48 @@ public class EnsureAccessTokenTests
         Assert.Equal(0, wire.LoginCalls);
         Assert.Equal("rs2", token.Value);
     }
+
+    private static async Task<(StubWireClient wire, EnsureAccessToken ensure)> BuildWithTokenExpiringIn(TimeSpan remaining)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var wire = new StubWireClient
+        {
+            OnRefresh = (_, _) => Task.FromResult(new AuthSession("raw2", "rs2", "rt2", now.AddMinutes(60), "u1", "user")),
+            OnLogin = (_, _, _) => throw new InvalidOperationException("login must not be called"),
+        };
+        var cache = new InMemoryTokenCache();
+        await cache.SetAsync("k", new AccessToken("rs1", "raw1", "rt1", now + remaining, "u1", "user"), CancellationToken.None);
+        var ensure = new EnsureAccessToken(
+            wire: wire,
+            cache: cache,
+            keySelector: new StaticKeySelector("k"),
+            clock: new FakeClock(now),
+            credentialsAccessor: () => ("user", "pass"),
+            refreshUseCase: new RefreshAccessToken(wire));
+        return (wire, ensure);
+    }
+
+    [Fact]
+    public async Task Token_with_exactly_30s_left_is_refreshed()
+    {
+        var (wire, ensure) = await BuildWithTokenExpiringIn(TimeSpan.FromSeconds(30));
+
+        var token = await ensure.ExecuteAsync(CancellationToken.None);
+
+        Assert.Equal(1, wire.RefreshCalls);
+        Assert.Equal(0, wire.LoginCalls);
+        Assert.Equal("rs2", token.Value);
+    }
+
+    [Fact]
+    public async Task Token_with_31s_left_is_reused()
+    {
+        var (wire, ensure) = await BuildWithTokenExpiringIn(TimeSpan.FromSeconds(31));
+
+        var token = await ensure.ExecuteAsync(CancellationToken.None);
+
+        Assert.Equal(0, wire.RefreshCalls);
+        Assert.Equal(0, wire.LoginCalls);
+        Assert.Equal("rs1", token.Value);
+    }
 }

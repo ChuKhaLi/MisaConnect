@@ -9,11 +9,12 @@ using MisaConnect.ESign.Infrastructure.ESign;
 namespace MisaConnect.ESign.Infrastructure.Http;
 
 /// <summary>
-/// On every request to a non-auth MISA endpoint: ensure an
-/// <see cref="AuthorizationRM"/> header is present (sourced from the cache via
-/// <see cref="EnsureAccessToken"/>). On 401: invalidate the cache entry, call
-/// <see cref="SingleFlightRefresh"/> to obtain a fresh token, retry the
-/// original request exactly once.
+/// On every request to a non-auth MISA endpoint: set the
+/// <see cref="AuthorizationRM"/> header from the current token
+/// (<see cref="EnsureAccessToken"/>), overriding whatever the caller set. On 401:
+/// reuse a token another flow already refreshed, otherwise refresh through
+/// <see cref="SingleFlightRefresh"/>, falling back to one fresh login when
+/// refresh is unavailable or fails; retry the original request exactly once.
 /// </summary>
 internal sealed class RemoteSigningAuthHandler : DelegatingHandler
 {
@@ -24,6 +25,7 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
     private readonly SingleFlightRefresh _singleFlight;
     private readonly IOptions<MisaESignOptions> _options;
     private readonly ICorrelationIdAccessor _correlation;
+    private readonly ISystemClock _clock;
 
     public RemoteSigningAuthHandler(
         Func<EnsureAccessToken> ensureFactory,
@@ -32,7 +34,8 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
         ITokenCacheKeySelector keySelector,
         SingleFlightRefresh singleFlight,
         IOptions<MisaESignOptions> options,
-        ICorrelationIdAccessor correlation)
+        ICorrelationIdAccessor correlation,
+        ISystemClock clock)
     {
         _ensureFactory = ensureFactory;
         _refreshFactory = refreshFactory;
@@ -41,6 +44,7 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
         _singleFlight = singleFlight;
         _options = options;
         _correlation = correlation;
+        _clock = clock;
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -50,11 +54,10 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
             return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
-        if (!request.Headers.Contains(MisaESignWireClient.AuthHeader))
-        {
-            var token = await _ensureFactory().ExecuteAsync(cancellationToken).ConfigureAwait(false);
-            ApplyAuth(request, token.Value);
-        }
+        // Always use the current token: callers capture a token once and pass it to every
+        // wire call, so the header they set can be stale after a refresh.
+        var current = await _ensureFactory().ExecuteAsync(cancellationToken).ConfigureAwait(false);
+        ApplyAuth(request, current.Value);
 
         var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.Unauthorized)
@@ -64,43 +67,59 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
         response.Dispose();
 
         var cacheKey = _keySelector.Compose();
-        var existing = await _cache.TryGetAsync(cacheKey, cancellationToken).ConfigureAwait(false);
-        if (existing is null || string.IsNullOrEmpty(existing.RefreshToken))
-        {
-            throw new AuthenticationFailedException(
-                rawCode: "401",
-                detail: "MISA eSign rejected the request with 401 and no cached refresh token is available.",
-                correlationId: _correlation.Current);
-        }
-
-        AccessToken refreshed;
-        try
-        {
-            refreshed = await _singleFlight.RefreshAsync(
-                cacheKey,
-                async ct => await _refreshFactory().ExecuteAsync(existing.RefreshToken, existing.UserId, existing.Username, ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-        }
-        catch (ESignException)
-        {
-            await _cache.RemoveAsync(cacheKey, cancellationToken).ConfigureAwait(false);
-            throw;
-        }
-
-        await _cache.SetAsync(cacheKey, refreshed, cancellationToken).ConfigureAwait(false);
+        var token = await RecoverTokenAsync(cacheKey, current, cancellationToken).ConfigureAwait(false);
 
         var retry = CloneForRetry(request);
-        ApplyAuth(retry, refreshed.Value);
+        ApplyAuth(retry, token.Value);
         var retryResponse = await base.SendAsync(retry, cancellationToken).ConfigureAwait(false);
         if (retryResponse.StatusCode == HttpStatusCode.Unauthorized)
         {
             retryResponse.Dispose();
+            await _cache.RemoveAsync(cacheKey, cancellationToken).ConfigureAwait(false);
             throw new AuthenticationFailedException(
                 rawCode: "401",
                 detail: "MISA eSign rejected the request with 401 even after a fresh access token.",
                 correlationId: _correlation.Current);
         }
         return retryResponse;
+    }
+
+    private async Task<AccessToken> RecoverTokenAsync(string cacheKey, AccessToken sent, CancellationToken ct)
+    {
+        try
+        {
+            var refreshed = await _singleFlight.RefreshAsync(
+                cacheKey,
+                async innerCt =>
+                {
+                    // Another flow may already have replaced the token we sent; reuse it.
+                    var cached = await _cache.TryGetAsync(cacheKey, innerCt).ConfigureAwait(false);
+                    if (cached is not null && !string.Equals(cached.Value, sent.Value, StringComparison.Ordinal))
+                    {
+                        return cached;
+                    }
+                    if (cached is null || string.IsNullOrEmpty(cached.RefreshToken))
+                    {
+                        throw new InvalidOperationException("No cached refresh token is available.");
+                    }
+                    var result = await _refreshFactory().ExecuteAsync(cached.RefreshToken, cached.UserId, cached.Username, innerCt).ConfigureAwait(false);
+                    if (result.ExpiresAtUtc <= _clock.UtcNow)
+                    {
+                        throw new InvalidOperationException("Refresh returned an already-expired token.");
+                    }
+                    await _cache.SetAsync(cacheKey, result, innerCt).ConfigureAwait(false);
+                    return result;
+                },
+                ct).ConfigureAwait(false);
+            return refreshed;
+        }
+        catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
+        {
+            // Refresh unavailable or failed: drop the entry so EnsureAccessToken logs in.
+            // Login errors (including 2FA-required) propagate unchanged.
+            await _cache.RemoveAsync(cacheKey, ct).ConfigureAwait(false);
+            return await _ensureFactory().ExecuteAsync(ct).ConfigureAwait(false);
+        }
     }
 
     private static bool IsAuthEndpoint(HttpRequestMessage request)
