@@ -4,6 +4,8 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-05
+
 ### `MisaConnect.ESign` 2.5.0
 
 Minor release of `MisaConnect.ESign`: back-ports the fixes and rulings first made in the TypeScript package `@misaconnect/esign` (see `docs/superpowers/specs/2026-11-05-esign-dotnet-ts-parity-design.md`), and corrects the eSign docs. Public changes are additive except for one constructor: `FinalizeFromWebhook`'s 2.4 constructor is removed (see "Public use-case constructors" under "Behaviour changes"). Code that builds the SDK through `AddMisaConnectESign` is unaffected. `MisaConnect.EInvoice` ships unchanged; its project version is only aligned to 2.5.0 because the release pipeline packs both families together.
