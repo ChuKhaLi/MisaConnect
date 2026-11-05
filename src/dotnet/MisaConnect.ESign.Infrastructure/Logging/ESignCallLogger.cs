@@ -1,12 +1,12 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using MisaConnect.ESign.Application.Abstractions;
-using MisaConnect.ESign.Infrastructure.Http;
 using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Domain.Certificates;
 using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Domain.Signing;
+using MisaConnect.ESign.Infrastructure.Http;
 
 namespace MisaConnect.ESign.Infrastructure.Logging;
 
