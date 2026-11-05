@@ -14,7 +14,7 @@ nav_order: 2
 | Key | Type | Required | Description |
 | --- | --- | --- | --- |
 | `Environment` | enum | yes | `Sandbox` or `Production`. Drives the host-validation check on `BaseUrl` and the default `login`/`two-factor` location (Sandbox ⇒ under `/webdev/`, Production ⇒ host root). |
-| `BaseUrl` | string | yes | Absolute `https://` URL — the **host root**. Sandbox: issued with your credentials. Production: `https://esignapp.misa.vn/`. Normalized to its origin, so any path you include (e.g. a trailing `/webdev/`) is tolerated and ignored for routing. |
+| `BaseUrl` | string | yes | Absolute `https://` URL — the **host root** (plain `http://` is accepted only for loopback hosts: `localhost`, `127.0.0.1`, `::1`). Sandbox: issued with your credentials. Production: `https://esignapp.misa.vn/`. Normalized to its origin, so any path you include (e.g. a trailing `/webdev/`) is tolerated and ignored for routing. |
 | `AuthUnderWebdev` | bool? | no | Overrides where `login`/`two-factor` are served. `null` (default) derives from `Environment`; `true` forces `/webdev/`, `false` forces the host root. Does not affect refresh/resend (always `/webdev/`) or ESRM (always host root). |
 | `ClientId` | string | yes | MISA client ID. |
 | `ClientKey` | string | yes | MISA client key. |
@@ -58,6 +58,32 @@ nav_order: 2
 | `Webhook:Path` | string | `/esign/webhook` | Sample-API URL path the webhook endpoint mounts at. |
 | `Webhook:Secret` | string | `null` | Sample-API shared-secret URL segment. When set, the endpoint mounts at `{Path}/{Secret}` and any POST to the bare `{Path}` returns `404`. Use `dotnet user-secrets` to set in production. |
 | `Webhook:AllowedIps` | string[] | `null` | Sample-API CIDR allowlist for inbound webhook POSTs. Example: `["203.0.113.0/24"]`. |
+| `Webhook:DeliverValidationFailuresToHook` | bool | `true` | When `true`, webhook validation failures (malformed envelope, client id mismatch, unknown transaction, incomplete or mismatched success) are also delivered to your `IWebhookDeliveryHook` as a `FailureWithError` outcome. `false` answers them with an ACK only and never calls the hook. **The default becomes `false` in 3.0**: a public webhook endpoint lets anyone trigger hook calls with forged payloads. Set it to `false` now unless your hook needs those failures. |
+
+### How a webhook is processed
+
+The webhook is only a trigger. For each accepted webhook the SDK calls MISA's `Signing/status` (one extra call per webhook) and decides from MISA's answer, not from the webhook body: on `SUCCESS` it attaches MISA's signature; on `FAILED` / `CANCELLED` the outcome carries MISA's status and error code. The first terminal state of a transaction (success, failed or cancelled) is stored once; later webhooks for it return the originally returned ACK and do not call the hook again. Finalize never prompts for an OTP: a two-factor requirement, an authentication error or a certificate error during finalize becomes a `webhook.finalize_failed` ACK.
+
+`HandleWebhookAsync` does not throw for malformed input or finalize failures; it returns an ACK and an outcome. Two exceptions propagate: caller cancellation, and exceptions thrown by **your** `IWebhookDeliveryHook` while delivering a success or terminal outcome. The success is cached before the hook runs, so MISA's retry receives the cached ACK and the hook is not called again for that transaction. (Exceptions thrown by the hook while delivering a validation-failure outcome are logged and swallowed.)
+
+### Webhook ACK codes
+
+`HandleWebhookAsync` returns a `WebhookAck`. Success uses the configured success code (`"0"` by default). Failures use these codes:
+
+| ACK `errorCode` | Returned when |
+| --- | --- |
+| `webhook.malformed` | The body is missing or has an empty `messageId`, `clientId` or `transactionId`, an unknown `status`, or a `signatures` value of the wrong shape. Also the fallback for an unspecified validation failure. |
+| `webhook.client_id_mismatch` | The webhook's `clientId` differs from the configured `ClientId`. |
+| `webhook.unknown_transaction` | No signing session is recorded for that `transactionId`. |
+| `webhook.incomplete_success` | `status` is `SUCCESS` but `signatures[]` is empty or invalid. |
+| `webhook.document_id_mismatch` | A `signatures[].documentId` does not match the session. |
+| `webhook.finalize_failed` | Confirming or attaching the signature failed (MISA status call, credentials, two-factor, certificate, a non-final or signature-less status, or any other unexpected error). MISA may retry. |
+
+### Dynamic mode and webhooks
+
+- **Client id check.** In `Dynamic` mode the webhook `clientId` check is skipped only when `ClientId` is left blank. If a Dynamic configuration also sets `ClientId`, webhooks for any other `clientId` are rejected with `webhook.client_id_mismatch`. With a blank `ClientId`, the session lookup by `(clientId, transactionId)` is the spoof check.
+- **Credentials.** A Dynamic-mode session records the `clientId` and `userName` it was started with (never secrets). On the webhook, the SDK asks `IWebhookCredentialsResolver.ResolveAsync(clientId, userName, ct)` for that principal's credentials. The default resolver returns `null` in Dynamic mode (so finalize answers `webhook.finalize_failed`); register your own **before** `AddMisaConnectESign`. In `Static` mode the options credentials are used.
+- **Custom `ISigningSessionStore`.** A persistent store must persist and restore `SigningSession.UserName` and `SigningSession.CachedTerminal` (both init-only properties). A store that rebuilds sessions through the constructor drops `UserName`, and Dynamic-mode webhooks then fail with `MissingPrincipal`. `CacheTerminalAsync` has a default no-op implementation: a store that does not implement it keeps the 2.4 behaviour (failed/cancelled terminals are re-delivered on every webhook).
 
 See [specs/004-misa-esign-webhook/quickstart.md](../../specs/004-misa-esign-webhook/quickstart.md) for the full webhook-mode walkthrough including hook registration, transport-layer auth, and end-to-end testing.
 
@@ -77,7 +103,7 @@ Never commit real credentials. Sample appsettings ship with empty placeholders.
 `MisaESignOptionsValidator` runs at startup (`ValidateOnStart`) and fails fast on:
 
 - Missing required keys (`BaseUrl`, `ClientId`, `ClientKey`, `UserName`, `Password`). The `ClientId`/`ClientKey`/`UserName`/`Password` requirement applies in **`Static` mode only** — in `Dynamic` mode these four checks are skipped because credentials are supplied per-call via `IMisaCredentialsAccessor`.
-- `BaseUrl` not absolute `https://`.
+- `BaseUrl` not an absolute `https://` URL (plain `http://` is allowed for loopback hosts only).
 - Host/environment mismatch (e.g. `Production` env with a sandbox host).
 - Out-of-range polling / retry values.
 
@@ -85,13 +111,14 @@ The `BaseUrl`, host/environment, polling, transport-retry, OTP, and webhook vali
 
 ## Custom DI overrides
 
-For most swappable ports you can register your own adapter before `AddMisaConnectESign`, or just after — both work because `AddMisaConnectESign` uses `TryAdd*` semantics for swappable services. Example:
+`AddMisaConnectESign` registers its defaults with `TryAdd*`, so a registration made **before** the call always wins. Most ports can also be registered just after the call, and `IWebhookDeliveryHook` may be registered before or after. `IMisaCredentialsAccessor` and `IWebhookCredentialsResolver` MUST be registered before. Example:
 
 ```csharp
 services.AddSingleton<ITokenCache, RedisTokenCache>();
 services.AddSingleton<ICertificateSelector, PickByIssuerDnSelector>();
 services.AddSingleton<IOtpProvider, MyOtpProvider>();
 services.AddSingleton<IWebhookDeliveryHook, MyDeliveryHook>();
+services.AddSingleton<IWebhookCredentialsResolver, MyWebhookCredentialsResolver>(); // before only
 services.AddMisaConnectESign(config);
 ```
 
