@@ -54,7 +54,7 @@ MisaConnect follows a strict layered (ports-and-adapters) architecture. Each lay
 | Infrastructure | Application, Domain, `Microsoft.Extensions.*` (Configuration/DI/Http/Options/Logging) |
 | Client | Application, Domain, Infrastructure (for DI), `Microsoft.Extensions.*` |
 
-Domain has zero dependencies. Application has zero infrastructure concerns. This is enforced by csproj `ProjectReference` graph plus an internal namespace audit in the test suite. The same rules apply identically to each product family — see [.specify/memory/constitution.md](../.specify/memory/constitution.md) Principles II and VII.
+Domain has zero dependencies. Application has zero infrastructure concerns. This is enforced by csproj `ProjectReference` graph plus an internal namespace audit in the test suite. The same rules apply identically to each product family — see [docs/constitution.md](constitution.md) Principles II and VII.
 
 ## Port-and-adapter seams
 

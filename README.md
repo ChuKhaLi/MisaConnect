@@ -67,7 +67,7 @@ docs/
   misa-api-reference/                  copies of MISA public reference docs
 ```
 
-See [docs/architecture.md](docs/architecture.md) for the layered (Domain → Application → Infrastructure → Client) design and [.specify/memory/constitution.md](.specify/memory/constitution.md) for the binding project principles.
+See [docs/architecture.md](docs/architecture.md) for the layered (Domain → Application → Infrastructure → Client) design and [docs/constitution.md](docs/constitution.md) for the binding project principles.
 
 ## Documentation
 
@@ -79,7 +79,7 @@ See [docs/architecture.md](docs/architecture.md) for the layered (Domain → App
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Slice-driven development via [Spec Kit](https://github.com/github/spec-kit) under `specs/`.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Design-driven development: each change starts from a design in `docs/superpowers/specs/` and a plan in `docs/superpowers/plans/`.
 
 ## License
 

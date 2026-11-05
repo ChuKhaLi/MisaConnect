@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # MisaConnect
 
-This repository is **MisaConnect** — a community .NET SDK for MISA cloud APIs. Two product families ship as independent NuGet packages: `MisaConnect.EInvoice` (v1.x, MISA eInvoice operations) and `MisaConnect.ESign` (v2.x, MISA eSign RemoteSigning operations). Each family is consumed via its own NuGet package; the API/host layer is shipped only as a sample under `samples/`. Development uses Spec Kit slices under `specs/`. See [docs/architecture.md](docs/architecture.md) for the layered design (Domain → Application → Infrastructure → Client), [.specify/memory/constitution.md](.specify/memory/constitution.md) for the binding project principles, and [CONTRIBUTING.md](CONTRIBUTING.md) for the slice workflow.
+This repository is **MisaConnect** — a community .NET SDK for MISA cloud APIs. Two product families ship as independent NuGet packages: `MisaConnect.EInvoice` (v1.x, MISA eInvoice operations) and `MisaConnect.ESign` (v2.x, MISA eSign RemoteSigning operations). Each family is consumed via its own NuGet package; the API/host layer is shipped only as a sample under `samples/`. Development uses the superpowers flow: a design under `docs/superpowers/specs/`, then a plan under `docs/superpowers/plans/`. `specs/001`–`009` are archived Spec Kit slices (read-only). See [docs/architecture.md](docs/architecture.md) for the layered design (Domain → Application → Infrastructure → Client), [docs/constitution.md](docs/constitution.md) for the binding project principles, and [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
 
 ## Build & test
 
@@ -46,9 +46,9 @@ The unit/integration split is by project, not by xUnit trait — no test uses `[
 
 ## Adding an operation
 
-TypeScript packages (npm `@misaconnect/einvoice`, `@misaconnect/esign`) do not use Spec Kit slices: they ship from a design under `docs/superpowers/specs/` and a plan under `docs/superpowers/plans/` (constitution v1.2.0, Principle V). See [docs/superpowers/specs/2026-11-02-typescript-sdk-design.md](docs/superpowers/specs/2026-11-02-typescript-sdk-design.md). The steps below apply to .NET.
+All work, .NET and TypeScript, follows the superpowers flow (constitution v1.3.0, Principle V): `superpowers:brainstorming` produces a design in `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, then `superpowers:writing-plans` produces a plan in `docs/superpowers/plans/`, executed with `superpowers:subagent-driven-development` or `superpowers:executing-plans`. Do not use Spec Kit or add `specs/NNN-*` slices. For .NET:
 
-1. New slice under `specs/NNN-name/` via `/speckit-specify` (spec.md, plan.md, tasks.md, contracts/).
+1. Design + plan as above.
 2. Implement Domain types → Application use case + port → Infrastructure adapter → Client facade.
 3. Unit tests required. Integration tests against the relevant sandbox or in-repo fake server (`tests/dotnet/MisaConnect.EInvoice.IntegrationTests/MisaFake/` for EInvoice, `tests/dotnet/MisaConnect.ESign.IntegrationTests/EsignFake/` for ESign).
 4. Update `README.md` supported-operations table and add a `CHANGELOG.md` entry under `[Unreleased]`.
@@ -72,9 +72,3 @@ TypeScript packages (npm `@misaconnect/einvoice`, `@misaconnect/esign`) do not u
 ## Logging
 
 Never log secrets, tokens, or buyer PII (names, addresses, line-item content). Raw MISA error messages surface only when `MisaEInvoiceOptions.Delete.IncludeRawErrorMessage = true` (or the equivalent opt-in flag on other operations). Correlation IDs are mandatory and structured.
-
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan at
-[specs/009-fix-einvoice-inventory-defects/plan.md](specs/009-fix-einvoice-inventory-defects/plan.md).
-<!-- SPECKIT END -->
