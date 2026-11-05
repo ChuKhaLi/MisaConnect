@@ -42,20 +42,16 @@ Read first:
 3. New .NET Spec Kit slice 010 (via `/speckit-specify`): back-port the TS esign fixes to `MisaConnect.ESign` — design §9 items 1–9 (stale token after 401 refresh, no login fallback, Signing/hash retried on 5xx/timeout, content-type guard only on certificates, ResponseError.error bool, webhook malformed input escapes, 122 missed on 4xx, unused refresh skew, dynamic creds unusable in webhook) plus the security rulings worth porting (webhook confirmation via Signing/status = R10, validation failures not delivered to hook = R12, no OTP in finalize = R11) and the docs errors listed in design §9 ("Docs-only"). Likely a minor version (behaviour changes).
 4. Add `.github/dependabot.yml` (npm root workspace, NuGet, github-actions). `npm audit`: minimatch (moderate, ESLint dev-only) and multer (high, via `@nestjs/platform-express` in samples/typescript/nestjs only) — published packages have zero runtime deps and are unaffected; bump the NestJS sample.
 5. Optional: EInvoice .NET DI uses `Add…` for all ports (ESign uses `TryAdd…`); switching is a behaviour change (minor bump). See specs/009-fix-einvoice-inventory-defects/research.md R4.
-6. Optional cleanup batch: ~25 deferred minors from the esign SDD ledger (copy at C:\Users\chung\AppData\Local\Temp\claude\F--Projects-MyProjects-MisaConnect\4c889050-712e-4b31-bce8-fa9ad35d1b1d\scratchpad\esign-sdd-ledger.md — scratchpad, may vanish; all were triaged "can ship" by the final review).
+6. Optional cleanup batch: ~25 deferred minors from the esign SDD ledger, all triaged "can ship" by the final review. The ledger copy was deleted at the owner's request; the rulings live in the esign README "Differences from the .NET SDK", the design doc, and the PR #3 description.
 
 ## Needs the user
 - Approve esign 0.1.1 stage (2FA).
 - An ACTIVE remote-signing certificate on the eSign sandbox account (owner said: later).
-- Whether to delete 8 merged local branches (001…008, fix/esign-hash-empty-doc-arrays) — all verified merged into main.
 - Whether slice 010 (.NET back-port) is wanted and at what version (minor suggested).
 
 ## Loose ends
-- No dev servers, tunnels or background processes left (all background shells this session completed).
-- npm: the owner ran `npm login` on this machine (account `chukhali`) — session token in the user's ~/.npmrc.
-- Scratchpad C:\Users\chung\AppData\Local\Temp\claude\F--Projects-MyProjects-MisaConnect\4c889050-712e-4b31-bce8-fa9ad35d1b1d\scratchpad\: throwaway install dirs (v012, v013, v014, nuget240, esign010, esign010pack), PR body drafts, esign-sdd-ledger.md (ledger copy with all rulings). Safe to delete except the ledger copy if you still want it.
-- `.superpowers/sdd/ts-einvoice-tls/` (gitignored, from the 0.1.1 TLS work) — safe to delete.
-- eInvoice and eSign sandbox credentials were typed into the previous chat by the owner; they live in GitHub environment `misa-sandbox` secrets, not on disk in the repo.
+- None. At the owner's request (2026-11-05 ~14:55): the 8 merged local branches were deleted, `.superpowers/sdd/ts-einvoice-tls/` and the session scratchpad were removed, and `npm logout` was run (`npm whoami` → ENEEDAUTH). No background processes remain.
+- eInvoice and eSign sandbox credentials live only in the GitHub environment `misa-sandbox` secrets (the owner typed them in chat; nothing is on disk in the repo).
 
 ## Decisions (don't relitigate)
 - eInvoice sandbox tax code is the bare MST; AppID separate (MISA's "MST-AppID" string split).
