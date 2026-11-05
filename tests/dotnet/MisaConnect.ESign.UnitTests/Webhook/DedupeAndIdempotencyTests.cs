@@ -132,6 +132,24 @@ public class DedupeAndIdempotencyTests
         Assert.Single(hook.Outcomes);
     }
 
+    private sealed class ThrowingHook : IWebhookDeliveryHook
+    {
+        public Task DeliverAsync(WebhookOutcome outcome, CancellationToken ct) => throw new InvalidOperationException("hook boom");
+    }
+
+    [Fact]
+    public async Task Hook_exception_on_success_delivery_propagates()
+    {
+        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var store = new InMemorySigningSessionStore(clock);
+        await store.RegisterAsync(SampleSession(), CancellationToken.None);
+        var sut = BuildSut(BuildWire(clock), store, new ThrowingHook());
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.HandleAsync(Envelope(), CancellationToken.None));
+        Assert.Equal("hook boom", ex.Message);
+    }
+
     [Fact]
     public async Task Cached_success_short_circuits_when_messageId_is_brand_new()
     {

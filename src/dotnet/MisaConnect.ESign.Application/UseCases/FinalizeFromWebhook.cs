@@ -90,7 +90,7 @@ public sealed class FinalizeFromWebhook
             await _sessionStore.CacheSuccessAsync(envelope.ClientId, envelope.TransactionId, envelope.MessageId, ack, signedBytes, ct).ConfigureAwait(false);
 
             var outcome = new WebhookOutcome.SuccessWithSignedBytes(envelope.TransactionId, refreshed.Format, signedBytes, correlationId);
-            await _deliveryHook.DeliverAsync(outcome, ct).ConfigureAwait(false);
+            await DeliveryHookFailedException.DeliverAsync(_deliveryHook, outcome, ct).ConfigureAwait(false);
 
             _logger.LogInformation(
                 "FinalizeFromWebhook success transactionId={TransactionId} format={Format} signedByteCount={SignedByteCount} correlationId={CorrelationId}",

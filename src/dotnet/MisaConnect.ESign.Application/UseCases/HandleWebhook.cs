@@ -112,7 +112,7 @@ public sealed class HandleWebhook
 
                 var terminal = new WebhookOutcome.TerminalWithoutFinalize(
                     envelope.TransactionId, session.Format, envelope.Status, envelope.ErrorCode, correlationId);
-                await _deliveryHook.DeliverAsync(terminal, ct).ConfigureAwait(false);
+                await DeliveryHookFailedException.DeliverAsync(_deliveryHook, terminal, ct).ConfigureAwait(false);
 
                 return new WebhookHandleResult(WebhookAck.Success(_successAckCodeAccessor()), terminal);
             }
@@ -151,6 +151,12 @@ public sealed class HandleWebhook
             await DeliverFailureIfEnabledAsync(outcome, correlationId, ct).ConfigureAwait(false);
 
             return new WebhookHandleResult(ack, outcome);
+        }
+        catch (DeliveryHookFailedException hookFailure)
+        {
+            // Integrator hook failures on success/terminal delivery propagate unchanged.
+            hookFailure.RethrowInner();
+            throw; // unreachable; satisfies definite-return analysis
         }
         catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
         {

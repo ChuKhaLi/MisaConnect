@@ -263,6 +263,23 @@ public class HandleWebhookTests
             () => sut.HandleAsync(BuildEnvelope(WebhookStatus.Success, sigs: new[] { ("doc-1", "SIG") }), cts.Token));
     }
 
+    private sealed class ThrowingHook : IWebhookDeliveryHook
+    {
+        public Task DeliverAsync(WebhookOutcome outcome, CancellationToken ct) => throw new InvalidOperationException("hook boom");
+    }
+
+    [Fact]
+    public async Task Hook_exception_on_terminal_delivery_propagates()
+    {
+        var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
+        await store.RegisterAsync(SampleSession(), CancellationToken.None);
+        var sut = BuildSut(store, new ThrowingHook());
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.HandleAsync(BuildEnvelope(WebhookStatus.Failed, errorCode: "E"), CancellationToken.None));
+        Assert.Equal("hook boom", ex.Message);
+    }
+
     private sealed class ThrowingStore : ISigningSessionStore
     {
         private readonly ISigningSessionStore _inner;
