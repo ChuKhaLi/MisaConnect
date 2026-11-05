@@ -1,0 +1,25 @@
+# TEMPORARY diagnostic (branch fix/node-autoselectfamily-timeout only); removed before merge.
+name: connect-diag
+on:
+  push:
+    branches: [fix/node-autoselectfamily-timeout]
+permissions:
+  contents: read
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+        mtu: ['1500', '1280']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Set MTU
+        run: sudo ip link set dev eth0 mtu ${{ matrix.mtu }}
+      - name: IPv6 route
+        run: ip -6 route show default || true; curl -6 -sS --max-time 5 -o /dev/null -w "curl -6: %{http_code}\n" https://testapi.meinvoice.vn/ || echo "curl -6 failed $?"; curl -4 -sS --max-time 10 -o /dev/null -w "curl -4: %{http_code} connect=%{time_connect}s\n" https://testapi.meinvoice.vn/
+      - run: node .github/diag/connect-diag.mjs
