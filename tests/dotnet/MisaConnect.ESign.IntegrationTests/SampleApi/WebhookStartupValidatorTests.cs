@@ -25,7 +25,7 @@ public class WebhookStartupValidatorTests
 
         ESignWebhookStartupValidator.EmitWarnIfPubliclyReachable(sp);
 
-        Assert.Single(sink.Where(line => line.Contains(WarnSentinel)));
+        Assert.Single(sink, line => line.Contains(WarnSentinel));
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public class WebhookStartupValidatorTests
 
         ESignWebhookStartupValidator.EmitWarnIfPubliclyReachable(sp);
 
-        Assert.Single(sink.Where(line => line.Contains(WarnSentinel)));
+        Assert.Single(sink, line => line.Contains(WarnSentinel));
     }
 
     [Fact]
