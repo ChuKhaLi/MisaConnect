@@ -13,6 +13,7 @@ First release: a TypeScript port of the .NET `MisaConnect.ESign` package.
 - Swappable ports with defaults: `TokenCache`, `CertificateSelector`, `OtpProvider`, `MisaCredentialsProvider`, `SigningSessionStore`, `WebhookDeliveryHook`, `Clock`, `Delay`, `Logger` (`fromPino`).
 - Typed errors (`ESignException` and subclasses, `isESignException`) with the .NET categories and error-code mapping.
 - Built-in `node:https` HTTP client with classical TLS key-exchange groups.
+- `tokenFingerprintSecret` option (at least 32 characters). The CHANGELOG inside the 0.1.0 tarball lists this under "Unreleased", but it shipped in 0.1.0. Hosts that share a `tokenCache` (e.g. Redis) and set the same secret now reuse each other's cached tokens: the token's credential fingerprint becomes HMAC-SHA256(secret, password + clientKey) instead of a random per-instance salt. Without the option the behaviour is unchanged (no reuse across processes or restarts). A wrong password still never matches a cached token.
 
 ### Differences from .NET
 

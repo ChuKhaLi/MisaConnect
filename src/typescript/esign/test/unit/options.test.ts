@@ -136,3 +136,27 @@ describe('resolveCredentials', () => {
     });
   });
 });
+
+describe('tokenFingerprintSecret option', () => {
+  const base = {
+    baseUrl: 'https://testesignappv1.misa.vn/',
+    credentials: { clientId: 'c', clientKey: 'k', userName: 'u', password: 'p' },
+  };
+  it('is optional and passed through when at least 32 characters', () => {
+    expect(validateOptions(base).tokenFingerprintSecret).toBeUndefined();
+    const s = 'x'.repeat(32);
+    expect(validateOptions({ ...base, tokenFingerprintSecret: s }).tokenFingerprintSecret).toBe(s);
+  });
+  it.each(['', 'short', ' '.repeat(40), 'x'.repeat(31)])('rejects %j', (s) => {
+    expect(() => validateOptions({ ...base, tokenFingerprintSecret: s })).toThrow(
+      /tokenFingerprintSecret/,
+    );
+  });
+  it('never echoes the secret in the error', () => {
+    try {
+      validateOptions({ ...base, tokenFingerprintSecret: 'tiny-secret-value' });
+    } catch (e) {
+      expect(String((e as Error).message)).not.toContain('tiny-secret-value');
+    }
+  });
+});

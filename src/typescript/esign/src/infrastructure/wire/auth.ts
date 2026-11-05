@@ -259,6 +259,7 @@ export function createDefaultTokenManager(
     clock: resolved.clock ?? systemClock,
     cacheKey: (creds) =>
       keyFn({ userName: creds.userName, clientId: creds.clientId, host: resolved.host }),
-    fingerprint: overrides.fingerprint ?? createCredentialFingerprinter(),
+    fingerprint:
+      overrides.fingerprint ?? createCredentialFingerprinter(resolved.tokenFingerprintSecret),
   });
 }

@@ -27,6 +27,13 @@ export interface MisaESignOptions {
   webhook?: { mode?: WebhookMode; sessionTtlMs?: number };
   tokenCache?: TokenCache;
   tokenCacheKey?: (c: { userName: string; clientId: string; host: string }) => string;
+  /**
+   * Shared secret (at least 32 characters) for the credential fingerprint that binds cached
+   * tokens to the password and client key. Set the same value on every host that shares a
+   * `tokenCache` (e.g. Redis) so they can reuse each other's tokens. Unset: a random per-instance
+   * salt is used, which is safest but means no token reuse across processes or restarts.
+   */
+  tokenFingerprintSecret?: string;
   certificateSelector?: CertificateSelector;
   otpProvider?: OtpProvider;
   signingSessionStore?: SigningSessionStore;
@@ -53,6 +60,7 @@ export interface ResolvedESignOptions {
   /** Collaborators are as given or `undefined`; defaults are filled where they are used. */
   tokenCache: TokenCache | undefined;
   tokenCacheKey: MisaESignOptions['tokenCacheKey'];
+  tokenFingerprintSecret: string | undefined;
   certificateSelector: CertificateSelector | undefined;
   otpProvider: OtpProvider | undefined;
   signingSessionStore: SigningSessionStore | undefined;
@@ -152,6 +160,12 @@ export function validateOptions(o: MisaESignOptions): ResolvedESignOptions {
     sessionTtlMs: o.webhook?.sessionTtlMs ?? 86_400_000,
   };
   if (!(webhook.sessionTtlMs > 0)) failures.push('webhook.sessionTtlMs must be greater than 0.');
+  if (
+    o.tokenFingerprintSecret !== undefined &&
+    (typeof o.tokenFingerprintSecret !== 'string' || o.tokenFingerprintSecret.trim().length < 32)
+  ) {
+    failures.push('tokenFingerprintSecret must be at least 32 non-blank characters.');
+  }
 
   if (failures.length > 0 || url === undefined) {
     throw new ESignGeneralException({
@@ -175,6 +189,7 @@ export function validateOptions(o: MisaESignOptions): ResolvedESignOptions {
     webhook,
     tokenCache: o.tokenCache,
     tokenCacheKey: o.tokenCacheKey,
+    tokenFingerprintSecret: o.tokenFingerprintSecret,
     certificateSelector: o.certificateSelector,
     otpProvider: o.otpProvider,
     signingSessionStore: o.signingSessionStore,
