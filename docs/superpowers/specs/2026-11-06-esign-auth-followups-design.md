@@ -27,9 +27,9 @@ resolve Microsoft.Extensions 10.x). Release is prepared, not tagged, until the o
    (`AmbientCorrelationId`) around its auth work. Infrastructure readers of the correlation ID
    (`MisaESignWireClient` request stamping, `ClientHeadersHandler`, `ESignCallLogger`,
    `RemoteSigningAuthHandler`'s own exception) prefer the override when set.
-4. **Missing `expiresIn` gets a default lifetime.** When MISA omits `expiresIn` (or sends a
-   non-integer), assume **300 s** instead of 0. Applies to login, 2FA and refresh, in both the
-   envelope and flat shapes. Same rule in `@misaconnect/esign` (TS) for parity.
+4. **`expiresIn` lifetime rule.** Missing (or non-integer) → **300 s**; an explicit value of 0 or
+   less is honoured (already expired); **1–59 s → 60 s**; 60 s and above as-is. Applies to login,
+   2FA and refresh, in both the envelope and flat shapes. Same rule in `@misaconnect/esign` (TS).
 5. **Shipped dependencies coherent on 10.x.** `Microsoft.Extensions.Http`,
    `Logging.Abstractions`, `Options`, `Options.ConfigurationExtensions` and `System.Text.Json` move
    to 10.0.x. Packages keep targeting `net8.0`.
@@ -50,12 +50,15 @@ resolve Microsoft.Extensions 10.x). Release is prepared, not tagged, until the o
   (`TokenLifecycleFakeServerTests.Already_expired_refresh_result_falls_back_to_login`).
 - Must not keep a refresh running forever: the HTTP client's own timeout still bounds it.
 
-## Deviation from the chat proposal (builder's call)
+## Deviation from the chat proposal (owner-visible)
 
-The chat proposal floored missing/≤ 0 to 300 s and short positive values to 60 s. Reading the tests
-showed that flooring explicit values would silently disable the 2.5.0 expired-refresh rule above,
-and an explicit short lifetime is MISA's word on validity. So only a **missing or non-integer**
-`expiresIn` is defaulted; explicit values are honoured.
+The chat proposal floored missing/≤ 0 to 300 s and 1–59 s to 60 s. Flooring an explicit 0 would
+silently disable the 2.5.0 rule above, so an explicit value ≤ 0 is honoured instead. The first
+draft of this doc also dropped the 60 s floor; the owner's side-note on 2026-11-06 caught that, and
+the floor is back. Only the explicit-≤ 0 case differs from what was approved.
+
+Known gap, not in scope: TS has no "already-expired refresh result falls back to login" rule
+(.NET does since 2.5.0); TS returns the expired token and recovers through its 401 path.
 
 ## Left to the builder
 

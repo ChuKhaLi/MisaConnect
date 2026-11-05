@@ -174,6 +174,33 @@ describe('token manager', () => {
     });
   });
 
+  describe('expiresIn lifetime', () => {
+    it.each([
+      ['missing', undefined, 300_000],
+      ['non-numeric', 'soon', 300_000],
+      ['short (10 s) floored to 60 s', 10, 60_000],
+      ['59 s floored to 60 s', 59, 60_000],
+      ['60 s as-is', 60, 60_000],
+      ['3600 s as-is', 3600, 3_600_000],
+    ])('login with %s expiresIn', async (_label, expiresIn, lifetimeMs) => {
+      const { tm } = setup({ 'login-api': () => loginOk('T1', { expiresIn }) });
+      const t = await tm.getToken(creds, ctx);
+      expect(t.expiresAt).toEqual(new Date(T0 + lifetimeMs));
+    });
+
+    it.each([
+      ['0', 0, 0],
+      ['negative', -5, -5_000],
+    ])(
+      'honours an explicit %s expiresIn (not defaulted, not floored)',
+      async (_label, expiresIn, lifetimeMs) => {
+        const { tm } = setup({ 'login-api': () => loginOk('T1', { expiresIn }) });
+        const t = await tm.getToken(creds, ctx);
+        expect(t.expiresAt).toEqual(new Date(T0 + lifetimeMs));
+      },
+    );
+  });
+
   it('falls back to login when refresh returns 500', async () => {
     const { tm, cache, count } = setup({
       refreshtoken: () => json(500, {}),

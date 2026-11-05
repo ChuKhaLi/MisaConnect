@@ -5,6 +5,25 @@ namespace MisaConnect.ESign.Infrastructure.ESign.Mapping;
 
 internal static class AuthSessionMapper
 {
+    /// <summary>Lifetime assumed when MISA omits <c>expiresIn</c>.</summary>
+    internal const int DefaultExpiresInSeconds = 300;
+
+    /// <summary>Shortest lifetime accepted for a positive <c>expiresIn</c>, so the 30 s
+    /// proactive-refresh skew still leaves a usable window.</summary>
+    internal const int MinExpiresInSeconds = 60;
+
+    /// <summary>
+    /// Missing → <see cref="DefaultExpiresInSeconds"/>; an explicit value of 0 or less is
+    /// honoured (already expired, so an expired refresh result still falls back to login);
+    /// 1–59 → <see cref="MinExpiresInSeconds"/>; anything else as-is.
+    /// </summary>
+    internal static int LifetimeSeconds(int? expiresIn) => expiresIn switch
+    {
+        null => DefaultExpiresInSeconds,
+        > 0 and < MinExpiresInSeconds => MinExpiresInSeconds,
+        { } explicitValue => explicitValue,
+    };
+
     public static AuthSession FromTwoFactorAuthResponse(LoginResponseDto? dto, DateTimeOffset now) =>
         FromLoginResponse(dto, now);
 
@@ -15,7 +34,7 @@ internal static class AuthSessionMapper
             throw new InvalidOperationException("Login response missing data block.");
         }
         var data = dto.Data;
-        var expiresIn = data.ExpiresIn ?? 0;
+        var expiresIn = LifetimeSeconds(data.ExpiresIn);
         return new AuthSession(
             AccessToken: data.AccessToken ?? string.Empty,
             RemoteSigningAccessToken: data.RemoteSigningAccessToken ?? string.Empty,
@@ -41,7 +60,7 @@ internal static class AuthSessionMapper
         if (dto?.Data is not null)
         {
             var data = dto.Data;
-            var expiresIn = data.ExpiresIn ?? 0;
+            var expiresIn = LifetimeSeconds(data.ExpiresIn);
             return new AuthSession(
                 AccessToken: data.AccessToken ?? string.Empty,
                 RemoteSigningAccessToken: data.RemoteSigningAccessToken ?? string.Empty,
@@ -57,7 +76,7 @@ internal static class AuthSessionMapper
                 AccessToken: dto.AccessToken ?? string.Empty,
                 RemoteSigningAccessToken: dto.RemoteSigningAccessToken ?? string.Empty,
                 RefreshToken: dto.RefreshToken ?? string.Empty,
-                ExpiresAtUtc: now.AddSeconds(dto.ExpiresIn ?? 0),
+                ExpiresAtUtc: now.AddSeconds(LifetimeSeconds(dto.ExpiresIn)),
                 UserId: previousUserId,
                 Username: previousUsername);
         }
