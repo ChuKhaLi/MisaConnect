@@ -25,4 +25,24 @@ public interface ISigningSessionStore
     ValueTask RecordObservedMessageIdAsync(string clientId, string transactionId, string messageId, CancellationToken ct);
 
     ValueTask CacheSuccessAsync(string clientId, string transactionId, string triggeringMessageId, WebhookAck ack, byte[] signedBytes, CancellationToken ct);
+
+    /// <summary>
+    /// Records the terminal (FAILED/CANCELLED) state MISA confirmed for the transaction
+    /// as <see cref="SigningSession.CachedTerminal"/>. The first write wins; later calls
+    /// for the same <c>(clientId, transactionId)</c> leave the recorded state unchanged.
+    /// </summary>
+    /// <remarks>
+    /// The default implementation records nothing, so a store written for an earlier
+    /// version keeps working: terminal outcomes are then confirmed with MISA and
+    /// delivered on every webhook repeat.
+    /// </remarks>
+    /// <param name="clientId">The session's MISA <c>clientId</c>.</param>
+    /// <param name="transactionId">The MISA transaction id.</param>
+    /// <param name="triggeringMessageId">The webhook <c>messageId</c> that recorded the state.</param>
+    /// <param name="ack">The ACK returned for that delivery.</param>
+    /// <param name="status">The terminal status MISA reported.</param>
+    /// <param name="misaErrorCode">MISA's error code for the terminal state, when present.</param>
+    /// <param name="ct">Cancellation token.</param>
+    ValueTask CacheTerminalAsync(string clientId, string transactionId, string triggeringMessageId, WebhookAck ack, WebhookStatus status, string? misaErrorCode, CancellationToken ct)
+        => ValueTask.CompletedTask;
 }

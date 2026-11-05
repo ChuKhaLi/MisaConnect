@@ -194,32 +194,13 @@ public class DedupeAndIdempotencyTests
     private static HandleWebhook BuildSut(StubWireClient wire, InMemorySigningSessionStore store, IWebhookDeliveryHook hook)
     {
         var clock = new FakeClock(DateTimeOffset.UtcNow);
-        var cache = new InMemoryTokenCache();
-        var keySelector = new BeginSignFixtures.StaticKeySelector();
-        var correlation = new StubCorrelationIdAccessor("cid");
-        var ensureToken = new EnsureAccessToken(wire, cache, keySelector, clock, () => ("alice", "pass"));
-        var listCerts = new ListActiveCertificates(wire, correlation);
-        var attachPdf = new AttachSignature(wire);
-        var attachXml = new AttachSignatureToXml(wire, correlation);
-        var attachWordExcel = new AttachSignatureToWordExcel(wire, correlation);
-        var finalize = new FinalizeFromWebhook(
-            ensureToken: ensureToken,
-            listCerts: listCerts,
-            certSelector: new BeginSignFixtures.FirstCertSelector(),
-            attachPdf: attachPdf,
-            attachXml: attachXml,
-            attachWordExcel: attachWordExcel,
-            sessionStore: store,
-            lockOwner: store,
-            deliveryHook: hook,
-            logger: NullLogger<FinalizeFromWebhook>.Instance,
-            successAckCodeAccessor: () => "0");
+        var finalize = BeginSignFixtures.BuildFinalize(wire, store, store, hook, clock);
         return new HandleWebhook(
             validator: new WebhookEnvelopeValidator(),
             sessionStore: store,
             finalizeFromWebhook: finalize,
             deliveryHook: hook,
-            correlationAccessor: correlation,
+            correlationAccessor: new StubCorrelationIdAccessor("cid"),
             configuredClientIdAccessor: () => "client-1",
             successAckCodeAccessor: () => "0",
             logger: NullLogger<HandleWebhook>.Instance,

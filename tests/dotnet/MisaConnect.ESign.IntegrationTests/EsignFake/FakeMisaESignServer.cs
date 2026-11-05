@@ -344,7 +344,7 @@ internal sealed class FakeMisaESignServer : IAsyncDisposable
                 await ctx.Response.WriteAsync($"{{\"status\":\"PENDING\",\"transactionId\":\"{tx}\"}}");
                 return;
             }
-            await ctx.Response.WriteAsync($"{{\"status\":\"SUCCESS\",\"transactionId\":\"{tx}\",\"signatures\":[{{\"documentId\":\"doc-1\",\"signature\":\"SIGNATURE-BYTES\"}}]}}");
+            await ctx.Response.WriteAsync($"{{\"status\":\"SUCCESS\",\"transactionId\":\"{tx}\",\"signatures\":[{{\"documentId\":\"doc-1\",\"signature\":\"misa-signature\"}}]}}");
         });
 
         app.MapPost("/external/esrm/service/document/api/v1/documents/attachment", async (HttpContext ctx) =>

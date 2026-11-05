@@ -32,6 +32,7 @@ public sealed class BeginSignPdf
     private readonly OtpSubmissionValidator? _otpSubmissionValidator;
     private readonly ICorrelationIdAccessor? _correlation;
     private readonly ILogger<BeginSignPdf> _logger;
+    private readonly Func<string?>? _userNameAccessor;
 
     public BeginSignPdf(
         EnsureAccessToken ensureToken,
@@ -48,7 +49,8 @@ public sealed class BeginSignPdf
         IOtpProvider? otpProvider = null,
         ExchangeOtp? exchangeOtp = null,
         OtpSubmissionValidator? otpSubmissionValidator = null,
-        ICorrelationIdAccessor? correlation = null)
+        ICorrelationIdAccessor? correlation = null,
+        Func<string?>? userNameAccessor = null)
     {
         _ensureToken = ensureToken;
         _listCerts = listCerts;
@@ -64,6 +66,7 @@ public sealed class BeginSignPdf
         _exchangeOtp = exchangeOtp;
         _otpSubmissionValidator = otpSubmissionValidator;
         _correlation = correlation;
+        _userNameAccessor = userNameAccessor;
         _logger = logger;
     }
 
@@ -120,7 +123,10 @@ public sealed class BeginSignPdf
             CreatedAtUtc: _clock.UtcNow,
             Ttl: _ttlAccessor(),
             ObservedMessageIds: new HashSet<string>(StringComparer.Ordinal),
-            CachedSuccess: null);
+            CachedSuccess: null)
+        {
+            UserName = _userNameAccessor?.Invoke(),
+        };
 
         await _sessionStore.RegisterAsync(session, ct).ConfigureAwait(false);
 

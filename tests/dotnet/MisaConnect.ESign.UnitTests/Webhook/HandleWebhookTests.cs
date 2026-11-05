@@ -6,6 +6,7 @@ using MisaConnect.ESign.Application.Validation;
 using MisaConnect.ESign.Application.Webhook;
 using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
+using MisaConnect.ESign.Domain.Signing;
 using MisaConnect.ESign.Domain.Webhook;
 using MisaConnect.ESign.Infrastructure.Sessions;
 using MisaConnect.ESign.UnitTests.TestSupport;
@@ -89,20 +90,37 @@ public class HandleWebhookTests
     }
 
     [Fact]
+    public async Task HandleAsync_blank_configured_client_id_skips_match_and_uses_session_lookup()
+    {
+        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var store = new InMemorySigningSessionStore(clock);
+        await store.RegisterAsync(SampleSession(clientId: "client-A"), CancellationToken.None);
+        var hook = new RecordingHook();
+        var sut = BuildSut(store, hook, configuredClientId: "", wire: TerminalWire(SignStatus.FAILED, null));
+
+        var known = await sut.HandleAsync(BuildEnvelope(WebhookStatus.Failed, clientId: "client-A"), CancellationToken.None);
+        var spoofed = await sut.HandleAsync(BuildEnvelope(WebhookStatus.Failed, clientId: "client-X"), CancellationToken.None);
+
+        Assert.Equal("0", known.Ack.ErrorCode);
+        Assert.Equal("webhook.unknown_transaction", spoofed.Ack.ErrorCode);
+    }
+
+    [Fact]
     public async Task HandleAsync_terminal_failed_returns_success_ack_with_TerminalWithoutFinalize_outcome()
     {
         var clock = new FakeClock(DateTimeOffset.UtcNow);
         var store = new InMemorySigningSessionStore(clock);
         await store.RegisterAsync(SampleSession(), CancellationToken.None);
         var hook = new RecordingHook();
-        var sut = BuildSut(store, hook);
+        var sut = BuildSut(store, hook, wire: TerminalWire(SignStatus.FAILED, "MisaErr-99"));
 
-        var envelope = BuildEnvelope(WebhookStatus.Failed, errorCode: "MisaErr-99");
+        var envelope = BuildEnvelope(WebhookStatus.Failed, errorCode: "EnvelopeErr");
         var result = await sut.HandleAsync(envelope, CancellationToken.None);
 
         Assert.Equal("0", result.Ack.ErrorCode);
         var terminal = Assert.IsType<WebhookOutcome.TerminalWithoutFinalize>(result.Outcome);
         Assert.Equal(WebhookStatus.Failed, terminal.Status);
+        // The terminal status and error code now come from MISA's Signing/status.
         Assert.Equal("MisaErr-99", terminal.MisaErrorCode);
         Assert.Single(hook.Outcomes);
     }
@@ -114,7 +132,7 @@ public class HandleWebhookTests
         var store = new InMemorySigningSessionStore(clock);
         await store.RegisterAsync(SampleSession(), CancellationToken.None);
         var hook = new RecordingHook();
-        var sut = BuildSut(store, hook);
+        var sut = BuildSut(store, hook, wire: TerminalWire(SignStatus.CANCELLED, null));
 
         var envelope = BuildEnvelope(WebhookStatus.Cancelled);
         var result = await sut.HandleAsync(envelope, CancellationToken.None);
@@ -273,7 +291,7 @@ public class HandleWebhookTests
     {
         var store = new InMemorySigningSessionStore(new FakeClock(DateTimeOffset.UtcNow));
         await store.RegisterAsync(SampleSession(), CancellationToken.None);
-        var sut = BuildSut(store, new ThrowingHook());
+        var sut = BuildSut(store, new ThrowingHook(), wire: TerminalWire(SignStatus.FAILED, "E"));
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.HandleAsync(BuildEnvelope(WebhookStatus.Failed, errorCode: "E"), CancellationToken.None));
@@ -307,32 +325,33 @@ public class HandleWebhookTests
             => _inner.CacheSuccessAsync(clientId, transactionId, triggeringMessageId, ack, signedBytes, ct);
     }
 
+    private static StubWireClient TerminalWire(SignStatus status, string? errorCode)
+    {
+        var wire = new StubWireClient();
+        wire.OnGetStatus = (_, tx, _) => Task.FromResult(new SignStatusSnapshot(status, errorCode, null, tx, null));
+        return wire;
+    }
+
     private static HandleWebhook BuildSut(
         ISigningSessionStore store,
         IWebhookDeliveryHook hook,
         string configuredClientId = "client-1",
         string successCode = "0",
         bool deliverValidationFailures = true,
-        InMemorySigningSessionStore? lockOwner = null)
+        InMemorySigningSessionStore? lockOwner = null,
+        StubWireClient? wire = null)
     {
-        var validator = new WebhookEnvelopeValidator();
-        // FinalizeFromWebhook is required by HandleWebhook ctor but only invoked when there's no cached success and validation passes;
-        // for the failure/short-circuit tests below it's never reached.
-        var finalize = new FinalizeFromWebhook(
-            ensureToken: null!,
-            listCerts: null!,
-            certSelector: null!,
-            attachPdf: null!,
-            attachXml: null!,
-            attachWordExcel: null!,
-            sessionStore: store,
-            lockOwner: (IFinalizeLockOwner)(lockOwner ?? store),
-            deliveryHook: hook,
-            logger: NullLogger<FinalizeFromWebhook>.Instance,
-            successAckCodeAccessor: () => successCode);
+        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var finalize = BeginSignFixtures.BuildFinalize(
+            wire ?? new StubWireClient(),
+            store,
+            (IFinalizeLockOwner)(lockOwner ?? store),
+            hook,
+            clock,
+            successCode: successCode);
         var correlation = new StubCorrelationIdAccessor("cid-test");
         return new HandleWebhook(
-            validator: validator,
+            validator: new WebhookEnvelopeValidator(),
             sessionStore: store,
             finalizeFromWebhook: finalize,
             deliveryHook: hook,

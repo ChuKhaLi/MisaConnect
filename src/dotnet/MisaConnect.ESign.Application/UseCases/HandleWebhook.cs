@@ -93,7 +93,13 @@ public sealed class HandleWebhook
         DocumentFormat? format = null;
         try
         {
-            _validator.AssertClientIdMatch(envelope, _configuredClientIdAccessor(), correlationId);
+            // Dynamic mode has no configured ClientId: the session lookup by
+            // (envelope.ClientId, transactionId) below is then the spoof check.
+            var configuredClientId = _configuredClientIdAccessor();
+            if (!string.IsNullOrWhiteSpace(configuredClientId))
+            {
+                _validator.AssertClientIdMatch(envelope, configuredClientId, correlationId);
+            }
 
             var session = await _sessionStore.TryGetByTransactionIdAsync(envelope.ClientId, envelope.TransactionId, ct).ConfigureAwait(false);
             if (session is null)
@@ -104,34 +110,9 @@ public sealed class HandleWebhook
             format = session.Format;
             await _sessionStore.RecordObservedMessageIdAsync(envelope.ClientId, envelope.TransactionId, envelope.MessageId, ct).ConfigureAwait(false);
 
-            if (envelope.Status is WebhookStatus.Failed or WebhookStatus.Cancelled)
-            {
-                _logger.LogInformation(
-                    "HandleWebhook terminal-without-finalize transactionId={TransactionId} status={Status} correlationId={CorrelationId}",
-                    envelope.TransactionId, envelope.Status, correlationId);
-
-                var terminal = new WebhookOutcome.TerminalWithoutFinalize(
-                    envelope.TransactionId, session.Format, envelope.Status, envelope.ErrorCode, correlationId);
-                await DeliveryHookFailedException.DeliverAsync(_deliveryHook, terminal, ct).ConfigureAwait(false);
-
-                return new WebhookHandleResult(WebhookAck.Success(_successAckCodeAccessor()), terminal);
-            }
-
-            _validator.AssertSuccessShapeIsValid(envelope, session, correlationId);
-
-            if (session.CachedSuccess is { } cached)
-            {
-                _logger.LogInformation(
-                    "HandleWebhook duplicate-delivery short-circuit transactionId={TransactionId} isMessageIdNew={IsMessageIdNew} correlationId={CorrelationId}",
-                    envelope.TransactionId,
-                    !session.ObservedMessageIds.Contains(envelope.MessageId),
-                    correlationId);
-
-                return new WebhookHandleResult(
-                    cached.Ack,
-                    new WebhookOutcome.SuccessWithSignedBytes(envelope.TransactionId, session.Format, cached.SignedBytes, correlationId));
-            }
-
+            // The envelope is only a trigger: FinalizeFromWebhook applies state precedence
+            // (cached success / recorded terminal), the SUCCESS shape checks, and MISA's
+            // confirmed Signing/status under the finalize lock.
             return await _finalizeFromWebhook.RunAsync(session, envelope, correlationId, ct).ConfigureAwait(false);
         }
         catch (WebhookValidationException ex)

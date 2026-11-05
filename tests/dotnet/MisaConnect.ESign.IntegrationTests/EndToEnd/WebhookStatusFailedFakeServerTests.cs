@@ -31,6 +31,7 @@ public class WebhookStatusFailedFakeServerTests
     public async Task Webhook_failed_status_returns_success_ack_and_skips_finalize()
     {
         await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.StatusAlwaysFailed = true;
         var hook = new CapturingHook();
         await using var sp = BuildSp(server.BaseUrl, hook);
 
@@ -54,7 +55,8 @@ public class WebhookStatusFailedFakeServerTests
         Assert.Equal(0, server.Calls.Attachment);
         var terminal = Assert.IsType<WebhookOutcomeDto.TerminalWithoutFinalize>(result.Outcome);
         Assert.Equal(WebhookStatusDto.Failed, terminal.Status);
-        Assert.Equal("MisaErr-99", terminal.MisaErrorCode);
+        // The terminal error code now comes from MISA's Signing/status, not the envelope.
+        Assert.Equal("ResultBad", terminal.MisaErrorCode);
         Assert.Single(hook.Outcomes);
     }
 
@@ -62,6 +64,7 @@ public class WebhookStatusFailedFakeServerTests
     public async Task Webhook_cancelled_status_returns_success_ack_and_skips_finalize()
     {
         await using var server = await FakeMisaESignServer.StartAsync();
+        server.Configure.StatusAlwaysCancelled = true;
         var hook = new CapturingHook();
         await using var sp = BuildSp(server.BaseUrl, hook);
 

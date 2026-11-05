@@ -100,6 +100,23 @@ public class BeginSignTests
         Assert.Equal(now, session.CreatedAtUtc);
     }
 
+    [Fact]
+    public async Task BeginSign_records_the_principal_user_name_on_every_format()
+    {
+        var clock = new FakeClock(DateTimeOffset.UtcNow);
+        var wire = new StubWireClient();
+        BeginSignFixtures.WireDefaults(wire, clock);
+        var store = new BeginSignFixtures.StubSigningSessionStore();
+
+        await BeginSignFixtures.BuildBeginSignPdf(wire, store, clock, userName: "alice").ExecuteAsync(BuildPdfWork(), CancellationToken.None);
+        await BeginSignFixtures.BuildBeginSignXml(wire, store, clock, userName: "alice").ExecuteAsync(BuildXmlRequest(), CancellationToken.None);
+        await BeginSignFixtures.BuildBeginSignWord(wire, store, clock, userName: "alice").ExecuteAsync(BuildWordRequest(), CancellationToken.None);
+        await BeginSignFixtures.BuildBeginSignExcel(wire, store, clock, userName: "alice").ExecuteAsync(BuildExcelRequest(), CancellationToken.None);
+        await BeginSignFixtures.BuildBeginSignPdf(wire, store, clock).ExecuteAsync(BuildPdfWork(), CancellationToken.None);
+
+        Assert.Equal(new string?[] { "alice", "alice", "alice", "alice", null }, store.Registered.Select(s => s.UserName).ToArray());
+    }
+
     private static SignPdfWorkRequest BuildPdfWork() => new(
         Pdf: new PdfDocument(new byte[] { 0x25, 0x50 }),
         SignatureInfo: BeginSignFixtures.PdfSignatureInfo(),

@@ -25,6 +25,7 @@ public sealed class BeginSignExcel
     private readonly OtpSubmissionValidator? _otpSubmissionValidator;
     private readonly ICorrelationIdAccessor? _correlation;
     private readonly ILogger<BeginSignExcel> _logger;
+    private readonly Func<string?>? _userNameAccessor;
 
     public BeginSignExcel(
         EnsureAccessToken ensureToken,
@@ -41,7 +42,8 @@ public sealed class BeginSignExcel
         IOtpProvider? otpProvider = null,
         ExchangeOtp? exchangeOtp = null,
         OtpSubmissionValidator? otpSubmissionValidator = null,
-        ICorrelationIdAccessor? correlation = null)
+        ICorrelationIdAccessor? correlation = null,
+        Func<string?>? userNameAccessor = null)
     {
         _ensureToken = ensureToken;
         _listCerts = listCerts;
@@ -57,6 +59,7 @@ public sealed class BeginSignExcel
         _exchangeOtp = exchangeOtp;
         _otpSubmissionValidator = otpSubmissionValidator;
         _correlation = correlation;
+        _userNameAccessor = userNameAccessor;
         _logger = logger;
     }
 
@@ -113,7 +116,10 @@ public sealed class BeginSignExcel
             CreatedAtUtc: _clock.UtcNow,
             Ttl: _ttlAccessor(),
             ObservedMessageIds: new HashSet<string>(StringComparer.Ordinal),
-            CachedSuccess: null);
+            CachedSuccess: null)
+        {
+            UserName = _userNameAccessor?.Invoke(),
+        };
 
         await _sessionStore.RegisterAsync(session, ct).ConfigureAwait(false);
 
