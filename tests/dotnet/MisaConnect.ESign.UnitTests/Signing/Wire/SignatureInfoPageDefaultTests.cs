@@ -44,7 +44,7 @@ public class SignatureInfoPageDefaultTests
         var client = new MisaESignWireClient(
             http,
             Options.Create(new MisaESignOptions()),
-            new StubMisaCredentialsAccessor(),
+            new MisaConnect.ESign.Infrastructure.Credentials.EffectiveCredentials(new StubMisaCredentialsAccessor()),
             new StubClock(),
             new StubCorrelationIdAccessor("cid"),
             logger);

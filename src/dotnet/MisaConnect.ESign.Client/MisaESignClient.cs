@@ -11,14 +11,15 @@ using MisaConnect.ESign.Domain.Authentication;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Domain.Webhook;
 using MisaConnect.ESign.Infrastructure.Configuration;
+using MisaConnect.ESign.Infrastructure.Credentials;
 using ClientWebhookOutcomeDto = MisaConnect.ESign.Client.Dtos.Webhook.WebhookOutcomeDto;
 
 namespace MisaConnect.ESign.Client;
 
 internal sealed class MisaESignClient : IMisaESignClient
 {
-    private string? _pendingUserName;
-    private readonly object _pendingLock = new();
+    private readonly PendingOtpChallenges _pending = new();
+    private readonly EffectiveCredentials _credentials;
 
     private readonly SignPdf _signPdf;
     private readonly SignXml _signXml;
@@ -43,6 +44,7 @@ internal sealed class MisaESignClient : IMisaESignClient
         ExchangeOtp exchangeOtp,
         ResendOtp resendOtp,
         OtpSubmissionValidator otpSubmissionValidator,
+        EffectiveCredentials credentials,
         BeginSignPdf? beginSignPdf = null,
         BeginSignXml? beginSignXml = null,
         BeginSignWord? beginSignWord = null,
@@ -58,6 +60,7 @@ internal sealed class MisaESignClient : IMisaESignClient
         _exchangeOtp = exchangeOtp;
         _resendOtp = resendOtp;
         _otpSubmissionValidator = otpSubmissionValidator;
+        _credentials = credentials;
         _otpProvider = otpProvider;
         _beginSignPdf = beginSignPdf;
         _beginSignXml = beginSignXml;
@@ -75,7 +78,7 @@ internal sealed class MisaESignClient : IMisaESignClient
         try
         {
             var result = await _signPdf.ExecuteAsync(workRequest, ct).ConfigureAwait(false);
-            lock (_pendingLock) { _pendingUserName = null; }
+            ClearPending();
             return new SignPdfResultDto(
                 SignedPdf: result.SignedPdf.Bytes,
                 TransactionId: result.TransactionId,
@@ -84,7 +87,7 @@ internal sealed class MisaESignClient : IMisaESignClient
         }
         catch (AuthenticationFailedException ex) when (ex.Requires2FA && _otpProvider is null)
         {
-            lock (_pendingLock) { _pendingUserName = ex.Username; }
+            MarkPending(ex.Username);
             throw;
         }
     }
@@ -97,7 +100,7 @@ internal sealed class MisaESignClient : IMisaESignClient
         try
         {
             var result = await _signXml.ExecuteAsync(workRequest, ct).ConfigureAwait(false);
-            lock (_pendingLock) { _pendingUserName = null; }
+            ClearPending();
             return new SignXmlResultDto(
                 SignedXml: result.SignedXml.Bytes,
                 TransactionId: result.TransactionId,
@@ -106,7 +109,7 @@ internal sealed class MisaESignClient : IMisaESignClient
         }
         catch (AuthenticationFailedException ex) when (ex.Requires2FA && _otpProvider is null)
         {
-            lock (_pendingLock) { _pendingUserName = ex.Username; }
+            MarkPending(ex.Username);
             throw;
         }
     }
@@ -119,7 +122,7 @@ internal sealed class MisaESignClient : IMisaESignClient
         try
         {
             var result = await _signWord.ExecuteAsync(workRequest, ct).ConfigureAwait(false);
-            lock (_pendingLock) { _pendingUserName = null; }
+            ClearPending();
             return new SignWordResultDto(
                 SignedWord: result.SignedWord.Bytes,
                 TransactionId: result.TransactionId,
@@ -128,7 +131,7 @@ internal sealed class MisaESignClient : IMisaESignClient
         }
         catch (AuthenticationFailedException ex) when (ex.Requires2FA && _otpProvider is null)
         {
-            lock (_pendingLock) { _pendingUserName = ex.Username; }
+            MarkPending(ex.Username);
             throw;
         }
     }
@@ -141,7 +144,7 @@ internal sealed class MisaESignClient : IMisaESignClient
         try
         {
             var result = await _signExcel.ExecuteAsync(workRequest, ct).ConfigureAwait(false);
-            lock (_pendingLock) { _pendingUserName = null; }
+            ClearPending();
             return new SignExcelResultDto(
                 SignedExcel: result.SignedExcel.Bytes,
                 TransactionId: result.TransactionId,
@@ -150,16 +153,15 @@ internal sealed class MisaESignClient : IMisaESignClient
         }
         catch (AuthenticationFailedException ex) when (ex.Requires2FA && _otpProvider is null)
         {
-            lock (_pendingLock) { _pendingUserName = ex.Username; }
+            MarkPending(ex.Username);
             throw;
         }
     }
 
     public async Task SignInWithOtpAsync(string otpCode, OtpDeliveryChannel otpType, bool remember, CancellationToken ct = default)
     {
-        string? userName;
-        lock (_pendingLock) { userName = _pendingUserName; }
-        if (string.IsNullOrEmpty(userName))
+        var userName = CurrentPendingUserName();
+        if (userName is null)
         {
             throw new InvalidOperationException(
                 "SignInWithOtpAsync must be invoked only after catching an AuthenticationFailedException with Requires2FA = true.");
@@ -169,14 +171,13 @@ internal sealed class MisaESignClient : IMisaESignClient
         _otpSubmissionValidator.Validate(submission);
 
         await _exchangeOtp.ExecuteAsync(userName, submission, ct).ConfigureAwait(false);
-        lock (_pendingLock) { _pendingUserName = null; }
+        ClearPending();
     }
 
     public async Task<OtpResendResultDto> ResendOtpAsync(string? language = null, CancellationToken ct = default)
     {
-        string? userName;
-        lock (_pendingLock) { userName = _pendingUserName; }
-        if (string.IsNullOrEmpty(userName))
+        var userName = CurrentPendingUserName();
+        if (userName is null)
         {
             throw new InvalidOperationException(
                 "ResendOtpAsync must be invoked only after catching an AuthenticationFailedException with Requires2FA = true.");
@@ -199,12 +200,12 @@ internal sealed class MisaESignClient : IMisaESignClient
         try
         {
             var result = await RequireBeginSignPdf().ExecuteAsync(workRequest, ct).ConfigureAwait(false);
-            lock (_pendingLock) { _pendingUserName = null; }
+            ClearPending();
             return new BeginResultDto(result.TransactionId, result.Format);
         }
         catch (AuthenticationFailedException ex) when (ex.Requires2FA && _otpProvider is null)
         {
-            lock (_pendingLock) { _pendingUserName = ex.Username; }
+            MarkPending(ex.Username);
             throw;
         }
     }
@@ -217,12 +218,12 @@ internal sealed class MisaESignClient : IMisaESignClient
         try
         {
             var result = await RequireBeginSignXml().ExecuteAsync(workRequest, ct).ConfigureAwait(false);
-            lock (_pendingLock) { _pendingUserName = null; }
+            ClearPending();
             return new BeginResultDto(result.TransactionId, result.Format);
         }
         catch (AuthenticationFailedException ex) when (ex.Requires2FA && _otpProvider is null)
         {
-            lock (_pendingLock) { _pendingUserName = ex.Username; }
+            MarkPending(ex.Username);
             throw;
         }
     }
@@ -235,12 +236,12 @@ internal sealed class MisaESignClient : IMisaESignClient
         try
         {
             var result = await RequireBeginSignWord().ExecuteAsync(workRequest, ct).ConfigureAwait(false);
-            lock (_pendingLock) { _pendingUserName = null; }
+            ClearPending();
             return new BeginResultDto(result.TransactionId, result.Format);
         }
         catch (AuthenticationFailedException ex) when (ex.Requires2FA && _otpProvider is null)
         {
-            lock (_pendingLock) { _pendingUserName = ex.Username; }
+            MarkPending(ex.Username);
             throw;
         }
     }
@@ -253,12 +254,12 @@ internal sealed class MisaESignClient : IMisaESignClient
         try
         {
             var result = await RequireBeginSignExcel().ExecuteAsync(workRequest, ct).ConfigureAwait(false);
-            lock (_pendingLock) { _pendingUserName = null; }
+            ClearPending();
             return new BeginResultDto(result.TransactionId, result.Format);
         }
         catch (AuthenticationFailedException ex) when (ex.Requires2FA && _otpProvider is null)
         {
-            lock (_pendingLock) { _pendingUserName = ex.Username; }
+            MarkPending(ex.Username);
             throw;
         }
     }
@@ -273,6 +274,24 @@ internal sealed class MisaESignClient : IMisaESignClient
         return new WebhookHandleResultDto(
             Ack: new WebhookAckDto(result.Ack.ErrorCode, result.Ack.DevMsg, result.Ack.UserMsg),
             Outcome: ToOutcomeDto(result.Outcome));
+    }
+
+    private void MarkPending(string? userName)
+    {
+        if (string.IsNullOrEmpty(userName)) return;
+        _pending.Add(_credentials.Get().ClientId, userName);
+    }
+
+    private void ClearPending()
+    {
+        var c = _credentials.Get();
+        _pending.Remove(c.ClientId, c.UserName);
+    }
+
+    private string? CurrentPendingUserName()
+    {
+        var c = _credentials.Get();
+        return !string.IsNullOrEmpty(c.UserName) && _pending.Contains(c.ClientId, c.UserName) ? c.UserName : null;
     }
 
     private void GuardPollingAllowed()
@@ -343,6 +362,4 @@ internal sealed class MisaESignClient : IMisaESignClient
             t.TransactionId, t.Format, (WebhookStatusDto)(byte)t.Status, t.MisaErrorCode, t.CorrelationId),
         _ => throw new InvalidOperationException($"Unknown WebhookOutcome variant: {outcome.GetType().Name}"),
     };
-
-    internal static void ClearPendingUserNameForTests() { /* obsolete — pendingUserName is per-instance now */ }
 }

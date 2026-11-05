@@ -61,6 +61,7 @@ internal static class ServiceCollectionExtensions
         services.TryAddSingleton<ITokenCacheKeySelector, DefaultTokenCacheKeySelector>();
         services.TryAddSingleton<ICertificateSelector, FirstActiveCertificateSelector>();
         services.TryAddSingleton<IMisaCredentialsAccessor, OptionsMisaCredentialsAccessor>();
+        services.TryAddSingleton<EffectiveCredentials>();
         services.AddSingleton<SingleFlightRefresh>();
 
         services.AddScoped<RefreshAccessToken>();
@@ -70,7 +71,7 @@ internal static class ServiceCollectionExtensions
             // body is sourced per-call: the closure is invoked lazily inside
             // EnsureAccessToken.ExecuteAsync, so a consumer's per-call ambient
             // flows in. The EnsureAccessToken ctor Func parameter is preserved.
-            var credentials = sp.GetRequiredService<IMisaCredentialsAccessor>();
+            var credentials = sp.GetRequiredService<EffectiveCredentials>();
             return new EnsureAccessToken(
                 wire: sp.GetRequiredService<IMisaESignWireClient>(),
                 cache: sp.GetRequiredService<ITokenCache>(),

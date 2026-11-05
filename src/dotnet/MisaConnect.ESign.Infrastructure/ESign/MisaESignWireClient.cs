@@ -10,6 +10,7 @@ using MisaConnect.ESign.Domain.Documents;
 using MisaConnect.ESign.Domain.Errors;
 using MisaConnect.ESign.Domain.Signing;
 using MisaConnect.ESign.Infrastructure.Configuration;
+using MisaConnect.ESign.Infrastructure.Credentials;
 using MisaConnect.ESign.Infrastructure.ESign.Mapping;
 using MisaConnect.ESign.Infrastructure.ESign.Wire;
 using MisaConnect.ESign.Infrastructure.Http;
@@ -27,7 +28,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
 
     private readonly HttpClient _http;
     private readonly IOptions<MisaESignOptions> _options;
-    private readonly IMisaCredentialsAccessor _credentials;
+    private readonly EffectiveCredentials _credentials;
     private readonly ISystemClock _clock;
     private readonly ICorrelationIdAccessor _correlation;
     private readonly ILogger<MisaESignWireClient> _logger;
@@ -35,7 +36,7 @@ internal sealed class MisaESignWireClient : IMisaESignWireClient
     public MisaESignWireClient(
         HttpClient http,
         IOptions<MisaESignOptions> options,
-        IMisaCredentialsAccessor credentials,
+        EffectiveCredentials credentials,
         ISystemClock clock,
         ICorrelationIdAccessor correlation,
         ILogger<MisaESignWireClient> logger)

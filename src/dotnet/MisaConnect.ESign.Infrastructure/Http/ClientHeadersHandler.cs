@@ -1,4 +1,5 @@
 using MisaConnect.ESign.Application.Abstractions;
+using MisaConnect.ESign.Infrastructure.Credentials;
 using MisaConnect.ESign.Infrastructure.ESign;
 
 namespace MisaConnect.ESign.Infrastructure.Http;
@@ -11,10 +12,10 @@ namespace MisaConnect.ESign.Infrastructure.Http;
 /// </summary>
 internal sealed class ClientHeadersHandler : DelegatingHandler
 {
-    private readonly IMisaCredentialsAccessor _credentials;
+    private readonly EffectiveCredentials _credentials;
     private readonly ICorrelationIdAccessor _correlation;
 
-    public ClientHeadersHandler(IMisaCredentialsAccessor credentials, ICorrelationIdAccessor correlation)
+    public ClientHeadersHandler(EffectiveCredentials credentials, ICorrelationIdAccessor correlation)
     {
         _credentials = credentials;
         _correlation = correlation;
