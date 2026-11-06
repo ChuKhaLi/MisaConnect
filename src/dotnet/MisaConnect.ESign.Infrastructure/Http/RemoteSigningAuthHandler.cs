@@ -135,14 +135,8 @@ internal sealed class RemoteSigningAuthHandler : DelegatingHandler
     }
 
     /// <summary>Removes the cache entry only while it still holds <paramref name="value"/>.</summary>
-    private async Task EvictIfHoldsAsync(string cacheKey, string value, CancellationToken ct)
-    {
-        var current = await _cache.TryGetAsync(cacheKey, ct).ConfigureAwait(false);
-        if (current is not null && string.Equals(current.Value, value, StringComparison.Ordinal))
-        {
-            await _cache.RemoveAsync(cacheKey, ct).ConfigureAwait(false);
-        }
-    }
+    private Task EvictIfHoldsAsync(string cacheKey, string value, CancellationToken ct) =>
+        _cache.RemoveIfMatchesAsync(cacheKey, value, ct);
 
     private static bool IsAuthEndpoint(HttpRequestMessage request)
     {

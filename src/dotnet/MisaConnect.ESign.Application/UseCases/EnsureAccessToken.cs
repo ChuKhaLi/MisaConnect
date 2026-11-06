@@ -96,9 +96,9 @@ public sealed class EnsureAccessToken
                 {
                     return current;
                 }
-                if (current is not null && string.Equals(current.Value, existing.Value, StringComparison.Ordinal))
+                if (current is not null)
                 {
-                    await _cache.RemoveAsync(key, ct).ConfigureAwait(false);
+                    await _cache.RemoveIfMatchesAsync(key, existing.Value, ct).ConfigureAwait(false);
                 }
             }
         }
