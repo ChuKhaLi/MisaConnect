@@ -4,6 +4,19 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-11-06
+
+Patch release of both families: fixes the packages so that consumer apps can load them (see "Fixed (packaging)"). Upgrade from 2.4.0–2.7.0: those versions crash at startup in console/worker apps, and 2.6.0–2.7.0 also in ASP.NET Core 8 apps. No API or behaviour change.
+
+### Fixed — `MisaConnect.EInvoice` and `MisaConnect.ESign` (packaging)
+
+- **Both packages now declare every dependency their bundled assemblies load.** The Domain, Application and Infrastructure assemblies are bundled into each package, so their own package references never reached the nuspec. As a result, `AddMisaConnectESign` / `AddEInvoiceClient` threw `FileNotFoundException` (first for `Microsoft.Extensions.Options.ConfigurationExtensions`) in:
+  - console and worker apps, since at least 2.4.0;
+  - ASP.NET Core 8 apps, since 2.6.0 (the move to Microsoft.Extensions 10.x).
+
+  The packages now also depend on `Microsoft.Extensions.Configuration.Binder`, `Microsoft.Extensions.Http`, `Microsoft.Extensions.Logging.Abstractions`, `Microsoft.Extensions.Options.ConfigurationExtensions` and `System.Text.Json` (all 10.0.14). An app that pins one of these Microsoft.Extensions packages below 10.0.14 now gets a restore-time NU1605 downgrade error naming the package, instead of a crash at startup.
+- New CI gate (`scripts/package-smoke.sh`, run in `ci.yml` and before the NuGet push in `release.yml`): it packs both packages and runs a net8.0 console app and an ASP.NET Core 8 app against them from a local feed.
+
 ### `MisaConnect.ESign` — Docs
 
 - `docs/esign/configuration.md` "`ITokenCache` — custom caches": decorators should forward `RemoveIfMatchesAsync`, and mocks of `ITokenCache` should set it up (an un-configured mock does not run the default body). This applies since 2.7.0.

@@ -51,7 +51,10 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          # 8.0.x: runtime for the net8.0 package smoke apps (and tests); 10.0.x: the SDK (global.json).
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Restore
         run: dotnet restore MisaConnect.slnx
@@ -91,6 +94,12 @@ jobs:
             if ! grep -q "Sandbox\.$t\." <<<"$listed"; then echo "::error::ESign sandbox test class $t is not discovered"; missing=1; fi
           done
           exit $missing
+
+      # Packs both packages and runs net8.0 console + ASP.NET Core apps against them from a local
+      # feed. In-repo tests use ProjectReferences, so only this catches a dependency missing from
+      # a package's nuspec (2.4.0-2.7.0 shipped without several and crashed in consumer apps).
+      - name: Package smoke test (consume the packed packages)
+        run: bash scripts/package-smoke.sh
 
       - name: Upload test results
         if: always()

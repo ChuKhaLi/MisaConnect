@@ -4,7 +4,7 @@
     <RootNamespace>MisaConnect.ESign.Client</RootNamespace>
     <AssemblyName>MisaConnect.ESign.Client</AssemblyName>
     <PackageId>MisaConnect.ESign</PackageId>
-    <Version>2.7.0</Version> <!-- release.yml overrides this from the v* tag; keep in step -->
+    <Version>2.7.1</Version> <!-- release.yml overrides this from the v* tag; keep in step -->
     <Description>Community .NET SDK for MISA eSign RemoteSigning. Provides a port-and-adapter facade for the MISA eSign HTTP API: PDF signing end-to-end (login, certificate listing, server-side hashing, sign submission, status polling, signature attachment).</Description>
     <PackageTags>misa;esign;remotesigning;vietnam;pdf;signature;sdk</PackageTags>
     <IsPackable>true</IsPackable>
@@ -17,10 +17,22 @@
     <ProjectReference Include="..\MisaConnect.ESign.Infrastructure\MisaConnect.ESign.Infrastructure.csproj" PrivateAssets="all" />
   </ItemGroup>
 
+  <!--
+    The Domain/Application/Infrastructure assemblies are bundled into this package
+    (PrivateAssets="all" + BundleReferencedProjects), so their own PackageReferences do not flow
+    into the nuspec. Every package they load at runtime MUST be listed here, or consumer apps fail
+    with FileNotFoundException (scripts/package-smoke.sh guards this in CI).
+  -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
   <ItemGroup>
