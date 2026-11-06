@@ -2,7 +2,7 @@
 
 All notable changes to `@misaconnect/esign` are documented here.
 
-## [Unreleased]
+## [0.1.2] - 2026-11-06
 
 ### Fixed
 
