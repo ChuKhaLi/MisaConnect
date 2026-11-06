@@ -4,6 +4,10 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-11-06
+
+Minor release of `MisaConnect.ESign`: closes the follow-ups from the 2.6.0 review. It adds one public member, `ITokenCache.RemoveIfMatchesAsync`, a default interface method, so existing custom caches compile and behave unchanged. `MisaConnect.EInvoice` has no code changes; its version is aligned to 2.7.0 because the release pipeline packs both families together.
+
 ### `MisaConnect.ESign` — Added
 
 - `ITokenCache.RemoveIfMatchesAsync(string key, string expectedValue, CancellationToken ct)`, a default interface method that removes an entry only while its token value matches. Existing custom caches keep working unchanged; the default implementation reads, compares and removes. The built-in in-memory cache overrides it atomically. The SDK now uses it on every "evict only the stale token" path (401 fallback, failed proactive refresh). See `docs/esign/configuration.md` "`ITokenCache` — custom caches".
