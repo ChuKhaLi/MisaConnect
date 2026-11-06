@@ -2,6 +2,13 @@
 
 All notable changes to `@misaconnect/esign` are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- A refresh result that is already expired (for example `expiresIn: 0`) now counts as a failed refresh and falls back to login, as in .NET `MisaConnect.ESign` since 2.5.0.
+- A non-integer `expiresIn` (for example `10.5`) counts as missing (300 s), matching the documented rule and .NET.
+
 ## [0.1.2] - 2026-11-06
 
 ### Fixed

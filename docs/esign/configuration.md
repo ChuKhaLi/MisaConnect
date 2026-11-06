@@ -122,6 +122,10 @@ services.AddSingleton<IWebhookCredentialsResolver, MyWebhookCredentialsResolver>
 services.AddMisaConnectESign(config);
 ```
 
+### `ITokenCache` — custom caches
+
+A custom token cache implements `TryGetAsync`, `SetAsync` and `RemoveAsync`. Since 2.7, the SDK evicts a stale token through `RemoveIfMatchesAsync(key, expectedValue, ct)`, which removes the entry only while it still holds the token that MISA rejected, so a token another flow has just stored is never evicted. The default implementation reads, compares and removes, which leaves a small race; a distributed cache that supports compare-and-delete (for example a Redis Lua script or `WATCH`/`MULTI`) should override it. Token-cache calls made during a shared refresh are not cancellable, so a custom cache must bound its own I/O with timeouts.
+
 ### `IMisaCredentialsAccessor` — register-before only
 
 To supply MISA credentials per signing call (e.g. per-person credentials), set `CredentialsMode = Dynamic` and register a custom `IMisaCredentialsAccessor`. The default `OptionsMisaCredentialsAccessor` is registered via `TryAddSingleton`, so a consumer override only wins when it is registered **before** `AddMisaConnectESign`:

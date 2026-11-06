@@ -4,6 +4,16 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+### `MisaConnect.ESign` — Added
+
+- `ITokenCache.RemoveIfMatchesAsync(string key, string expectedValue, CancellationToken ct)`, a default interface method that removes an entry only while its token value matches. Existing custom caches keep working unchanged; the default implementation reads, compares and removes. The built-in in-memory cache overrides it atomically. The SDK now uses it on every "evict only the stale token" path (401 fallback, failed proactive refresh). See `docs/esign/configuration.md` "`ITokenCache` — custom caches".
+
+### `MisaConnect.ESign` — Fixed
+
+- A shared token refresh that fails after every waiter has cancelled no longer raises `TaskScheduler.UnobservedTaskException`.
+- `expiresIn` is read leniently: a numeric string such as `"3600"` is accepted, and any other odd value (a non-integer number, another string, a boolean, an object or an array) counts as missing (300 s) instead of failing the login. Same rule as `@misaconnect/esign`.
+- Docs: the shared-refresh notes now say which calls inside it are bounded (HTTP) and which are not (custom `ITokenCache`), and that its auth calls carry the correlation ID of the flow that started it.
+
 ## [2.6.0] - 2026-11-06
 
 Minor release of both families. `MisaConnect.ESign` fixes the token-lifecycle and correlation edge cases left open by the 2.5.0 review. Both packages now depend on Microsoft.Extensions 10.x (see "Dependencies"); that consumer-visible dependency change is why this is a minor release rather than a patch. No public API change in either family. `MisaConnect.EInvoice` has no code changes.

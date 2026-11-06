@@ -59,6 +59,7 @@ the floor is back. Only the explicit-≤ 0 case differs from what was approved.
 
 Known gap, not in scope: TS has no "already-expired refresh result falls back to login" rule
 (.NET does since 2.5.0); TS returns the expired token and recovers through its 401 path.
+*Closed by `docs/superpowers/specs/2026-11-06-esign-review-minors-design.md` (goal 6).*
 
 ## Left to the builder
 
