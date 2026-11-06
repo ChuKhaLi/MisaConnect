@@ -1,3 +1,5 @@
+using System.Text.Json;
+using MisaConnect.ESign.Infrastructure.ESign;
 using MisaConnect.ESign.Infrastructure.ESign.Mapping;
 using MisaConnect.ESign.Infrastructure.ESign.Wire;
 using Xunit;
@@ -47,5 +49,45 @@ public class AuthSessionMapperTests
         var dto = new RefreshTokenResponseDto { AccessToken = "raw", RemoteSigningAccessToken = "rs", ExpiresIn = expiresIn };
         var session = AuthSessionMapper.FromRefreshResponse(dto, Now, "u", "alice");
         Assert.Equal(Now.AddSeconds(expectedSeconds), session.ExpiresAtUtc);
+    }
+
+    // Lenient reading: integer as-is; a string of an optional '-' and digits parsed;
+    // anything else is treated as missing (→ 300 s by the lifetime rule), never a failed login.
+    public static TheoryData<string, int?> RawExpiresIn => new()
+    {
+        { "3600", 3600 },
+        { "\"3600\"", 3600 },
+        { "\" 42 \"", 42 },
+        { "\"-1\"", -1 },
+        { "\"+42\"", null },
+        { "3600.5", null },
+        { "3600.0", null },
+        { "\"abc\"", null },
+        { "\"\"", null },
+        { "true", null },
+        { "{\"a\":1}", null },
+        { "[1,2]", null },
+        { "null", null },
+        { "99999999999", null },
+    };
+
+    [Theory]
+    [MemberData(nameof(RawExpiresIn))]
+    public void Lenient_expiresIn_json_login_envelope(string raw, int? expected)
+    {
+        var json = "{\"data\":{\"remoteSigningAccessToken\":\"rs\",\"expiresIn\":" + raw + ",\"refreshToken\":\"rt\"}}";
+        var dto = JsonSerializer.Deserialize<LoginResponseDto>(json, ESignJsonOptions.Wire);
+        Assert.Equal(expected, dto!.Data!.ExpiresIn);
+        Assert.Equal("rt", dto.Data.RefreshToken); // the reader stays aligned after skipping
+    }
+
+    [Theory]
+    [MemberData(nameof(RawExpiresIn))]
+    public void Lenient_expiresIn_json_refresh_flat(string raw, int? expected)
+    {
+        var json = "{\"remoteSigningAccessToken\":\"rs\",\"expiresIn\":" + raw + ",\"refreshToken\":\"rt\"}";
+        var dto = JsonSerializer.Deserialize<RefreshTokenResponseDto>(json, ESignJsonOptions.Wire);
+        Assert.Equal(expected, dto!.ExpiresIn);
+        Assert.Equal("rt", dto.RefreshToken);
     }
 }

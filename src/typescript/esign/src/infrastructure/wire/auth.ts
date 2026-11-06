@@ -39,12 +39,12 @@ export const MIN_EXPIRES_IN_SECONDS = 60;
 
 /**
  * `expiresIn` is documented as an int of seconds (same rule as .NET `AuthSessionMapper`):
- * missing or non-numeric → {@link DEFAULT_EXPIRES_IN_SECONDS}; an explicit value ≤ 0 is honoured
+ * missing or not an integer → {@link DEFAULT_EXPIRES_IN_SECONDS}; an explicit value ≤ 0 is honoured
  * (already expired); 1–59 → {@link MIN_EXPIRES_IN_SECONDS}; anything else as-is.
  */
 function expiresInSeconds(v: unknown): number {
   let n: number;
-  if (typeof v === 'number' && Number.isFinite(v)) n = v;
+  if (typeof v === 'number' && Number.isInteger(v)) n = v;
   else if (typeof v === 'string' && /^-?\d+$/.test(v.trim())) n = Number(v);
   else return DEFAULT_EXPIRES_IN_SECONDS;
   return n > 0 && n < MIN_EXPIRES_IN_SECONDS ? MIN_EXPIRES_IN_SECONDS : n;

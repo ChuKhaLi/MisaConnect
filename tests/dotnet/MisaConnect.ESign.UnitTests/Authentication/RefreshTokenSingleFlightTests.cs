@@ -118,6 +118,51 @@ public class RefreshTokenSingleFlightTests
     }
 
     [Fact]
+    public async Task Faulted_flight_with_no_waiters_left_is_observed()
+    {
+        var marker = "flight-fault-" + Guid.NewGuid().ToString("N");
+        var unobserved = 0;
+        EventHandler<UnobservedTaskExceptionEventArgs> onUnobserved = (_, e) =>
+        {
+            if (e.Exception.Flatten().InnerExceptions.Any(x => x.Message == marker))
+            {
+                Interlocked.Increment(ref unobserved);
+            }
+        };
+        TaskScheduler.UnobservedTaskException += onUnobserved;
+        try
+        {
+            var slot = new SingleFlightRefresh();
+            await RunAndAbandonAsync(slot, marker);
+
+            for (var i = 0; i < 3; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+
+            Assert.Equal(0, Volatile.Read(ref unobserved));
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= onUnobserved;
+        }
+    }
+
+    // Kept out of line so no local keeps the faulted flight task reachable.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static async Task RunAndAbandonAsync(SingleFlightRefresh slot, string marker)
+    {
+        var gate = new TaskCompletionSource<AccessToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cts = new CancellationTokenSource();
+        var waiter = slot.RefreshAsync("k-fault", _ => gate.Task, cts.Token);
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiter.WaitAsync(TimeSpan.FromSeconds(5)));
+        gate.SetException(new InvalidOperationException(marker));
+        await Task.Delay(50);
+    }
+
+    [Fact]
     public async Task Failing_factory_propagates_to_all_waiters()
     {
         var slot = new SingleFlightRefresh();

@@ -188,7 +188,8 @@ export function createTokenManager(deps: TokenManagerDeps): TokenManager {
   }
 
   /**
-   * Refreshes `previous` (merging omitted fields); on any failure evicts and logs in once.
+   * Refreshes `previous` (merging omitted fields); on any failure, including a refresh result that
+   * is already expired, evicts and logs in once.
    * `previous` must belong to these credentials; with none, logs in directly.
    */
   async function renew(
@@ -213,7 +214,10 @@ export function createTokenManager(deps: TokenManagerDeps): TokenManager {
       } catch {
         refreshed = undefined;
       }
-      if (refreshed !== undefined) return store(key, fp, refreshed);
+      // A refresh result that is already expired counts as a failed refresh (as .NET since 2.5.0).
+      if (refreshed !== undefined && expiryTime(refreshed.expiresAt) > clock.now().getTime()) {
+        return store(key, fp, refreshed);
+      }
       await evictOwned(key, fp);
     }
     return store(key, fp, await gateway.login(creds, ctx));

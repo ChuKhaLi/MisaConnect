@@ -178,6 +178,7 @@ describe('token manager', () => {
     it.each([
       ['missing', undefined, 300_000],
       ['non-numeric', 'soon', 300_000],
+      ['non-integer number', 10.5, 300_000],
       ['short (10 s) floored to 60 s', 10, 60_000],
       ['59 s floored to 60 s', 59, 60_000],
       ['60 s as-is', 60, 60_000],
@@ -199,6 +200,19 @@ describe('token manager', () => {
         expect(t.expiresAt).toEqual(new Date(T0 + lifetimeMs));
       },
     );
+  });
+
+  it('falls back to login when refresh returns an already-expired token (expiresIn 0)', async () => {
+    const { tm, cache, count } = setup({
+      refreshtoken: () => json(200, { remoteSigningAccessToken: 'T2', expiresIn: 0 }),
+      'login-api': () => loginOk('T3'),
+    });
+    await cache.set(KEY, token({ expiresAt: new Date(T0 - 1) }));
+    const t = await tm.getToken(creds, ctx);
+    expect(count('refreshtoken')).toBe(1);
+    expect(count('login-api')).toBe(1);
+    expect(t.value).toBe('T3');
+    expect((await cache.get(KEY))?.value).toBe('T3');
   });
 
   it('falls back to login when refresh returns 500', async () => {

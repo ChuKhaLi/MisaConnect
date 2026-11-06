@@ -32,5 +32,6 @@ internal sealed class RefreshTokenResponseDto
     public string? RefreshToken { get; set; }
 
     [JsonPropertyName("expiresIn")]
+    [JsonConverter(typeof(LenientInt32Converter))]
     public int? ExpiresIn { get; set; }
 }
