@@ -9,8 +9,9 @@ public interface ITokenCache
     /// <summary>
     /// Removes the entry for <paramref name="key"/> only while its <see cref="AccessToken.Value"/>
     /// equals <paramref name="expectedValue"/> (ordinal), so a token another flow stored meanwhile
-    /// is never evicted. The default implementation reads, compares and removes, which leaves a
-    /// small race; a cache that can compare-and-remove atomically should override it.
+    /// is not evicted. The default implementation reads, compares and removes, which leaves a small
+    /// race in which a just-stored token can be evicted; a cache that can compare-and-remove
+    /// atomically should override it.
     /// </summary>
     async Task RemoveIfMatchesAsync(string key, string expectedValue, CancellationToken ct)
     {

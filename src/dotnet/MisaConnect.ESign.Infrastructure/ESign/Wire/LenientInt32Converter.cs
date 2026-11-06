@@ -21,8 +21,10 @@ internal sealed class LenientInt32Converter : JsonConverter<int?>
             case JsonTokenType.Number:
                 return reader.TryGetInt32(out var number) ? number : null;
             case JsonTokenType.String:
+                // Only an optional leading '-' (not '+'), matching the TS rule /^-?\d+$/.
                 var text = reader.GetString()?.Trim();
-                return int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var parsed)
+                return text is { Length: > 0 } && text[0] != '+'
+                    && int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var parsed)
                     ? parsed
                     : null;
             case JsonTokenType.StartObject:

@@ -59,6 +59,7 @@ public class AuthSessionMapperTests
         { "\"3600\"", 3600 },
         { "\" 42 \"", 42 },
         { "\"-1\"", -1 },
+        { "\"+42\"", null },
         { "3600.5", null },
         { "3600.0", null },
         { "\"abc\"", null },

@@ -11,7 +11,7 @@ All notable changes to MisaConnect will be documented here. This project follows
 ### `MisaConnect.ESign` — Fixed
 
 - A shared token refresh that fails after every waiter has cancelled no longer raises `TaskScheduler.UnobservedTaskException`.
-- `expiresIn` is read leniently: a numeric string such as `"3600"` is accepted, and any other odd value (a non-integer number, another string, a boolean, an object or an array) counts as missing (300 s) instead of failing the login. Same rule as `@misaconnect/esign`.
+- `expiresIn` is read leniently: a numeric string such as `"3600"` or `"-1"` is accepted, and any other odd value (a non-integer number, another string, a boolean, an object or an array) counts as missing (300 s) instead of failing the login. This matches `@misaconnect/esign` for integers and numeric strings; the two still differ on out-of-range numbers and on numbers written with a fraction or exponent (`3600.0`, `1e3`), which .NET treats as missing.
 - Docs: the shared-refresh notes now say which calls inside it are bounded (HTTP) and which are not (custom `ITokenCache`), and that its auth calls carry the correlation ID of the flow that started it.
 
 ## [2.6.0] - 2026-11-06
