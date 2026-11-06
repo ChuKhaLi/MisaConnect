@@ -4,6 +4,10 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-11-06
+
+Minor release of both families. `MisaConnect.ESign` fixes the token-lifecycle and correlation edge cases left open by the 2.5.0 review. Both packages now depend on Microsoft.Extensions 10.x (see "Dependencies"); that consumer-visible dependency change is why this is a minor release rather than a patch. No public API change in either family. `MisaConnect.EInvoice` has no code changes.
+
 ### `MisaConnect.ESign` — Fixed
 
 - A shared token refresh (proactive, 401-driven, or the OTP exchange) is no longer cancelled when the caller that started it cancels. Each waiter now stops on its own `CancellationToken`; the refresh completes for the others and its result is cached.
