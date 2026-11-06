@@ -4,6 +4,11 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+### `MisaConnect.ESign` — Docs
+
+- `docs/esign/configuration.md` "`ITokenCache` — custom caches": decorators should forward `RemoveIfMatchesAsync`, and mocks of `ITokenCache` should set it up (an un-configured mock does not run the default body). This applies since 2.7.0.
+- New end-to-end test pinning the cached token lifetime for odd `expiresIn` values on login.
+
 ## [2.7.0] - 2026-11-06
 
 Minor release of `MisaConnect.ESign`: closes the follow-ups from the 2.6.0 review. It adds one public member, `ITokenCache.RemoveIfMatchesAsync`, a default interface method, so existing custom caches compile and behave unchanged. `MisaConnect.EInvoice` has no code changes; its version is aligned to 2.7.0 because the release pipeline packs both families together.

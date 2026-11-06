@@ -126,6 +126,9 @@ services.AddMisaConnectESign(config);
 
 A custom token cache implements `TryGetAsync`, `SetAsync` and `RemoveAsync`. Since 2.7, the SDK evicts a stale token through `RemoveIfMatchesAsync(key, expectedValue, ct)`, which removes the entry only while it still holds the token that MISA rejected. The built-in in-memory cache does this atomically, so a token another flow has just stored is never evicted. The default implementation, used by a custom cache that does not override it, reads, compares and removes, which leaves a small race in which a just-stored token can be evicted (costing one extra login). A distributed cache that supports compare-and-delete (for example a Redis Lua script or `WATCH`/`MULTI`) should override it. Token-cache calls made during a shared refresh are not cancellable, so a custom cache must bound its own I/O with timeouts.
 
+- **Decorators.** A cache that wraps another (for logging, metrics or a two-level cache) should forward `RemoveIfMatchesAsync` to the inner cache. If it does not, the default implementation runs against the wrapper, and the inner cache's atomic compare-and-remove is lost.
+- **Test doubles.** A mock of `ITokenCache` (Moq, NSubstitute and similar) usually does not run the default body of `RemoveIfMatchesAsync`: an un-configured call just returns a completed task. A test that expects `RemoveAsync` to be called on the 401-fallback or failed-refresh path should set up or verify `RemoveIfMatchesAsync` instead.
+
 ### `IMisaCredentialsAccessor` — register-before only
 
 To supply MISA credentials per signing call (e.g. per-person credentials), set `CredentialsMode = Dynamic` and register a custom `IMisaCredentialsAccessor`. The default `OptionsMisaCredentialsAccessor` is registered via `TryAddSingleton`, so a consumer override only wins when it is registered **before** `AddMisaConnectESign`:
