@@ -8,3 +8,6 @@ samples/typescript/** text eol=lf
 /.prettierrc.json text eol=lf
 /.prettierignore text eol=lf
 /.nvmrc text eol=lf
+
+# Shell scripts run under bash (CI and Git Bash): always LF.
+*.sh text eol=lf
