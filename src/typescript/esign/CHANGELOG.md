@@ -2,6 +2,16 @@
 
 All notable changes to `@misaconnect/esign` are documented here.
 
+## [0.3.0] - 2026-11-07
+
+### Added
+
+- `TokenCache.deleteIfMatches?(key, value)`, an optional compare-and-delete: removes the entry only while its token value matches. `createInMemoryTokenCache()` implements it. Existing custom caches keep working unchanged (same as .NET `ITokenCache.RemoveIfMatchesAsync` in `MisaConnect.ESign` 2.7.0).
+
+### Fixed
+
+- After a failed refresh, the SDK no longer evicts a token another call stored meanwhile. The first-token and 401-retry paths run in separate shared flights, so one could evict the token the other had just stored, costing an extra login (or a spurious OTP prompt for a two-factor account). It now reuses a fresh token stored by another call, and otherwise evicts only the stale token (through `deleteIfMatches` when the cache has it), as .NET `MisaConnect.ESign` has since 2.6.0.
+
 ## [0.2.0] - 2026-11-07
 
 ### Changed (breaking)
