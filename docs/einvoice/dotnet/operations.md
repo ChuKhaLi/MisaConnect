@@ -188,7 +188,7 @@ IMisaEInvoiceClient client = MisaEInvoiceClientFactory.Create(o =>
 {
     o.Environment = MeInvoiceEnvironment.Sandbox;
     o.BaseUrl = "https://testapi.meinvoice.vn/api/integration";
-    o.TaxCode = "0101243150";
+    o.TaxCode = "0000000000";
     o.UserName = "your-misa-user";
     o.Password = "your-misa-password";
     o.AppId = "your-app-id";

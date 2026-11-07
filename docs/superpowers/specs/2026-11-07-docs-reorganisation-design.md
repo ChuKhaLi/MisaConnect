@@ -86,6 +86,10 @@ looking for "e-invoice in Node" has no entry point on the site.
 - Package READMEs link to the site with **absolute URLs** (`https://chung-nd.id.vn/MisaConnect/…`),
   because nuget.org / npmjs.com render them outside the repo. Those links can only be checked after
   merge (the site builds from `main`); the root README and site pages use relative links.
+- **Deviation, decided while implementing:** the absolute links use `https://chukhali.github.io/MisaConnect/…`, not
+  `chung-nd.id.vn`. On 2026-11-07 `chung-nd.id.vn` had no DNS records (the account's user site `ChuKhaLi.github.io`
+  sets it as custom domain, so github.io answers with a 301 to it). The github.io address follows whatever domain
+  the owner configures, so the links keep working once the domain is fixed or removed.
 
 ## Proof of done
 

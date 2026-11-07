@@ -30,7 +30,9 @@ using MisaConnect.ESign.Client.Dtos;
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddMisaConnectESign(builder.Configuration); // section "Misa:ESign"
 using var host = builder.Build();
-var esign = host.Services.GetRequiredService<IMisaESignClient>();
+
+await using var scope = host.Services.CreateAsyncScope(); // IMisaESignClient is scoped
+var esign = scope.ServiceProvider.GetRequiredService<IMisaESignClient>();
 
 var result = await esign.SignPdfAsync(new SignPdfRequestDto(
     Pdf: await File.ReadAllBytesAsync("input.pdf"),
@@ -64,7 +66,7 @@ All on `IMisaESignClient`:
 
 Details and flows: [Operations](https://chukhali.github.io/MisaConnect/esign/dotnet/operations) · [Two-factor sign-in](https://chukhali.github.io/MisaConnect/esign/dotnet/two-factor) · [Webhook mode](https://chukhali.github.io/MisaConnect/esign/dotnet/webhooks) · [Credentials](https://chukhali.github.io/MisaConnect/esign/dotnet/credentials) · [Errors](https://chukhali.github.io/MisaConnect/esign/dotnet/errors) · [Concepts](https://chukhali.github.io/MisaConnect/esign/#concepts).
 
-Signing needs an ACTIVE remote-signing certificate on the MISA account.
+Signing needs an ACTIVE remote-signing certificate on the MISA account. Live signing is not yet verified against MISA (tested against an in-repo fake server).
 
 Two-factor accounts can also answer OTP challenges transparently: register an `IOtpProvider` and the SDK completes the sign-in itself. See [Two-factor sign-in](https://chukhali.github.io/MisaConnect/esign/dotnet/two-factor).
 

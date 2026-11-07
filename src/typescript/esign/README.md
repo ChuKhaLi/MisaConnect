@@ -59,7 +59,7 @@ try {
 | `beginSignPdf` / `beginSignXml` / `beginSignWord` / `beginSignExcel` | Webhook mode: start signing and return.  |
 | `handleWebhook(envelope)`                                            | Webhook mode: process one MISA delivery. |
 
-Signing needs an ACTIVE remote-signing certificate on the MISA account.
+Signing needs an ACTIVE remote-signing certificate on the MISA account. Live signing is not yet verified against MISA (tested against an in-repo fake server).
 
 More: [Operations](https://chukhali.github.io/MisaConnect/esign/typescript/operations) · [Two-factor sign-in](https://chukhali.github.io/MisaConnect/esign/typescript/two-factor) · [Webhook mode](https://chukhali.github.io/MisaConnect/esign/typescript/webhooks) · [Credentials](https://chukhali.github.io/MisaConnect/esign/typescript/credentials) · [Configuration](https://chukhali.github.io/MisaConnect/esign/typescript/configuration) · [Errors](https://chukhali.github.io/MisaConnect/esign/typescript/errors) · [Concepts](https://chukhali.github.io/MisaConnect/esign/#concepts) · [CHANGELOG](https://github.com/ChuKhaLi/MisaConnect/blob/main/src/typescript/esign/CHANGELOG.md).
 

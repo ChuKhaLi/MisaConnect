@@ -35,7 +35,7 @@ For `samples/dotnet/MisaConnect.Samples.Console`:
 cd samples/dotnet/MisaConnect.Samples.Console
 dotnet user-secrets set "Misa:EInvoice:Environment" "Sandbox"
 dotnet user-secrets set "Misa:EInvoice:BaseUrl" "https://testapi.meinvoice.vn/api/integration"
-dotnet user-secrets set "Misa:EInvoice:TaxCode" "0101243150"
+dotnet user-secrets set "Misa:EInvoice:TaxCode" "0000000000"
 dotnet user-secrets set "Misa:EInvoice:UserName" "your-misa-user"
 dotnet user-secrets set "Misa:EInvoice:Password" "your-misa-password"
 dotnet user-secrets set "Misa:EInvoice:AppId" "your-app-id"
@@ -55,13 +55,13 @@ sandbox calls:
 # Configuration for the Misa:EInvoice options binder
 export Misa__EInvoice__Environment=Sandbox
 export Misa__EInvoice__BaseUrl=https://testapi.meinvoice.vn/api/integration
-export Misa__EInvoice__TaxCode=0101243150
+export Misa__EInvoice__TaxCode=0000000000
 export Misa__EInvoice__UserName=your-misa-user
 export Misa__EInvoice__Password=your-misa-password
 export Misa__EInvoice__AppId=your-app-id
 
 # Sandbox credentials read by [SandboxFact]
-export MISACONNECT_SANDBOX_TAXCODE=0101243150
+export MISACONNECT_SANDBOX_TAXCODE=0000000000
 export MISACONNECT_SANDBOX_USERNAME=your-misa-user
 export MISACONNECT_SANDBOX_PASSWORD=your-misa-password
 export MISACONNECT_SANDBOX_APPID=your-app-id

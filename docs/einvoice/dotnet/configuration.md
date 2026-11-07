@@ -16,7 +16,7 @@ but match the table so that keys line up with logs and validator messages.
 
 | Key | Type | Required | Description |
 | --- | --- | --- | --- |
-| `Environment` | enum `MeInvoiceEnvironment` | yes | `Sandbox` (the default when the key is missing) or `Production`. Drives the host check on `BaseUrl`. |
+| `Environment` | enum `MeInvoiceEnvironment` | no (default `Sandbox`) | `Sandbox` or `Production`. Drives the host check on `BaseUrl`. |
 | `BaseUrl` | string | yes | Absolute `https://` URL. Sandbox: `https://testapi.meinvoice.vn/api/integration`. Production: `https://api.meinvoice.vn/api/integration`. |
 | `TaxCode` | string | yes | Issuer tax code (mã số thuế), **without** the AppID. See [Tax code and AppID](../index#tax-code-and-appid). |
 | `UserName` | string | yes | MISA meInvoice user. |
@@ -47,7 +47,7 @@ services.AddEInvoiceClient(o =>
 {
     o.Environment = MeInvoiceEnvironment.Production;
     o.BaseUrl = "https://api.meinvoice.vn/api/integration";
-    o.TaxCode = "0101243150";
+    o.TaxCode = "0000000000";
     o.UserName = "your-misa-user";
     o.Password = "your-misa-password";
     o.AppId = "your-app-id";

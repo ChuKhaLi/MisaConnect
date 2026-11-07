@@ -32,7 +32,7 @@ prefer: `appsettings.json`, user secrets, environment variables or a vault provi
     "EInvoice": {
       "Environment": "Sandbox",
       "BaseUrl": "https://testapi.meinvoice.vn/api/integration",
-      "TaxCode": "0101243150",
+      "TaxCode": "0000000000",
       "UserName": "your-misa-user",
       "Password": "your-misa-password",
       "AppId": "your-app-id"
@@ -82,7 +82,7 @@ var configuration = new ConfigurationBuilder()
     {
         ["Misa:EInvoice:Environment"] = "Sandbox",
         ["Misa:EInvoice:BaseUrl"] = "https://testapi.meinvoice.vn/api/integration",
-        ["Misa:EInvoice:TaxCode"] = "0101243150",
+        ["Misa:EInvoice:TaxCode"] = "0000000000",
         ["Misa:EInvoice:UserName"] = "your-misa-user",
         ["Misa:EInvoice:Password"] = Environment.GetEnvironmentVariable("MISA_PASSWORD") ?? "your-misa-password",
         ["Misa:EInvoice:AppId"] = "your-app-id",
@@ -126,7 +126,7 @@ IMisaEInvoiceClient client = MisaEInvoiceClientFactory.Create(o =>
 {
     o.Environment = MeInvoiceEnvironment.Sandbox;
     o.BaseUrl = "https://testapi.meinvoice.vn/api/integration";
-    o.TaxCode = "0101243150";
+    o.TaxCode = "0000000000";
     o.UserName = "your-misa-user";
     o.Password = "your-misa-password";
     o.AppId = "your-app-id";

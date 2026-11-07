@@ -17,6 +17,9 @@ SDKs for **MISA eSign RemoteSigning (chữ ký số từ xa)**, in two languages
 
 MISA eSign RemoteSigning signs documents with a certificate that MISA-CA holds for the signer. Your application sends the document; the signer approves the request on the **MISA eSign** mobile app; MISA returns the signature and the SDK embeds it. Both SDKs sign **PDF, XML (XAdES), Word (`.docx`) and Excel (`.xlsx`)**, either blocking until the signer approves (polling) or non-blocking (webhook mode), and handle two-factor (OTP) sign-in. They call these MISA endpoints, with the wire format kept verbatim: the auth app — `login-api`, `two-factor-auth`, `resend-otp-auth`, `refreshtoken`; and the eSign service (ESRM) — `Certificates/by-userId`, `documents/hash`, `Signing/hash`, `Signing/status`, `documents/attachment`. They also accept MISA's inbound signing-status webhook. `Certificates/by-certId` is not used. The full MISA API document (Vietnamese) is in the repository under [`docs/misa-api-reference/`](https://github.com/ChuKhaLi/MisaConnect/tree/main/docs/misa-api-reference).
 
+{: .note }
+Live signing has not been verified against MISA yet: the sandbox account has no ACTIVE remote-signing certificate, so signing, two-factor and webhook flows are tested against an in-repo fake MISA server. Sign-in against the real sandbox works.
+
 ## Concepts
 
 These apply to both SDKs. The language guides link here instead of repeating them.

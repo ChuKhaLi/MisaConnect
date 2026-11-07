@@ -127,7 +127,7 @@ void client;
 
 ### Token cache
 
-Tokens are cached under `"{userName}|| `userName`, `clientId` and host joined; see [Token cache](#token-cache) ||{host}"` (override with `tokenCacheKey`), refreshed
+Tokens are cached under `"{userName}|{clientId}|{host}"` (override with `tokenCacheKey`), refreshed
 30 s before expiry, and a failed refresh falls back to one fresh login. A cached token is bound to a
 **salted fingerprint of password + clientKey** (`AccessToken.credentialFingerprint`): a custom
 `tokenCache` must store and return the token object exactly as given, and a custom `tokenCacheKey`

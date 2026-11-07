@@ -52,9 +52,12 @@ DTO property names are the camelCase of the .NET names; wire field names match M
 ## Differences from the .NET SDK
 
 Since .NET `MisaConnect.ESign` 2.5.0 the two SDKs agree on token handling, retries, response
-guards, 2FA detection and webhook handling. Two differences remain: the default of the
-validation-failure delivery option, and how webhook credentials are found in static credentials
-mode.
+guards, 2FA detection and webhook handling. Three differences remain: the default of the
+validation-failure delivery option, how webhook credentials are found in static credentials
+mode, and the webhook `clientId` check — .NET compares the envelope's `clientId` with the
+configured `ClientId` (`client_id_mismatch`), while TypeScript looks the session up by the
+envelope's `clientId`, so a foreign `clientId` usually answers `webhook.unknown_transaction`
+(see the ACK tables in [Webhook mode](./webhooks) and the [.NET page](../dotnet/webhooks)).
 
 - **Validation-failure delivery default.** `handleWebhook` answers validation failures (malformed
   body, unknown transaction, client id or document mismatch) to the caller only and never calls
