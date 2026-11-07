@@ -8,7 +8,7 @@
 [![Downloads](https://img.shields.io/nuget/dt/MisaConnect.EInvoice.svg)](https://www.nuget.org/packages/MisaConnect.EInvoice)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/ChuKhaLi/MisaConnect/blob/main/LICENSE)
 
-Community .NET SDK for the **MISA MeInvoice** (eInvoice) HTTP API. Provides a port-and-adapter facade for token acquisition, template lookup, invoice preview/save/PDF/delete, lookup, and amendments. Targets .NET 8.
+Community .NET SDK for the **MISA MeInvoice** (eInvoice) HTTP API. Provides a port-and-adapter facade for token acquisition, template lookup, invoice preview/save/PDF/delete, lookup, and amendments. Targets .NET 8 and .NET 10.
 
 > Looking for digital-signature operations (PDF/XML/Word/Excel signing, 2FA/OTP, webhooks)? Install the sibling [`MisaConnect.ESign`](https://www.nuget.org/packages/MisaConnect.ESign) package.
 

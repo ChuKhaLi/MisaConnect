@@ -4,6 +4,19 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-11-07
+
+Minor release of both families: adds .NET 10 builds. .NET 8 (and Microsoft.Extensions 8.x) reach end of support on 2026-11-10; the `net8.0` builds stay for apps that have not moved yet. No API or behaviour change.
+
+### Added
+
+- Both packages ship `lib/net10.0` alongside `lib/net8.0`. Both targets depend on Microsoft.Extensions 10.0.14; on `net10.0`, `System.Text.Json` comes from the framework.
+
+### Changed
+
+- Requirement made explicit in the README and getting-started pages: an app must use `Microsoft.Extensions.*` 10.0.14 or later (an 8.x pin fails restore with NU1605). This has been the case since 2.6.0.
+- Repo: the unit tests run on both `net8.0` and `net10.0`; integration tests and samples run on `net10.0` (ASP.NET Core 10). The package smoke gate runs its console and ASP.NET Core apps on both targets.
+
 ## [2.7.1] - 2026-11-06
 
 Patch release of both families: fixes the packages so that consumer apps can load them (see "Fixed (packaging)"). Upgrade from 2.4.0–2.7.0: those versions crash at startup in console/worker apps, and 2.6.0–2.7.0 also in ASP.NET Core 8 apps. No API or behaviour change.

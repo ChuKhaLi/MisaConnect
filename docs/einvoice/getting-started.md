@@ -15,6 +15,8 @@ This guide walks through installing `MisaConnect.EInvoice`, wiring DI, and calli
 dotnet add package MisaConnect.EInvoice
 ```
 
+**Requirements:** .NET 8 or .NET 10 (each package ships a build for both). The packages depend on `Microsoft.Extensions.*` **10.0.14 or later**, which also runs on .NET 8. If your app pins a `Microsoft.Extensions.*` package below 10.0.14, restore fails with `NU1605` (package downgrade) naming it; raise that reference to 10.0.14 or later.
+
 ## 2. Add configuration
 
 `MisaConnect.EInvoice` binds the `Misa:EInvoice` configuration section. Use whichever configuration provider you prefer — `appsettings.json`, user-secrets, environment variables, or vault providers.

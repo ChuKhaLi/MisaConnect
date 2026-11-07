@@ -15,7 +15,9 @@ This guide walks through installing `MisaConnect.ESign`, wiring DI, and signing 
 dotnet add package MisaConnect.ESign
 ```
 
-Targets .NET 8. Transitively depends only on `Microsoft.Extensions.{Configuration,DependencyInjection,Http,Options,Logging.Abstractions}` — no Polly, no third-party HTTP plumbing.
+Targets .NET 8 and .NET 10. Depends only on `Microsoft.Extensions.{Configuration,DependencyInjection,Http,Options,Logging.Abstractions}` and `System.Text.Json` — no Polly, no third-party HTTP plumbing.
+
+**Requirements:** .NET 8 or .NET 10 (each package ships a build for both). The packages depend on `Microsoft.Extensions.*` **10.0.14 or later**, which also runs on .NET 8. If your app pins a `Microsoft.Extensions.*` package below 10.0.14, restore fails with `NU1605` (package downgrade) naming it; raise that reference to 10.0.14 or later.
 
 ## 2. Add configuration
 

@@ -8,7 +8,7 @@ permalink: /einvoice/
 
 # MisaConnect.EInvoice
 
-Community .NET SDK for the **MISA MeInvoice** HTTP API. Provides a port-and-adapter facade for token acquisition, template lookup, invoice preview / save / PDF / delete, lookup, and amendment operations. Targets .NET 8.
+Community .NET SDK for the **MISA MeInvoice** HTTP API. Provides a port-and-adapter facade for token acquisition, template lookup, invoice preview / save / PDF / delete, lookup, and amendment operations. Targets .NET 8 and .NET 10.
 
 ```
 dotnet add package MisaConnect.EInvoice

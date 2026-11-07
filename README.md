@@ -20,7 +20,7 @@ Community .NET SDK for MISA cloud APIs. Two independent NuGet packages ship from
 | **[`@misaconnect/einvoice`](https://www.npmjs.com/package/@misaconnect/einvoice)** (TypeScript / npm) | Same ten MeInvoice operations as the .NET package — templates, preview, save / PDF / delete draft, lookups, replacement & adjustment invoices. Node >= 20, ESM + CJS. | [src/typescript/einvoice/README.md](src/typescript/einvoice/README.md) |
 | **[`@misaconnect/esign`](https://www.npmjs.com/package/@misaconnect/esign)** (TypeScript / npm) | Same eSign RemoteSigning operations as the .NET package — PDF / XML / Word / Excel signing, explicit and transparent 2FA / OTP, webhook-mode (non-blocking) signing, per-call or provider credentials. Node >= 20, ESM + CJS. Live signing against MISA is not yet verified (tested against an in-repo fake server). | [src/typescript/esign/README.md](src/typescript/esign/README.md) |
 
-Both packages target **.NET 8** and share the same layered architecture, options-pattern configuration, swappable ports, and wire-format fidelity with MISA's published APIs.
+Both packages target **.NET 8 and .NET 10** and share the same layered architecture, options-pattern configuration, swappable ports, and wire-format fidelity with MISA's published APIs.
 
 > 📖 **Full docs:** <https://chukhali.github.io/MisaConnect/>
 
@@ -32,6 +32,8 @@ dotnet add package MisaConnect.ESign       # digital-signature operations
 ```
 
 The two packages are entirely independent — install whichever you need (or both).
+
+**Requirements:** .NET 8 or .NET 10 (each package ships a build for both). The packages depend on `Microsoft.Extensions.*` **10.0.14 or later**, which also runs on .NET 8. If your app pins a `Microsoft.Extensions.*` package below 10.0.14, restore fails with `NU1605` (package downgrade) naming it; raise that reference to 10.0.14 or later.
 
 ## Quickstart
 
