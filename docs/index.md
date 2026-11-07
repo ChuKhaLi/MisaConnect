@@ -2,14 +2,14 @@
 title: Home
 layout: default
 nav_order: 1
-description: "Community .NET SDK for MISA cloud APIs — EInvoice and ESign, shipped as independent NuGet packages."
+description: "Community .NET and TypeScript SDKs for MISA cloud APIs — EInvoice and ESign."
 permalink: /
 ---
 
 # MisaConnect
 {: .fs-9 }
 
-Community .NET SDK for MISA cloud APIs. Two independent NuGet packages ship from this repo, each a port-and-adapter facade over a separate MISA product.
+Community SDKs for MISA cloud APIs, for .NET and TypeScript. Four independent packages ship from this repo: one per MISA product and language, with the same operations in both languages.
 {: .fs-5 .fw-300 }
 
 [Get started with EInvoice](./einvoice/){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
@@ -20,34 +20,35 @@ Community .NET SDK for MISA cloud APIs. Two independent NuGet packages ship from
 
 ## Packages
 
-| Package | Covers | Docs |
+| Product | .NET (NuGet) | TypeScript (npm) |
 | --- | --- | --- |
-| [`MisaConnect.EInvoice`](https://www.nuget.org/packages/MisaConnect.EInvoice) | MISA MeInvoice — token acquisition, template lookup, invoice preview / save / PDF / delete, lookup, replacement & adjustment invoices. | [EInvoice docs](./einvoice/) |
-| [`MisaConnect.ESign`](https://www.nuget.org/packages/MisaConnect.ESign) | MISA eSign RemoteSigning — PDF / XML / Word / Excel signing, 2FA / OTP (explicit + transparent), webhook-mode (non-blocking) signing. | [ESign docs](./esign/) |
+| **[EInvoice](./einvoice/)** — MISA MeInvoice: templates, e-ticket templates, invoice preview / save / PDF / delete, lookups, replacement and adjustment invoices. | [`MisaConnect.EInvoice`](https://www.nuget.org/packages/MisaConnect.EInvoice) · [guide](./einvoice/dotnet/) | [`@misaconnect/einvoice`](https://www.npmjs.com/package/@misaconnect/einvoice) · [guide](./einvoice/typescript/) |
+| **[ESign](./esign/)** — MISA eSign RemoteSigning: PDF / XML / Word / Excel signing, two-factor sign-in (OTP), webhook-mode signing, per-call credentials. | [`MisaConnect.ESign`](https://www.nuget.org/packages/MisaConnect.ESign) · [guide](./esign/dotnet/) | [`@misaconnect/esign`](https://www.npmjs.com/package/@misaconnect/esign) · [guide](./esign/typescript/) |
 
 [![MisaConnect.EInvoice](https://img.shields.io/nuget/v/MisaConnect.EInvoice.svg?label=MisaConnect.EInvoice)](https://www.nuget.org/packages/MisaConnect.EInvoice)
-[![Downloads](https://img.shields.io/nuget/dt/MisaConnect.EInvoice.svg?label=downloads)](https://www.nuget.org/packages/MisaConnect.EInvoice)
 [![MisaConnect.ESign](https://img.shields.io/nuget/v/MisaConnect.ESign.svg?label=MisaConnect.ESign)](https://www.nuget.org/packages/MisaConnect.ESign)
-[![Downloads](https://img.shields.io/nuget/dt/MisaConnect.ESign.svg?label=downloads)](https://www.nuget.org/packages/MisaConnect.ESign)
+[![@misaconnect/einvoice](https://img.shields.io/npm/v/@misaconnect/einvoice.svg?label=%40misaconnect%2Feinvoice)](https://www.npmjs.com/package/@misaconnect/einvoice)
+[![@misaconnect/esign](https://img.shields.io/npm/v/@misaconnect/esign.svg?label=%40misaconnect%2Fesign)](https://www.npmjs.com/package/@misaconnect/esign)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/ChuKhaLi/MisaConnect/blob/main/LICENSE)
 
-Both packages target **.NET 8 and .NET 10** and share the same layered architecture, options-pattern configuration, swappable ports, and wire-format fidelity with MISA's published APIs.
+The .NET packages target **.NET 8 and .NET 10**; the npm packages run on **Node.js 22 or later** (ESM and CommonJS) and have no runtime dependencies. Each package is independent: install only what you need.
 
 ## Install
 
-```
-dotnet add package MisaConnect.EInvoice    # invoice operations
-dotnet add package MisaConnect.ESign       # digital-signature operations
+```bash
+dotnet add package MisaConnect.EInvoice    # or MisaConnect.ESign
 ```
 
-The two packages are entirely independent — install whichever you need (or both).
+```bash
+npm install @misaconnect/einvoice          # or @misaconnect/esign (pnpm / yarn work too)
+```
 
 ## What's next
 
-- **New to MisaConnect.EInvoice?** Start with the [EInvoice getting-started guide](./einvoice/getting-started).
-- **New to MisaConnect.ESign?** Start with the [ESign getting-started guide](./esign/getting-started).
-- **Curious about the design?** Read [Architecture](./architecture) — both packages share the same layered ports-and-adapters pattern.
+- **Issuing e-invoices?** Start at [EInvoice](./einvoice/), then pick [.NET](./einvoice/dotnet/getting-started) or [TypeScript](./einvoice/typescript/getting-started).
+- **Signing documents?** Start at [ESign](./esign/), then pick [.NET](./esign/dotnet/getting-started) or [TypeScript](./esign/typescript/getting-started).
+- **Curious about the design?** Read [Architecture](./architecture).
 
 ## About this project
 
-MisaConnect is a community-maintained .NET SDK. It is not affiliated with or endorsed by MISA JSC. Source, issues, and contributions are on [GitHub](https://github.com/ChuKhaLi/MisaConnect). Licensed under [MIT](https://github.com/ChuKhaLi/MisaConnect/blob/main/LICENSE).
+MisaConnect is community-maintained. It is not affiliated with or endorsed by MISA JSC. Source, issues, and contributions are on [GitHub](https://github.com/ChuKhaLi/MisaConnect). Licensed under [MIT](https://github.com/ChuKhaLi/MisaConnect/blob/main/LICENSE).

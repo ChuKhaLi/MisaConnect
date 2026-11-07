@@ -1,39 +1,50 @@
 ---
 title: ESign
-layout: default
 nav_order: 3
 has_children: true
 permalink: /esign/
 ---
 
-# MisaConnect.ESign
+# ESign
+{: .no_toc }
 
-Community .NET SDK for the **MISA eSign RemoteSigning** HTTP API. End-to-end PDF / XML / Word / Excel signing, two-factor (OTP) authentication, and webhook-mode (non-blocking) signing — all behind a single `IMisaESignClient` facade. Targets .NET 8 and .NET 10.
+SDKs for **MISA eSign RemoteSigning (chữ ký số từ xa)**, in two languages with the same operations:
 
-```
-dotnet add package MisaConnect.ESign
-```
+| Language | Package | Start here |
+| --- | --- | --- |
+| .NET 8 / .NET 10 | [`MisaConnect.ESign`](https://www.nuget.org/packages/MisaConnect.ESign) | [.NET guide](./dotnet/) |
+| TypeScript (Node ≥ 22) | [`@misaconnect/esign`](https://www.npmjs.com/package/@misaconnect/esign) | [TypeScript guide](./typescript/) |
 
-## Guides
+<!-- TODO(Task 4): one paragraph on what the product does and which MISA endpoints are covered. -->
 
-- [Getting started](./getting-started) — install, configure DI, and sign your first PDF via MISA eSign RemoteSigning.
-- [Configuration](./configuration) — every `MisaESignOptions` setting explained.
-- [Sandbox setup](./sandbox-setup) — provisioning a MISA eSign sandbox tenant and wiring credentials for integration tests.
+## Concepts
 
-## Facade methods
+These apply to both SDKs. The language guides link here instead of repeating them.
 
-| Method | Purpose |
-| --- | --- |
-| `SignPdfAsync` | One-shot synchronous PDF signature. |
-| `SignXmlAsync` | One-shot synchronous XML signature. |
-| `SignWordAsync`, `SignExcelAsync` | One-shot synchronous Office-document signature. |
-| `SignInWithOtpAsync` | Submit an OTP returned to the signer's device (2FA flow). |
-| `ResendOtpAsync` | Re-request an OTP if the previous one expired. |
-| `BeginSignPdfAsync`, `BeginSignXmlAsync`, `BeginSignWordAsync`, `BeginSignExcelAsync` | Webhook (non-blocking) variants — return a tracking handle and deliver the signed artifact via your callback. |
-| `HandleWebhookAsync` | Parse and validate a MISA eSign webhook payload inside your callback endpoint. |
+### Certificates
 
-All methods live on `IMisaESignClient` (resolved via DI) and preserve MISA's wire format verbatim.
+<!-- TODO(Task 4): shared concept -->
 
-## Sibling package
+### How signing works
 
-Need invoice operations? See [`MisaConnect.EInvoice`](../einvoice/).
+<!-- TODO(Task 4): shared concept -->
+
+### Two-factor sign-in (OTP)
+
+<!-- TODO(Task 4): shared concept -->
+
+### Webhook mode
+
+<!-- TODO(Task 4): shared concept -->
+
+### Credentials modes
+
+<!-- TODO(Task 4): shared concept -->
+
+### Error categories
+
+<!-- TODO(Task 4): shared concept -->
+
+### Calling MISA from outside Vietnam
+
+<!-- TODO(Task 4): shared concept -->

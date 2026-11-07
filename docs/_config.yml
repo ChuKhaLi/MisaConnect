@@ -1,5 +1,5 @@
 title: MisaConnect
-description: Community .NET SDK for MISA cloud APIs — EInvoice and ESign
+description: Community .NET and TypeScript SDKs for MISA cloud APIs — EInvoice and ESign
 url: https://chung-nd.id.vn
 baseurl: /MisaConnect
 
@@ -28,6 +28,8 @@ aux_links:
   "GitHub": https://github.com/ChuKhaLi/MisaConnect
   "EInvoice on NuGet": https://www.nuget.org/packages/MisaConnect.EInvoice
   "ESign on NuGet": https://www.nuget.org/packages/MisaConnect.ESign
+  "einvoice on npm": https://www.npmjs.com/package/@misaconnect/einvoice
+  "esign on npm": https://www.npmjs.com/package/@misaconnect/esign
 
 aux_links_new_tab: true
 
@@ -40,6 +42,7 @@ back_to_top_text: "Back to top"
 
 exclude:
   - misa-api-reference/
+  - superpowers/
   - Gemfile
   - Gemfile.lock
   - vendor/

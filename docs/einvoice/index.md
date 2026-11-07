@@ -1,42 +1,50 @@
 ---
 title: EInvoice
-layout: default
 nav_order: 2
 has_children: true
 permalink: /einvoice/
 ---
 
-# MisaConnect.EInvoice
+# EInvoice
+{: .no_toc }
 
-Community .NET SDK for the **MISA MeInvoice** HTTP API. Provides a port-and-adapter facade for token acquisition, template lookup, invoice preview / save / PDF / delete, lookup, and amendment operations. Targets .NET 8 and .NET 10.
+SDKs for **MISA MeInvoice (hóa đơn điện tử)**, in two languages with the same operations:
 
-```
-dotnet add package MisaConnect.EInvoice
-```
+| Language | Package | Start here |
+| --- | --- | --- |
+| .NET 8 / .NET 10 | [`MisaConnect.EInvoice`](https://www.nuget.org/packages/MisaConnect.EInvoice) | [.NET guide](./dotnet/) |
+| TypeScript (Node ≥ 22) | [`@misaconnect/einvoice`](https://www.npmjs.com/package/@misaconnect/einvoice) | [TypeScript guide](./typescript/) |
 
-## Guides
+<!-- TODO(Task 2): one paragraph on what the product does and which MISA endpoints are covered. -->
 
-- [Getting started](./getting-started) — install, configure DI, and call your first MISA API.
-- [Configuration](./configuration) — every `MisaEInvoiceOptions` setting explained.
-- [Sandbox setup](./sandbox-setup) — provisioning a MISA sandbox tenant and wiring credentials for integration tests.
+## Concepts
 
-## Supported operations
+These apply to both SDKs. The language guides link here instead of repeating them.
 
-| Use case | Purpose |
-| --- | --- |
-| `ListActiveTemplates` | Enumerate publishable invoice templates for the current tax payer. |
-| `ListTicketTemplates` | One page of e-ticket templates (MISA `/webapp/templates/ticket`), active and inactive. Since 2.10.0. |
-| `PreviewInvoice` | Generate a non-issued PDF preview for an in-memory invoice. |
-| `SaveDraftInvoices` | Persist one or more drafts using a client-supplied `RefId`. |
-| `GetDraftPdfByRefId` | Fetch a draft's PDF render by RefId. |
-| `DeleteDraftInvoice` | Remove a draft (with opt-in raw-error surfacing for diagnostics). |
-| `LookupByRefIds` | Resolve drafts / issued invoices back to MISA invoice metadata. |
-| `LookupStandard`, `LookupCalculating` | Read issued or calculating-state invoices for downstream reconciliation. |
-| `IssueReplacementInvoice` | Issue a replacement for an issued invoice. |
-| `IssueAdjustmentInvoice` | Issue an adjustment invoice. |
+### Tax code and AppID
 
-All operations live behind `IMisaEInvoiceClient` (resolved via DI) and follow MISA's wire format verbatim.
+<!-- TODO(Task 2): shared concept -->
 
-## Sibling package
+### With-code and without-code invoices
 
-Need digital-signature operations? See [`MisaConnect.ESign`](../esign/).
+<!-- TODO(Task 2): shared concept -->
+
+### Templates and series
+
+<!-- TODO(Task 2): shared concept -->
+
+### RefId and drafts
+
+<!-- TODO(Task 2): shared concept -->
+
+### Paging
+
+<!-- TODO(Task 2): shared concept -->
+
+### Error categories
+
+<!-- TODO(Task 2): shared concept -->
+
+### Calling MISA from outside Vietnam
+
+<!-- TODO(Task 2): shared concept -->
