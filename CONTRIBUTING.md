@@ -25,7 +25,7 @@ Thanks for considering a contribution. MisaConnect is a community .NET SDK for M
 ## PR requirements
 
 - `dotnet build MisaConnect.slnx` — clean, no warnings (`TreatWarningsAsErrors=true`).
-- `dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests` and `dotnet test tests/dotnet/MisaConnect.ESign.UnitTests` — both unit test projects green.
+- `dotnet test --project tests/dotnet/MisaConnect.EInvoice.UnitTests` and `dotnet test --project tests/dotnet/MisaConnect.ESign.UnitTests` — both unit test projects green.
 - New public types or DI-exposed types need XML doc comments.
 - TypeScript changes (`src/typescript/**`): `npm ci`, then `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test` — all green. The TS dev toolchain needs Node ≥ 22.18 (see `.nvmrc`); published packages support Node ≥ 20.
 - One design/plan per PR. Bundle test + code + docs + changelog into a single change.

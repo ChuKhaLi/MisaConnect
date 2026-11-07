@@ -27,13 +27,10 @@
 
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.14" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
-    <!-- xunit.v3: dynamic skips (Assert.Skip) are built in, so Xunit.SkippableFact is gone.
-         Held on 3.x: xunit.v3 4.x runs only on Microsoft Testing Platform v2, which the .NET 10 SDK
-         no longer drives through VSTest `dotnet test` (the CI test steps rely on VSTest options).
-         Moving to 4.x means opting the repo into the MTP `dotnet test` mode (global.json) first. -->
-    <PackageVersion Include="xunit.v3" Version="3.2.2" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!-- xunit.v3: dynamic skips (Assert.Skip) are built in. Runs on Microsoft Testing Platform
+         (global.json "test.runner"), so neither Microsoft.NET.Test.Sdk nor xunit.runner.visualstudio
+         is needed. -->
+    <PackageVersion Include="xunit.v3" Version="4.0.2" />
   </ItemGroup>
 
 </Project>

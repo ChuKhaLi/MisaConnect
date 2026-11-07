@@ -10,11 +10,11 @@ This repository is **MisaConnect** — a community .NET SDK for MISA cloud APIs.
 
 ```
 dotnet build MisaConnect.slnx
-dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests                                                         # fast unit tests, no network
-dotnet test tests/dotnet/MisaConnect.EInvoice.IntegrationTests                                                  # integration + sandbox tests (sandbox facts skip cleanly without MISA creds)
-dotnet test tests/dotnet/MisaConnect.ESign.UnitTests                                                            # ESign unit tests (slice 1–4), fast, no network
-dotnet test tests/dotnet/MisaConnect.ESign.IntegrationTests                                                     # ESign integration + sandbox tests (sandbox facts skip cleanly)
-dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests --filter "FullyQualifiedName~SaveDraftInvoicesTests"    # single test class
+dotnet test --project tests/dotnet/MisaConnect.EInvoice.UnitTests                                                         # fast unit tests, no network
+dotnet test --project tests/dotnet/MisaConnect.EInvoice.IntegrationTests                                                  # integration + sandbox tests (sandbox facts skip cleanly without MISA creds)
+dotnet test --project tests/dotnet/MisaConnect.ESign.UnitTests                                                            # ESign unit tests (slice 1–4), fast, no network
+dotnet test --project tests/dotnet/MisaConnect.ESign.IntegrationTests                                                     # ESign integration + sandbox tests (sandbox facts skip cleanly)
+dotnet test --project tests/dotnet/MisaConnect.EInvoice.UnitTests --filter "FullyQualifiedName~SaveDraftInvoicesTests"    # single test class
 dotnet format MisaConnect.slnx                                                                           # required before PR
 ```
 
@@ -28,6 +28,8 @@ npm test -w @misaconnect/einvoice       # one package
 npm run lint && npm run format:check    # required before PR
 npm run typecheck
 ```
+
+Tests run on xunit.v3 over Microsoft Testing Platform (`global.json` → `test.runner`), so `dotnet test` needs `--project <dir>`; `--filter` still takes VSTest syntax, and a filter that matches no test exits 8.
 
 The unit/integration split is by project, not by xUnit trait — no test uses `[Trait("Category", ...)]`. Sandbox-credential-requiring tests use `[SandboxFact]`, which skips when the relevant env vars are absent or the sandbox host is unreachable: EInvoice tests check `MISACONNECT_SANDBOX_*`, ESign tests check `MISACONNECT_ESIGN_SANDBOX_*`.
 

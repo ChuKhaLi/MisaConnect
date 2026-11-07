@@ -54,7 +54,7 @@ jobs:
           MISACONNECT_SANDBOX_USERNAME: ${{ secrets.MISA_USERNAME }}
           MISACONNECT_SANDBOX_PASSWORD: ${{ secrets.MISA_PASSWORD }}
           MISACONNECT_SANDBOX_APPID: ${{ secrets.MISA_APP_ID }}
-        run: dotnet test tests/dotnet/MisaConnect.EInvoice.IntegrationTests/MisaConnect.EInvoice.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFileName=einvoice-integration-tests.trx" --results-directory artifacts/test-results
+        run: dotnet test --project tests/dotnet/MisaConnect.EInvoice.IntegrationTests/MisaConnect.EInvoice.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}" --ignore-exit-code 8', inputs.test_filter) || '' }} --report-xunit-trx --results-directory artifacts/test-results
 
       - name: Integration tests (ESign)
         env:
@@ -67,7 +67,7 @@ jobs:
           # REQUIRED, the sign tests skip (not fail) on NoActiveCertificateException (see
           # Sandbox/SandboxSigning.cs; mirrors ts-sandbox.yml). Add
           # MISACONNECT_ESIGN_SANDBOX_REQUIRED: '1' once it has one, so that skip becomes a failure.
-        run: dotnet test tests/dotnet/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFileName=esign-integration-tests.trx" --results-directory artifacts/test-results
+        run: dotnet test --project tests/dotnet/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}" --ignore-exit-code 8', inputs.test_filter) || '' }} --report-xunit-trx --results-directory artifacts/test-results
 
       - name: Upload test results
         if: always()

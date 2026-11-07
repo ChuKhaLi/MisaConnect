@@ -111,8 +111,23 @@ public class RefreshTokenSingleFlightTests
         Assert.Equal("rs", (await joined).Value);
         Assert.True(firstFlight!.IsCompletedSuccessfully);
 
-        await Task.Delay(50);
-        var next = await slot.RefreshAsync("k4", factory, CancellationToken.None);
+        // The slot is cleared by a continuation queued to the thread pool (the gate runs
+        // continuations asynchronously), so wait for it instead of assuming a fixed delay:
+        // until then a caller still joins the finished flight and gets its result.
+        AccessToken next;
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        do
+        {
+            next = await slot.RefreshAsync("k4", factory, CancellationToken.None);
+            if (next.Value == "rs2")
+            {
+                break;
+            }
+            Assert.Equal("rs", next.Value);
+            await Task.Delay(10);
+        }
+        while (DateTime.UtcNow < deadline);
+
         Assert.Equal("rs2", next.Value);
         Assert.Equal(2, invocations);
     }
