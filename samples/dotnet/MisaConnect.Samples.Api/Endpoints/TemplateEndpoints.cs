@@ -30,6 +30,45 @@ public static class TemplateEndpoints
             return Results.Ok(new { templates = dtos });
         });
 
+        builder.MapGet("/api/templates/ticket", async (
+            ListTicketTemplates useCase,
+            bool withCode = true,
+            int start = 0,
+            int length = 20,
+            bool fromCashRegister = false,
+            CancellationToken ct = default) =>
+        {
+            IReadOnlyList<MisaConnect.EInvoice.Domain.Templates.TicketTemplate> rows;
+            try
+            {
+                rows = await useCase
+                    .ExecuteAsync(new TicketTemplateListRequest(withCode, start, length, fromCashRegister), ct)
+                    .ConfigureAwait(false);
+            }
+            catch (MisaConnect.EInvoice.Domain.Errors.MeInvoiceException ex)
+            {
+                return ErrorMapping.ToResult(ex);
+            }
+
+            var dtos = new List<object>(rows.Count);
+            foreach (var t in rows)
+            {
+                dtos.Add(new
+                {
+                    ticketTemplateId = t.TicketTemplateID,
+                    templateName = t.TemplateName,
+                    invSeries = t.InvSeries,
+                    isActive = t.IsActive,
+                    ticketType = t.TicketType,
+                    templateType = t.TemplateType,
+                    serviceName = t.ServiceName,
+                    isInheritFromOldTemplate = t.IsInheritFromOldTemplate,
+                    isTicketCode = t.IsTicketCode,
+                });
+            }
+            return Results.Ok(new { ticketTemplates = dtos });
+        });
+
         return builder;
     }
 }

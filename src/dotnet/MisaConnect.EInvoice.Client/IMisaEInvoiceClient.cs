@@ -11,6 +11,16 @@ public interface IMisaEInvoiceClient
 {
     Task<IReadOnlyList<TemplateDto>> ListTemplatesAsync(bool withCode = true, CancellationToken ct = default);
 
+    /// <summary>
+    /// Lists e-ticket templates (MISA <c>/webapp/templates/ticket</c>), one page at a time. Rows are returned as
+    /// MISA sends them, active and inactive (see <see cref="TicketTemplateDto.IsActive"/>). <c>null</c> uses the
+    /// defaults of <see cref="TicketTemplateListRequestDto"/>. Throws <c>MeInvoiceException</c> (Validation) for
+    /// <c>Start &lt; 0</c> or <c>Length</c> outside 1–100, before any request.
+    /// </summary>
+    Task<IReadOnlyList<TicketTemplateDto>> ListTicketTemplatesAsync(
+        TicketTemplateListRequestDto? request = null,
+        CancellationToken ct = default);
+
     Task<PdfDocumentDto> PreviewAsync(InvoiceDto invoice, bool withCode = true, CancellationToken ct = default);
 
     Task<IReadOnlyList<SaveResultDto>> SaveDraftAsync(
