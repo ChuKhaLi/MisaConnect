@@ -11,7 +11,8 @@ Minor release of both families. EInvoice DI registration order no longer matters
 ### Changed
 
 - **EInvoice:** `AddMisaConnectEInvoice` registers its default ports with `TryAdd…` instead of `Add…`: `ISystemClock`, `IRefIdGenerator`, `ITokenCache`, `IInvoiceValidator`, `IDeleteOptionsAccessor` (singleton) and `ITemplateResolver` (scoped); `AddEInvoiceClient` does the same for `ICorrelationIdAccessor` (scoped). A consumer registration now wins whether it is made before or after the call (before 2.9.0, one made before was silently overridden). Matches ESign. Lifetimes are unchanged; use cases, HTTP handlers and the `IMeInvoiceClient` decorator still use `Add…`.
-- Side effect: with a consumer registration made before the call, `IEnumerable<ITokenCache>` (and the other ports) now holds one entry instead of two; calling `AddMisaConnectEInvoice` twice no longer duplicates the defaults.
+- **Upgrading:** check for port registrations made *before* `AddMisaConnectEInvoice` / `AddEInvoiceClient`. In 2.8.0 they were silently ignored; from 2.9.0 they take effect, with the lifetime you gave them (e.g. a leftover scoped `ITokenCache` would replace the singleton `InMemoryTokenCache`).
+- Side effect: with a consumer registration made before the call, `IEnumerable<ITokenCache>` (and the other ports) now holds one entry instead of two; calling `AddMisaConnectEInvoice` twice no longer duplicates the default port registrations listed above (use cases, handlers and the options validator are still added each time).
 
 ### Fixed
 
