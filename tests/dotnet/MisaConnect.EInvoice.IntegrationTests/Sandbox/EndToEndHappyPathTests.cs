@@ -12,20 +12,20 @@ public class EndToEndHappyPathTests
         var client = SandboxClientFactory.Create();
 
         // Step 1: list templates (also implicitly acquires token).
-        var templates = await client.ListTemplatesAsync();
+        var templates = await client.ListTemplatesAsync(ct: TestContext.Current.CancellationToken);
         Assert.NotEmpty(templates);
 
         // Step 2: preview.
         var dto = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
-        var preview = await client.PreviewAsync(dto);
+        var preview = await client.PreviewAsync(dto, ct: TestContext.Current.CancellationToken);
         Assert.NotEmpty(preview.Content);
 
         // Step 3: save.
-        var saveResults = await client.SaveDraftAsync(new[] { dto });
+        var saveResults = await client.SaveDraftAsync(new[] { dto }, ct: TestContext.Current.CancellationToken);
         Assert.Single(saveResults);
 
         // Step 4: view-by-RefID.
-        var pdf = await client.GetDraftPdfAsync(saveResults[0].RefId);
+        var pdf = await client.GetDraftPdfAsync(saveResults[0].RefId, ct: TestContext.Current.CancellationToken);
         Assert.NotEmpty(pdf.Content);
         Assert.Equal((byte)'%', pdf.Content[0]);
     }

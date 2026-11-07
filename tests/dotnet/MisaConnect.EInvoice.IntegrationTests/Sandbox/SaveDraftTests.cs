@@ -12,7 +12,7 @@ public class SaveDraftTests
     {
         var client = SandboxClientFactory.Create();
         var dto = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
-        var results = await client.SaveDraftAsync(new[] { dto });
+        var results = await client.SaveDraftAsync(new[] { dto }, ct: TestContext.Current.CancellationToken);
 
         Assert.Single(results);
         Assert.Equal(SaveOutcomeDto.Success, results[0].Outcome);
@@ -25,7 +25,7 @@ public class SaveDraftTests
         var client = SandboxClientFactory.Create();
         var a = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
         var b = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
-        var results = await client.SaveDraftAsync(new[] { a, b });
+        var results = await client.SaveDraftAsync(new[] { a, b }, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, results.Count);
         Assert.All(results, r => Assert.Equal(SaveOutcomeDto.Success, r.Outcome));
@@ -36,7 +36,7 @@ public class SaveDraftTests
     {
         var client = SandboxClientFactory.Create();
         var dto = SampleInvoiceFactory.CreateDto(refId: null);
-        var results = await client.SaveDraftAsync(new[] { dto });
+        var results = await client.SaveDraftAsync(new[] { dto }, ct: TestContext.Current.CancellationToken);
 
         Assert.NotEmpty(results[0].RefId);
         Assert.NotEqual(string.Empty, results[0].RefId);

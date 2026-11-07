@@ -1,7 +1,6 @@
 using MisaConnect.EInvoice.Client.Dtos;
 using MisaConnect.EInvoice.IntegrationTests.Api;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace MisaConnect.EInvoice.IntegrationTests.Sandbox;
 
@@ -38,7 +37,7 @@ public class LookupCalculatingSandboxTests
     public async Task Sandbox_calculating_paging_returns_seeded_pos_invoice()
     {
         var client = SandboxClientFactory.Create();
-        var templates = await client.ListTemplatesAsync(withCode: true);
+        var templates = await client.ListTemplatesAsync(withCode: true, ct: TestContext.Current.CancellationToken);
         var posTemplate = templates.FirstOrDefault(IsPosCalculating);
         if (posTemplate is null)
         {
@@ -51,7 +50,7 @@ public class LookupCalculatingSandboxTests
         }
 
         var dto = MakePosDto(posTemplate);
-        var saveResults = await client.SaveDraftAsync(new[] { dto }, withCode: true);
+        var saveResults = await client.SaveDraftAsync(new[] { dto }, withCode: true, ct: TestContext.Current.CancellationToken);
         Assert.Single(saveResults);
         var refId = saveResults[0].RefId;
         await using var cleanup = SandboxDraftCleanup.Track(client, refId, invoiceWithCode: true);
@@ -65,7 +64,7 @@ public class LookupCalculatingSandboxTests
             ToDate: today.AddDays(7),
             PublishStatus: null);
 
-        var page = await client.LookupCalculatingAsync(request, invoiceWithCode: true);
+        var page = await client.LookupCalculatingAsync(request, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
         Assert.Contains(page.Items, s => s.RefId == refId);
     }
 
@@ -73,7 +72,7 @@ public class LookupCalculatingSandboxTests
     public async Task Sandbox_standard_and_calculating_are_disjoint()
     {
         var client = SandboxClientFactory.Create();
-        var templates = await client.ListTemplatesAsync(withCode: true);
+        var templates = await client.ListTemplatesAsync(withCode: true, ct: TestContext.Current.CancellationToken);
         var posTemplate = templates.FirstOrDefault(IsPosCalculating);
         var standardTemplate = templates.FirstOrDefault(IsStandard);
         if (posTemplate is null || standardTemplate is null)
@@ -88,12 +87,12 @@ public class LookupCalculatingSandboxTests
         var standardDto = MakeStandardDto(standardTemplate);
         var posDto = MakePosDto(posTemplate);
 
-        var savedStandard = await client.SaveDraftAsync(new[] { standardDto }, withCode: true);
+        var savedStandard = await client.SaveDraftAsync(new[] { standardDto }, withCode: true, ct: TestContext.Current.CancellationToken);
         Assert.Single(savedStandard);
         var standardRefId = savedStandard[0].RefId;
         await using var cleanupStandard = SandboxDraftCleanup.Track(client, standardRefId, invoiceWithCode: true);
 
-        var savedPos = await client.SaveDraftAsync(new[] { posDto }, withCode: true);
+        var savedPos = await client.SaveDraftAsync(new[] { posDto }, withCode: true, ct: TestContext.Current.CancellationToken);
         Assert.Single(savedPos);
         var posRefId = savedPos[0].RefId;
         await using var cleanupPos = SandboxDraftCleanup.Track(client, posRefId, invoiceWithCode: true);
@@ -107,8 +106,8 @@ public class LookupCalculatingSandboxTests
             ToDate: today.AddDays(7),
             PublishStatus: null);
 
-        var standardPage = await client.LookupStandardAsync(request, invoiceWithCode: true);
-        var calculatingPage = await client.LookupCalculatingAsync(request, invoiceWithCode: true);
+        var standardPage = await client.LookupStandardAsync(request, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
+        var calculatingPage = await client.LookupCalculatingAsync(request, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
 
         // Standard seed appears only on /standard.
         Assert.Contains(standardPage.Items, s => s.RefId == standardRefId);

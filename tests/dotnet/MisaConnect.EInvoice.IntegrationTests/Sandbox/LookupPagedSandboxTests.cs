@@ -32,7 +32,7 @@ public class LookupPagedSandboxTests
         var client = SandboxClientFactory.Create();
         var seedRefId = Guid.NewGuid().ToString();
         var dto = SampleInvoiceFactory.CreateDto(refId: seedRefId);
-        var saved = await client.SaveDraftAsync(new[] { dto });
+        var saved = await client.SaveDraftAsync(new[] { dto }, ct: TestContext.Current.CancellationToken);
         Assert.NotEmpty(saved);
         var refId = saved[0].RefId;
 
@@ -50,7 +50,7 @@ public class LookupPagedSandboxTests
             ToDate: seedDate.AddDays(7),
             PublishStatus: null);
 
-        var result = await client.LookupStandardAsync(request, invoiceWithCode: true);
+        var result = await client.LookupStandardAsync(request, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
 
         Assert.Contains(result.Items, item =>
             string.Equals(item.RefId, refId, StringComparison.Ordinal) &&
@@ -63,7 +63,7 @@ public class LookupPagedSandboxTests
         var client = SandboxClientFactory.Create();
         var seed1 = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
         var seed2 = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
-        var saved = await client.SaveDraftAsync(new[] { seed1, seed2 });
+        var saved = await client.SaveDraftAsync(new[] { seed1, seed2 }, ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, saved.Count);
         var refId1 = saved[0].RefId;
         var refId2 = saved[1].RefId;
@@ -79,7 +79,7 @@ public class LookupPagedSandboxTests
             ToDate: seed1.InvDate.AddDays(7),
             PublishStatus: 0); // Drafts only
 
-        var result = await client.LookupStandardAsync(request, invoiceWithCode: true);
+        var result = await client.LookupStandardAsync(request, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
 
         Assert.Contains(result.Items, i => i.RefId == refId1);
         Assert.Contains(result.Items, i => i.RefId == refId2);
@@ -100,7 +100,7 @@ public class LookupPagedSandboxTests
             ToDate: new DateOnly(1900, 1, 2),
             PublishStatus: null);
 
-        var result = await client.LookupStandardAsync(request, invoiceWithCode: true);
+        var result = await client.LookupStandardAsync(request, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal(0, result.ReturnedCount);
         Assert.Empty(result.Items);

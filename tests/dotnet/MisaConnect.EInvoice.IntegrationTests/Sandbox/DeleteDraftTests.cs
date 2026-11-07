@@ -14,18 +14,18 @@ public class DeleteDraftTests
     {
         var client = SandboxClientFactory.Create();
         var dto = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
-        var saved = await client.SaveDraftAsync(new[] { dto });
+        var saved = await client.SaveDraftAsync(new[] { dto }, ct: TestContext.Current.CancellationToken);
         Assert.NotEmpty(saved);
         var refId = saved[0].RefId;
 
         var sw = Stopwatch.StartNew();
-        var outcome = await client.DeleteDraftAsync(refId, invoiceWithCode: true);
+        var outcome = await client.DeleteDraftAsync(refId, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
         sw.Stop();
 
         Assert.Equal(DeleteDraftStatus.Deleted, outcome.Status);
         Assert.True(sw.Elapsed.TotalSeconds < 5, $"Delete took {sw.Elapsed.TotalSeconds:F2}s, exceeds 5s SC-001 budget.");
 
-        var lookupEx = await Assert.ThrowsAsync<MeInvoiceException>(() => client.GetDraftPdfAsync(refId));
+        var lookupEx = await Assert.ThrowsAsync<MeInvoiceException>(() => client.GetDraftPdfAsync(refId, ct: TestContext.Current.CancellationToken));
         Assert.Equal(MeInvoiceErrorCategory.ResourceNotFound, lookupEx.Category);
     }
 
@@ -40,13 +40,13 @@ public class DeleteDraftTests
         // contract, not the specific surfaced status.
         var client = SandboxClientFactory.Create();
         var dto = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
-        var saved = await client.SaveDraftAsync(new[] { dto });
+        var saved = await client.SaveDraftAsync(new[] { dto }, ct: TestContext.Current.CancellationToken);
         var refId = saved[0].RefId;
 
-        var first = await client.DeleteDraftAsync(refId, invoiceWithCode: true);
+        var first = await client.DeleteDraftAsync(refId, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
         Assert.Equal(DeleteDraftStatus.Deleted, first.Status);
 
-        var second = await client.DeleteDraftAsync(refId, invoiceWithCode: true);
+        var second = await client.DeleteDraftAsync(refId, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
         Assert.True(
             second.Status is DeleteDraftStatus.Deleted or DeleteDraftStatus.NotFound,
             $"Re-delete must be idempotent (Deleted or NotFound); observed {second.Status}.");
@@ -59,7 +59,7 @@ public class DeleteDraftTests
         // success:true. The Status MUST be one of the two idempotent values;
         // never an exception or a duplicate-create side effect.
         var client = SandboxClientFactory.Create();
-        var outcome = await client.DeleteDraftAsync(Guid.NewGuid().ToString(), invoiceWithCode: true);
+        var outcome = await client.DeleteDraftAsync(Guid.NewGuid().ToString(), invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
         Assert.True(
             outcome.Status is DeleteDraftStatus.Deleted or DeleteDraftStatus.NotFound,
             $"Unknown-RefID delete must be idempotent (Deleted or NotFound); observed {outcome.Status}.");
@@ -70,15 +70,15 @@ public class DeleteDraftTests
     {
         var client = SandboxClientFactory.Create();
         var dto = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
-        var saved = await client.SaveDraftAsync(new[] { dto });
+        var saved = await client.SaveDraftAsync(new[] { dto }, ct: TestContext.Current.CancellationToken);
         var refId = saved[0].RefId;
 
-        var outcome = await client.DeleteDraftAsync(refId, invoiceWithCode: false);
+        var outcome = await client.DeleteDraftAsync(refId, invoiceWithCode: false, ct: TestContext.Current.CancellationToken);
         Assert.True(
             outcome.Status is DeleteDraftStatus.Deleted or DeleteDraftStatus.NotFound,
             $"Wrong-flag delete must be idempotent; observed {outcome.Status}.");
 
         // Cleanup with the correct flag (idempotent — safe even if the wrong-flag call already deleted).
-        await client.DeleteDraftAsync(refId, invoiceWithCode: true);
+        await client.DeleteDraftAsync(refId, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
     }
 }
