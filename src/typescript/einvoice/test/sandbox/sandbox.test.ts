@@ -147,6 +147,8 @@ describe.skipIf(!runnable)('MISA sandbox (live)', () => {
 
   it('listTicketTemplates succeeds (the account may have none); every row has a TicketTemplateID', async () => {
     const rows = await client.listTicketTemplates();
+    // Logged so a run shows whether the field mapping met real rows or only an empty list.
+    console.log(`ticket templates returned: ${rows.length}`);
     for (const row of rows) expect(row.ticketTemplateID).not.toBe('');
   });
 

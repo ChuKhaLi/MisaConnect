@@ -16,6 +16,7 @@ Minor release of both families: EInvoice gains e-ticket template listing. ESign:
 - An unreadable ticket-template payload surfaces as `MeInvoiceException` (`MisaUnknown`, `InvalidResponse`), never a raw `JsonException`; `TicketType` / `TemplateType` sent as JSON strings are read; rows without a `TicketTemplateID` are skipped (as in TypeScript).
 - `MisaEInvoiceClient` keeps its existing public constructor; an instance built with it throws `InvalidOperationException` from `ListTicketTemplatesAsync`. DI uses the new constructor.
 - Sample API: `GET /api/templates/ticket?withCode&start&length&fromCashRegister`.
+- **Not yet verified against live MISA data:** the sandbox host was unreachable when this was released, so the request body and the Ticket field names follow MISA's API document and are tested only against the in-repo fake servers.
 
 ### Repo (TypeScript tooling, nothing shipped)
 
