@@ -2,7 +2,7 @@
 
 TypeScript SDK for **MISA eSign RemoteSigning** — a port of the .NET `MisaConnect.ESign` package. Signs PDF, XML, Word and Excel documents with a remote certificate, including two-factor (OTP) sign-in and a non-blocking webhook mode. Zero runtime dependencies; HTTP goes through Node's built-in `node:https` (or a `fetch` you supply). ESM and CommonJS builds, full type declarations.
 
-Requires **Node.js >= 20**.
+Requires **Node.js >= 22**.
 
 ## Install
 

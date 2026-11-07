@@ -2,7 +2,7 @@
 
 TypeScript SDK for **MISA meInvoice** — a port of the .NET `MisaConnect.EInvoice` package. Zero runtime dependencies; HTTP goes through Node's built-in `node:https` (or a `fetch` you supply). ESM and CommonJS builds, full type declarations.
 
-Requires **Node.js >= 20**.
+Requires **Node.js >= 22**.
 
 ## Install
 

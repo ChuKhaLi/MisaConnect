@@ -2,6 +2,12 @@
 
 All notable changes to `@misaconnect/einvoice` are documented here.
 
+## [0.2.0] - 2026-11-07
+
+### Changed (breaking)
+
+- Requires **Node.js 22 or later** (`engines.node` `>=22`; was `>=20`). Node.js 20 reached end of life on 2026-04-30. The build now targets `node22`; no API change. CI exercises the built package on Node 22.0.0, 22 and 24.
+
 ## [0.1.4] - 2026-11-05
 
 ### Fixed
