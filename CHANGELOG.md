@@ -6,6 +6,7 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ### Repo (tests only, nothing shipped)
 
+- Dev toolchain: npm `overrides` pins `minimatch` to `^11.0.5` (GHSA-g3hv-75wg-m249, ReDoS; eslint and typescript-eslint pulled 10.2.6). `npm audit` is clean; eslint lints the same 143 files. Not shipped: both npm packages have zero runtime dependencies.
 - Tests move from xunit 2 (deprecated) to **xunit.v3 3.2.2** with `xunit.runner.visualstudio` 3.1.5 and `Microsoft.NET.Test.Sdk` 18.11.0. `Xunit.SkippableFact` is gone: run-time sandbox skips use xUnit's built-in `Assert.Skip`. Test commands are unchanged. xunit.v3 4.x is held back because it needs the Microsoft Testing Platform `dotnet test` mode.
 - Sandbox tests with a `Timeout` now pass `TestContext.Current.CancellationToken` to the client, so a timed-out test is actually cancelled.
 
