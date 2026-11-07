@@ -63,9 +63,9 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<ITokenCache, InMemoryTokenCache>();
         services.TryAddSingleton<IInvoiceValidator, InvoiceValidator>();
 
-        // The MeInvoiceCallLogger decorator captures ICorrelationIdAccessor whose
-        // lifetime is per-request (scoped) in Api and singleton in Client. To
-        // honour both safely, use cases + the decorator are registered Scoped.
+        // The MeInvoiceCallLogger decorator captures ICorrelationIdAccessor, which is
+        // scoped (per request in the sample Api; per DI scope via AddEInvoiceClient) and may
+        // be any lifetime when the consumer registers it. Use cases + the decorator are Scoped.
         services.AddScoped<EnsureAccessToken>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<MisaEInvoiceOptions>>();

@@ -100,6 +100,17 @@ public class AddEInvoiceClientServiceCollectionTests
         Assert.Same(mine, ResolveScoped<ITokenCache>(services));
     }
 
+    [Fact]
+    public void Token_cache_registered_after_AddEInvoiceClient_wins()
+    {
+        var services = new ServiceCollection();
+        services.AddEInvoiceClient(ConfigureValid);
+        var mine = new NullTokenCache();
+        services.AddSingleton<ITokenCache>(mine);
+
+        Assert.Same(mine, ResolveScoped<ITokenCache>(services));
+    }
+
     private static void ConfigureValid(MisaEInvoiceOptions opts)
     {
         opts.Environment = MeInvoiceEnvironment.Sandbox;
