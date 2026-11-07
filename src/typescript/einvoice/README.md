@@ -92,6 +92,7 @@ Every method takes an optional last argument `opts?: CallOptions` (`{ signal?: A
 | Method                                 | Returns                 | Purpose                                        |
 | -------------------------------------- | ----------------------- | ---------------------------------------------- |
 | `listTemplates(withCode?)`             | `TemplateDto[]`         | Active invoice templates.                      |
+| `listTicketTemplates(request?)`        | `TicketTemplateDto[]`   | One page of e-ticket templates (see below).    |
 | `preview(invoice, withCode?)`          | `PdfDocumentDto`        | Render an invoice PDF without saving it.       |
 | `saveDraft(invoices, withCode?)`       | `SaveResultDto[]`       | Save drafts; one result per invoice.           |
 | `getDraftPdf(refId, withCode?)`        | `PdfDocumentDto`        | PDF of a saved draft.                          |
@@ -101,6 +102,13 @@ Every method takes an optional last argument `opts?: CallOptions` (`{ signal?: A
 | `lookupCalculating(request, withCode)` | `PagedLookupResultDto`  | Paged lookup (calculating-machine invoices).   |
 | `issueReplacement(request)`            | `AmendmentResultDto`    | Issue a replacement invoice.                   |
 | `issueAdjustment(request)`             | `AmendmentResultDto`    | Issue an adjustment invoice.                   |
+
+`listTicketTemplates` calls MISA's `/webapp/templates/ticket` ("mẫu vé điện tử"). `request` is `{ withCode?, start?, length?, fromCashRegister? }` with defaults `true`, `0`, `20`, `false`; `length` is 1–100 and `fromCashRegister` is MISA's `invoiceCalcu` (cash-register / MTT templates). Rows come back as MISA sends them, active and inactive (`isActive`), because the endpoint is paged. A `start` below 0 or a `length` outside 1–100 throws `MeInvoiceException` with category `Validation` before any request.
+
+```ts
+const page = await client.listTicketTemplates({ start: 0, length: 100 });
+const usable = page.filter((t) => t.isActive);
+```
 
 ```ts
 const results = await client.saveDraft([invoice]); // one result per invoice, in input order

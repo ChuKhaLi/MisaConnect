@@ -4,6 +4,17 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-11-07
+
+Minor release of both families: EInvoice gains e-ticket template listing. ESign: no change (version moves in lock-step).
+
+### Added
+
+- **EInvoice:** `IMisaEInvoiceClient.ListTicketTemplatesAsync(TicketTemplateListRequestDto? request = null, CancellationToken ct = default)` → `IReadOnlyList<TicketTemplateDto>`, for MISA's `/webapp/templates/ticket` ("Lấy danh sách mẫu vé điện tử", API document §3.2; Ticket object §8.2). The request carries `WithCode`, `Start`, `Length` (1–100, default 20) and `FromCashRegister` (MISA's `invoiceCalcu`). Out-of-range values throw `MeInvoiceException` (`Validation`) before any request. Rows are returned active and inactive (`IsActive`), since the endpoint is paged.
+- Application: `ListTicketTemplates` use case, `TicketTemplateListRequest`; Domain: `TicketTemplate`. The `IMeInvoiceClient` port gains `ListTicketTemplatesAsync` with a default implementation (throws `NotImplementedException`, like the lookup and amendment members), so custom implementations keep compiling.
+- `MisaEInvoiceClient` keeps its existing public constructor; an instance built with it throws `InvalidOperationException` from `ListTicketTemplatesAsync`. DI uses the new constructor.
+- Sample API: `GET /api/templates/ticket?withCode&start&length&fromCashRegister`.
+
 ### Repo (TypeScript tooling, nothing shipped)
 
 - The TypeScript workspace moves from npm workspaces to **pnpm 12** (`pnpm-workspace.yaml`, `pnpm-lock.yaml`, `packageManager`). Isolated `node_modules`; only `esbuild` may run install scripts; the `minimatch` override moves to `pnpm-workspace.yaml`. Samples link the packages with `workspace:*`.

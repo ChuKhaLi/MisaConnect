@@ -2,6 +2,12 @@
 
 All notable changes to `@misaconnect/einvoice` are documented here.
 
+## [0.3.0] - 2026-11-07
+
+### Added
+
+- `listTicketTemplates(request?, opts?)`: one page of e-ticket templates from MISA's `/webapp/templates/ticket` (API document §3.2, Ticket object §8.2). `request` is `{ withCode?, start?, length?, fromCashRegister? }` (defaults `true` / `0` / `20` / `false`; `fromCashRegister` is MISA's `invoiceCalcu`). Returns `TicketTemplateDto[]` with all rows, active and inactive. `start < 0`, a non-integer, or `length` outside 1–100 throws `MeInvoiceException` (`Validation`) before any request. Same as .NET `MisaConnect.EInvoice` 2.10.0 `ListTicketTemplatesAsync`.
+
 ## [0.2.0] - 2026-11-07
 
 ### Changed (breaking)
