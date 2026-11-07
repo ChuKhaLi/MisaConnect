@@ -6,6 +6,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # pnpm 12 only resolves releases older than its minimum release age (~1 day); match it so
+    # Dependabot does not propose versions pnpm refuses to lock.
+    cooldown:
+      default-days: 1
     open-pull-requests-limit: 5
     groups:
       npm-minor-patch:
