@@ -25,6 +25,7 @@ dotnet add package MisaConnect.EInvoice
 | Use case | Purpose |
 | --- | --- |
 | `ListActiveTemplates` | Enumerate publishable invoice templates for the current tax payer. |
+| `ListTicketTemplates` | One page of e-ticket templates (MISA `/webapp/templates/ticket`), active and inactive. Since 2.10.0. |
 | `PreviewInvoice` | Generate a non-issued PDF preview for an in-memory invoice. |
 | `SaveDraftInvoices` | Persist one or more drafts using a client-supplied `RefId`. |
 | `GetDraftPdfByRefId` | Fetch a draft's PDF render by RefId. |

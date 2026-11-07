@@ -12,6 +12,8 @@ Minor release of both families: EInvoice gains e-ticket template listing. ESign:
 
 - **EInvoice:** `IMisaEInvoiceClient.ListTicketTemplatesAsync(TicketTemplateListRequestDto? request = null, CancellationToken ct = default)` → `IReadOnlyList<TicketTemplateDto>`, for MISA's `/webapp/templates/ticket` ("Lấy danh sách mẫu vé điện tử", API document §3.2; Ticket object §8.2). The request carries `WithCode`, `Start`, `Length` (1–100, default 20) and `FromCashRegister` (MISA's `invoiceCalcu`). Out-of-range values throw `MeInvoiceException` (`Validation`) before any request. Rows are returned active and inactive (`IsActive`), since the endpoint is paged.
 - Application: `ListTicketTemplates` use case, `TicketTemplateListRequest`; Domain: `TicketTemplate`. The `IMeInvoiceClient` port gains `ListTicketTemplatesAsync` with a default implementation (throws `NotImplementedException`, like the lookup and amendment members), so custom implementations keep compiling.
+- `IMisaEInvoiceClient.ListTicketTemplatesAsync` has a default implementation (throws `NotImplementedException`), so a custom implementation of the interface written for 2.9.0 still compiles and loads.
+- An unreadable ticket-template payload surfaces as `MeInvoiceException` (`MisaUnknown`, `InvalidResponse`), never a raw `JsonException`; `TicketType` / `TemplateType` sent as JSON strings are read; rows without a `TicketTemplateID` are skipped (as in TypeScript).
 - `MisaEInvoiceClient` keeps its existing public constructor; an instance built with it throws `InvalidOperationException` from `ListTicketTemplatesAsync`. DI uses the new constructor.
 - Sample API: `GET /api/templates/ticket?withCode&start&length&fromCashRegister`.
 

@@ -114,7 +114,7 @@ internal static class InvoiceDtoMapper
     {
         ArgumentNullException.ThrowIfNull(dto);
         return new TicketTemplate(
-            TicketTemplateID: dto.TicketTemplateID,
+            TicketTemplateID: dto.TicketTemplateID ?? string.Empty,
             TemplateName: dto.TemplateName ?? string.Empty,
             InvSeries: dto.InvSeries ?? string.Empty,
             IsActive: !dto.Inactive,

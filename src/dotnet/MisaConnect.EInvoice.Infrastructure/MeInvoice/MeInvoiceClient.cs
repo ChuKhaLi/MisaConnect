@@ -118,12 +118,30 @@ internal sealed class MeInvoiceClient : IMeInvoiceClient
             return Array.Empty<TicketTemplate>();
         }
 
-        var dtos = JsonSerializer.Deserialize<IReadOnlyList<TicketTemplateDto>>(envelope.data, MeInvoiceJsonOptions.Wire)
-            ?? Array.Empty<TicketTemplateDto>();
+        IReadOnlyList<TicketTemplateDto?> dtos;
+        try
+        {
+            dtos = JsonSerializer.Deserialize<IReadOnlyList<TicketTemplateDto?>>(envelope.data, MeInvoiceJsonOptions.Wire)
+                ?? Array.Empty<TicketTemplateDto?>();
+        }
+        catch (JsonException)
+        {
+            // This endpoint's wire shape is documented but not yet observed live: never let a
+            // System.Text.Json exception escape the SDK's MeInvoiceException contract.
+            throw new MeInvoiceException(
+                MeInvoiceErrorCategory.MisaUnknown,
+                rawErrorCode: "InvalidResponse",
+                message: "MISA returned a ticket templates payload that could not be read.");
+        }
 
         var output = new List<TicketTemplate>(dtos.Count);
         foreach (var dto in dtos)
         {
+            // Skip rows without a TicketTemplateID (as the TypeScript SDK does): the public DTO's ID is non-null.
+            if (dto is null || string.IsNullOrEmpty(dto.TicketTemplateID))
+            {
+                continue;
+            }
             output.Add(InvoiceDtoMapper.FromWire(dto));
         }
         return output;

@@ -23,11 +23,13 @@ internal sealed record TemplateDto(
 /// <c>ServiceName</c> and <c>IsTicketCode</c> as present in JSON but not in its table.
 /// </summary>
 internal sealed record TicketTemplateDto(
-    string TicketTemplateID,
+    string? TicketTemplateID,
     string? TemplateName,
     string? InvSeries,
     bool Inactive,
+    [property: System.Text.Json.Serialization.JsonNumberHandling(System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString)]
     int? TicketType,
+    [property: System.Text.Json.Serialization.JsonNumberHandling(System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString)]
     int? TemplateType,
     string? ServiceName,
     bool? IsInheritFromOldTemplate,
