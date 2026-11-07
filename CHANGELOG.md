@@ -4,6 +4,11 @@ All notable changes to MisaConnect will be documented here. This project follows
 
 ## [Unreleased]
 
+### Repo (TypeScript tooling, nothing shipped)
+
+- The TypeScript workspace moves from npm workspaces to **pnpm 12** (`pnpm-workspace.yaml`, `pnpm-lock.yaml`, `packageManager`). Isolated `node_modules`; only `esbuild` may run install scripts; the `minimatch` override moves to `pnpm-workspace.yaml`. Samples link the packages with `workspace:*`.
+- CI (`ts-ci`, `ts-sandbox`, `release-ts`) installs and runs on pnpm. Publishing is unchanged: `npm stage publish` (trusted publishing, staged approval). Published tarballs contain the same files.
+
 ## [2.9.0] - 2026-11-07
 
 Minor release of both families. EInvoice DI registration order no longer matters for its swappable ports. ESign: no change (version moves in lock-step).

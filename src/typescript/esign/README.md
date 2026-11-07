@@ -356,7 +356,7 @@ Further behaviour decided while implementing:
 The sandbox suite skips cleanly unless `MISACONNECT_ESIGN_SANDBOX_BASE_URL`, `_CLIENT_ID`, `_CLIENT_KEY`, `_USERNAME` and `_PASSWORD` are all set (`MISACONNECT_ESIGN_SANDBOX_REQUIRED=1` turns a skip into a failure):
 
 ```
-npm run test:sandbox -w @misaconnect/esign
+pnpm --filter @misaconnect/esign run test:sandbox
 ```
 
 ## License

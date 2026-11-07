@@ -1,7 +1,7 @@
 # Express sample
 
 ```
-npm run start -w @misaconnect/sample-express
+pnpm --filter @misaconnect/sample-express run start
 ```
 
 `start` type-checks first (`tsc --noEmit`) and then runs `server.ts` directly with Node's built-in

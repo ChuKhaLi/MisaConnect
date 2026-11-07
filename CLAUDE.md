@@ -18,15 +18,15 @@ dotnet test --project tests/dotnet/MisaConnect.EInvoice.UnitTests --filter "Full
 dotnet format MisaConnect.slnx                                                                           # required before PR
 ```
 
-TypeScript (npm workspace at repo root; packages under `src/typescript/*`; dev toolchain needs Node ≥ 22.18, packages support Node ≥ 22):
+TypeScript (pnpm workspace at repo root — `pnpm-workspace.yaml`, version pinned by `packageManager`, use `corepack pnpm` or an installed pnpm 12; packages under `src/typescript/*`; dev toolchain needs Node ≥ 22.18, packages support Node ≥ 22). Publishing stays on the npm CLI (`npm stage publish` in `release-ts.yml`):
 
 ```
-npm ci                                  # install workspace
-npm run build                           # tsup → ESM + CJS + .d.ts per package
-npm test                                # vitest, all packages (builds first)
-npm test -w @misaconnect/einvoice       # one package
-npm run lint && npm run format:check    # required before PR
-npm run typecheck
+pnpm install --frozen-lockfile                   # install workspace
+pnpm run build                                   # tsup → ESM + CJS + .d.ts per package
+pnpm test                                        # vitest, all packages (builds first)
+pnpm --filter @misaconnect/einvoice run test     # one package
+pnpm run lint && pnpm run format:check           # required before PR
+pnpm run typecheck
 ```
 
 Tests run on xunit.v3 over Microsoft Testing Platform (`global.json` → `test.runner`), so `dotnet test` needs `--project <dir>`; `--filter` still takes VSTest syntax, and a filter that matches no test exits 8.
