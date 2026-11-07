@@ -1,5 +1,5 @@
+using System.Runtime.CompilerServices;
 using Xunit;
-using Xunit.Sdk;
 
 namespace MisaConnect.ESign.IntegrationTests.Sandbox;
 
@@ -18,21 +18,18 @@ public enum SandboxRequirement
 /// <c>MISACONNECT_ESIGN_SANDBOX_USER_2FA_ENABLED</c> — when any of these is
 /// absent the fact skips cleanly.
 /// <para>
-/// Uses the Xunit.SkippableFact discoverer so a test can also skip at run time
-/// by throwing <see cref="SkipException"/> (see <see cref="SandboxSigning"/>).
-/// Two traps, both of which make the test silently disappear from discovery:
-/// the discoverer must be declared on this type (xUnit 2 does not inherit it),
-/// and the constructor must take no arguments, because the discoverer reads the
-/// first constructor argument as its <c>params Type[]</c> skipping-exception
-/// list. That is why the requirement is a named property.
+/// A test can also skip at run time with xUnit v3's built-in <c>Assert.Skip</c>
+/// (see <see cref="SandboxSigning"/>); no custom discoverer is needed.
 /// </para>
 /// </summary>
-[XunitTestCaseDiscoverer("Xunit.Sdk.SkippableFactDiscoverer", "Xunit.SkippableFact")]
 public sealed class SandboxFactAttribute : FactAttribute
 {
     private SandboxRequirement _requires;
 
-    public SandboxFactAttribute() => Evaluate();
+    public SandboxFactAttribute(
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber) => Evaluate();
 
     public SandboxRequirement Requires
     {

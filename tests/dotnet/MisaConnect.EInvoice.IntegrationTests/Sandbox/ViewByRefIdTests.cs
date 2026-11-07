@@ -12,11 +12,11 @@ public class ViewByRefIdTests
     {
         var client = SandboxClientFactory.Create();
         var dto = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
-        var saved = await client.SaveDraftAsync(new[] { dto });
+        var saved = await client.SaveDraftAsync(new[] { dto }, ct: TestContext.Current.CancellationToken);
         Assert.NotEmpty(saved);
 
         var refId = saved[0].RefId;
-        var pdf = await client.GetDraftPdfAsync(refId);
+        var pdf = await client.GetDraftPdfAsync(refId, ct: TestContext.Current.CancellationToken);
 
         Assert.NotEmpty(pdf.Content);
         Assert.Equal((byte)'%', pdf.Content[0]);
@@ -27,7 +27,7 @@ public class ViewByRefIdTests
     {
         var client = SandboxClientFactory.Create();
         var ex = await Assert.ThrowsAsync<MeInvoiceException>(
-            () => client.GetDraftPdfAsync($"non-existent-{Guid.NewGuid()}"));
+            () => client.GetDraftPdfAsync($"non-existent-{Guid.NewGuid()}", ct: TestContext.Current.CancellationToken));
         Assert.Equal(MeInvoiceErrorCategory.ResourceNotFound, ex.Category);
     }
 }

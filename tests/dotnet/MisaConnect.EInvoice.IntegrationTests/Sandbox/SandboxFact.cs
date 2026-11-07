@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace MisaConnect.EInvoice.IntegrationTests.Sandbox;
@@ -12,7 +13,10 @@ namespace MisaConnect.EInvoice.IntegrationTests.Sandbox;
 /// </summary>
 public sealed class SandboxFactAttribute : FactAttribute
 {
-    public SandboxFactAttribute()
+    public SandboxFactAttribute(
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (!SandboxCredentials.TryLoad(out _, out var credsMissing))
         {
@@ -34,7 +38,11 @@ public sealed class SandboxFactAttribute : FactAttribute
 /// </summary>
 public sealed class SandboxAmendmentFactAttribute : FactAttribute
 {
-    public SandboxAmendmentFactAttribute(string kind)
+    public SandboxAmendmentFactAttribute(
+        string kind,
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (!SandboxCredentials.TryLoad(out _, out var credsMissing))
         {

@@ -11,7 +11,7 @@ public class PreviewTests
     {
         var client = SandboxClientFactory.Create();
         var dto = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
-        var pdf = await client.PreviewAsync(dto);
+        var pdf = await client.PreviewAsync(dto, ct: TestContext.Current.CancellationToken);
 
         Assert.NotEmpty(pdf.Content);
         Assert.Equal((byte)'%', pdf.Content[0]);

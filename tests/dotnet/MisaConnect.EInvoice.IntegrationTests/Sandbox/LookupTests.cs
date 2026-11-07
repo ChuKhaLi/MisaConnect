@@ -36,7 +36,7 @@ public class LookupTests
         var b = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
         var c = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
 
-        var saved = await client.SaveDraftAsync(new[] { a, b, c });
+        var saved = await client.SaveDraftAsync(new[] { a, b, c }, ct: TestContext.Current.CancellationToken);
         Assert.Equal(3, saved.Count);
         var refIds = saved.Select(s => s.RefId).ToArray();
 
@@ -44,7 +44,7 @@ public class LookupTests
         await using var cleanB = SandboxDraftCleanup.Track(client, refIds[1], invoiceWithCode: true);
         await using var cleanC = SandboxDraftCleanup.Track(client, refIds[2], invoiceWithCode: true);
 
-        var outcome = await client.LookupByRefIdAsync(refIds, invoiceWithCode: true);
+        var outcome = await client.LookupByRefIdAsync(refIds, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal("Completed", outcome.Status);
         Assert.NotNull(outcome.Outcomes);
@@ -67,7 +67,7 @@ public class LookupTests
         var a = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
         var b = SampleInvoiceFactory.CreateDto(refId: Guid.NewGuid().ToString());
 
-        var saved = await client.SaveDraftAsync(new[] { a, b });
+        var saved = await client.SaveDraftAsync(new[] { a, b }, ct: TestContext.Current.CancellationToken);
         Assert.Equal(2, saved.Count);
         var seedA = saved[0].RefId;
         var seedB = saved[1].RefId;
@@ -78,7 +78,7 @@ public class LookupTests
 
         var outcome = await client.LookupByRefIdAsync(
             new[] { seedA, unknown, seedB },
-            invoiceWithCode: true);
+            invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal("Completed", outcome.Status);
         Assert.NotNull(outcome.Outcomes);
@@ -103,7 +103,7 @@ public class LookupTests
             refIds[i] = Guid.NewGuid().ToString();
         }
 
-        var outcome = await client.LookupByRefIdAsync(refIds, invoiceWithCode: true);
+        var outcome = await client.LookupByRefIdAsync(refIds, invoiceWithCode: true, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal("Completed", outcome.Status);
         Assert.NotNull(outcome.Outcomes);

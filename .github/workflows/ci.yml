@@ -84,9 +84,9 @@ jobs:
       - name: Integration tests (ESign, no sandbox)
         run: dotnet test tests/dotnet/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --logger "trx;LogFileName=esign-integration-tests.trx" --results-directory artifacts/test-results
 
-      # A broken skippable-fact setup does not fail: the ESign sandbox tests just vanish from
-      # discovery and CI stays green (e.g. Xunit.SkippableFact 1.5.x, or a SandboxFact
-      # constructor argument). Fail loudly if any of them stop being discovered.
+      # A broken fact-attribute or runner setup does not fail: the ESign sandbox tests just vanish
+      # from discovery and CI stays green (this happened with Xunit.SkippableFact 1.5.x under
+      # xunit 2). Fail loudly if any of them stop being discovered.
       - name: Guard ESign sandbox test discovery
         run: |
           listed=$(dotnet test tests/dotnet/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --list-tests)

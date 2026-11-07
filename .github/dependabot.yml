@@ -20,11 +20,12 @@ updates:
       nuget-minor-patch:
         update-types: [minor, patch]
     ignore:
-      # Pinned to 1.4.13: with xunit 2.4.2 + xunit.runner.visualstudio 2.8.2, 1.5.x test cases
-      # are not mapped back to VS test cases, so the ESign sandbox tests silently vanish from
-      # dotnet test output while CI stays green. See the comment in Directory.Packages.props.
-      - dependency-name: Xunit.SkippableFact
-        versions: [">= 1.5.0"]
+      # xunit.v3 4.x / runner 4.x need the Microsoft Testing Platform `dotnet test` mode, which
+      # changes every CI test command. See the comment in Directory.Packages.props.
+      - dependency-name: xunit.v3
+        versions: [">= 4.0.0"]
+      - dependency-name: xunit.runner.visualstudio
+        versions: [">= 4.0.0"]
 
   - package-ecosystem: github-actions
     directory: /

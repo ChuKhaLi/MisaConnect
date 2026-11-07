@@ -26,11 +26,22 @@ public static class SandboxSigning
         {
             return await sign();
         }
-        catch (NoActiveCertificateException) when (!required)
+        catch (Exception ex) when (SkipReasonFor(ex, required) is { } reason)
         {
-            throw new SkipException(
-                "Sandbox account has no ACTIVE certificate (NoActiveCertificate): login and certificate " +
-                $"listing worked; set {RequiredVar}=1 to fail instead.");
+            Assert.Skip(reason);
+            throw; // unreachable: Assert.Skip always throws
         }
     }
+
+    /// <summary>
+    /// The skip decision, kept separate from <see cref="Assert.Skip(string)"/> so it can be tested
+    /// directly (a skip raised inside a test skips that test). Only
+    /// <see cref="NoActiveCertificateException"/> becomes a skip, and only when not
+    /// <paramref name="required"/>; every other failure stays a failure.
+    /// </summary>
+    public static string? SkipReasonFor(Exception ex, bool required) =>
+        ex is NoActiveCertificateException && !required
+            ? "Sandbox account has no ACTIVE certificate (NoActiveCertificate): login and certificate " +
+              $"listing worked; set {RequiredVar}=1 to fail instead."
+            : null;
 }

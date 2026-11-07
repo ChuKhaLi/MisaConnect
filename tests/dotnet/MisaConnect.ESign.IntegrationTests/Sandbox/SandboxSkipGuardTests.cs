@@ -1,40 +1,38 @@
 using System.Reflection;
 using MisaConnect.ESign.Domain.Errors;
 using Xunit;
-using Xunit.Sdk;
 
 namespace MisaConnect.ESign.IntegrationTests.Sandbox;
 
 /// <summary>
-/// Network-free guards for the sandbox skip plumbing. A wrongly shaped
-/// <see cref="SandboxFactAttribute"/> does not fail: every sandbox test just
-/// disappears from discovery, so these checks pin the shape down.
+/// Network-free guards for the sandbox skip plumbing. The CI step "Guard ESign
+/// sandbox test discovery" additionally fails the build if the sandbox tests
+/// stop being discovered.
 /// </summary>
 public class SandboxSkipGuardTests
 {
     [Fact]
-    public void SandboxFact_declares_the_skippable_fact_discoverer()
+    public void SandboxFact_is_a_plain_fact_attribute()
     {
-        var discoverer = typeof(SandboxFactAttribute).GetCustomAttribute<XunitTestCaseDiscovererAttribute>(inherit: false);
-        Assert.NotNull(discoverer);
+        Assert.True(typeof(FactAttribute).IsAssignableFrom(typeof(SandboxFactAttribute)));
+        Assert.Null(typeof(SandboxFactAttribute).GetCustomAttribute<AttributeUsageAttribute>(inherit: false));
     }
 
     [Fact]
-    public void SandboxFact_has_only_a_parameterless_constructor()
+    public void No_active_certificate_becomes_a_skip_when_not_required()
     {
-        // SkippableFactDiscoverer reads the first constructor argument as its
-        // params Type[] list; any other argument breaks discovery.
-        var ctors = typeof(SandboxFactAttribute).GetConstructors();
-        Assert.All(ctors, c => Assert.Empty(c.GetParameters()));
+        var reason = SandboxSigning.SkipReasonFor(NoCert(), required: false);
+        Assert.NotNull(reason);
+        Assert.Contains(SandboxSigning.RequiredVar, reason);
     }
 
     [Fact]
-    public async Task No_active_certificate_becomes_a_skip_when_not_required()
-    {
-        var ex = await Assert.ThrowsAsync<Xunit.SkipException>(() =>
-            SandboxSigning.SignOrSkipAsync<int>(() => throw NoCert(), required: false));
-        Assert.Contains(SandboxSigning.RequiredVar, ex.Message);
-    }
+    public void No_active_certificate_is_not_a_skip_when_required() =>
+        Assert.Null(SandboxSigning.SkipReasonFor(NoCert(), required: true));
+
+    [Fact]
+    public void Other_failures_are_never_skip_reasons() =>
+        Assert.Null(SandboxSigning.SkipReasonFor(new InvalidOperationException(), required: false));
 
     [Fact]
     public async Task No_active_certificate_fails_when_required()
