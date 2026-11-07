@@ -115,4 +115,4 @@ MISA's published APIs use specific JSON envelope shapes, casing, and date format
 - EInvoice wire DTOs live in `MisaConnect.EInvoice.Infrastructure/MeInvoice/Wire/`; mapping in `MisaConnect.EInvoice.Infrastructure/MeInvoice/Mapping/`.
 - ESign wire DTOs live in `MisaConnect.ESign.Infrastructure/ESign/Wire/`; mapping in `MisaConnect.ESign.Infrastructure/ESign/Mapping/`.
 
-Cross-reference the [MISA reference docs](misa-api-reference/) for ground truth.
+Cross-reference the [MISA reference docs](https://github.com/ChuKhaLi/MisaConnect/tree/main/docs/misa-api-reference) for ground truth.
