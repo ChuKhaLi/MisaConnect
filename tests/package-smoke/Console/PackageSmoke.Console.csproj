@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Smoke.cs" />
+    <PackageReference Include="MisaConnect.ESign" Version="$(SmokePackageVersion)" />
+    <PackageReference Include="MisaConnect.EInvoice" Version="$(SmokePackageVersion)" />
+    <!-- A console app adds logging itself. Since 2.6.0 the packages need Microsoft.Extensions.* >= 10.0.14;
+         an 8.x reference here is reported at restore as NU1605 (downgrade), never as a runtime crash. -->
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.14" />
+  </ItemGroup>
+</Project>

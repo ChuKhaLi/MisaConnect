@@ -4,7 +4,7 @@
     <RootNamespace>MisaConnect.EInvoice.Client</RootNamespace>
     <AssemblyName>MisaConnect.EInvoice.Client</AssemblyName>
     <PackageId>MisaConnect.EInvoice</PackageId>
-    <Version>2.7.0</Version> <!-- release.yml overrides this from the v* tag; keep in step -->
+    <Version>2.7.1</Version> <!-- release.yml overrides this from the v* tag; keep in step -->
     <Description>Community .NET SDK for MISA MeInvoice. Provides a port-and-adapter facade for the MISA eInvoice HTTP API: token acquisition, template lookup, invoice preview/save/PDF/delete, lookup, and amendments.</Description>
     <PackageTags>misa;meinvoice;einvoice;vietnam;invoice;sdk;hoadon</PackageTags>
     <IsPackable>true</IsPackable>
@@ -17,10 +17,22 @@
     <ProjectReference Include="..\MisaConnect.EInvoice.Infrastructure\MisaConnect.EInvoice.Infrastructure.csproj" PrivateAssets="all" />
   </ItemGroup>
 
+  <!--
+    The Domain/Application/Infrastructure assemblies are bundled into this package
+    (PrivateAssets="all" + BundleReferencedProjects), so their own PackageReferences do not flow
+    into the nuspec. Every package they load at runtime MUST be listed here, or consumer apps fail
+    with FileNotFoundException (scripts/package-smoke.sh guards this in CI).
+  -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <Compile Include="../Smoke.cs" />
+    <PackageReference Include="MisaConnect.ESign" Version="$(SmokePackageVersion)" />
+    <PackageReference Include="MisaConnect.EInvoice" Version="$(SmokePackageVersion)" />
+  </ItemGroup>
+</Project>

@@ -26,7 +26,10 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          # 8.0.x: runtime for the net8.0 package smoke apps; 10.0.x: the SDK (global.json).
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Derive version
         id: ver
@@ -55,6 +58,13 @@ jobs:
 
       - name: Pack (ESign)
         run: dotnet pack src/dotnet/MisaConnect.ESign.Client/MisaConnect.ESign.Client.csproj --configuration Release -p:Version=${{ steps.ver.outputs.version }} -o artifacts
+
+      # Gate: never push a package that a consumer app cannot load.
+      - name: Package smoke test (consume the packed packages)
+        env:
+          SMOKE_FEED: artifacts
+          SMOKE_VERSION: ${{ steps.ver.outputs.version }}
+        run: bash scripts/package-smoke.sh
 
       - name: NuGet login (OIDC -> temp API key)
         id: nuget_login
