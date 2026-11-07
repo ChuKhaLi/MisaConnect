@@ -1,0 +1,12 @@
+# pnpm workspace: the TypeScript packages and their samples. Publishing stays on the npm CLI
+# (`npm stage publish`, trusted publishing) — see .github/workflows/release-ts.yml.
+packages:
+  - src/typescript/*
+  - samples/typescript/*
+
+allowBuilds:
+  esbuild: true
+
+overrides:
+  # GHSA-g3hv-75wg-m249 (ReDoS) in minimatch < 11.0.5, pulled by eslint / typescript-eslint.
+  minimatch: ^11.0.5

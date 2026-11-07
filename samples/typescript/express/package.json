@@ -8,8 +8,8 @@
     "start": "tsc --noEmit && node server.ts"
   },
   "dependencies": {
-    "@misaconnect/einvoice": "*",
-    "@misaconnect/esign": "*",
+    "@misaconnect/einvoice": "workspace:*",
+    "@misaconnect/esign": "workspace:*",
     "express": "^5.1.0"
   },
   "devDependencies": {
