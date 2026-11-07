@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -87,6 +88,61 @@ internal sealed class MeInvoiceClient : IMeInvoiceClient
         foreach (var dto in dtos)
         {
             output.Add(InvoiceDtoMapper.FromWire(dto, defaultWithCode: invoiceWithCode));
+        }
+        return output;
+    }
+
+    public async Task<IReadOnlyList<TicketTemplate>> ListTicketTemplatesAsync(TicketTemplateListRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var opts = _options.Value;
+        // MISA documents only headers + query params for this endpoint; the credential body is the
+        // same one /webapp/templates takes (see the 2026-11-07 ticket-templates design).
+        var body = new TemplateRequestDto(
+            TaxCode: WireTaxCode.Compose(opts),
+            UserName: opts.UserName,
+            Password: opts.Password);
+
+        var url = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{MeInvoiceHttpRoutes.TicketTemplates}?invoiceWithCode={(request.InvoiceWithCode ? "true" : "false")}&start={request.Start}&length={request.Length}&invoiceCalcu={(request.FromCashRegister ? "true" : "false")}");
+        var envelope = await PostEnvelopeAsync(url, body, ct).ConfigureAwait(false);
+
+        if (!envelope.success)
+        {
+            ThrowFromEnvelope(envelope);
+        }
+
+        if (string.IsNullOrEmpty(envelope.data))
+        {
+            return Array.Empty<TicketTemplate>();
+        }
+
+        IReadOnlyList<TicketTemplateDto?> dtos;
+        try
+        {
+            dtos = JsonSerializer.Deserialize<IReadOnlyList<TicketTemplateDto?>>(envelope.data, MeInvoiceJsonOptions.Wire)
+                ?? Array.Empty<TicketTemplateDto?>();
+        }
+        catch (JsonException)
+        {
+            // This endpoint's wire shape is documented but not yet observed live: never let a
+            // System.Text.Json exception escape the SDK's MeInvoiceException contract.
+            throw new MeInvoiceException(
+                MeInvoiceErrorCategory.MisaUnknown,
+                rawErrorCode: "InvalidResponse",
+                message: "MISA returned a ticket templates payload that could not be read.");
+        }
+
+        var output = new List<TicketTemplate>(dtos.Count);
+        foreach (var dto in dtos)
+        {
+            // Skip rows without a TicketTemplateID (as the TypeScript SDK does): the public DTO's ID is non-null.
+            if (dto is null || string.IsNullOrEmpty(dto.TicketTemplateID))
+            {
+                continue;
+            }
+            output.Add(InvoiceDtoMapper.FromWire(dto));
         }
         return output;
     }

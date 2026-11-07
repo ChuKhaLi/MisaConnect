@@ -83,6 +83,23 @@ export class FakeState {
   /** Every request received, in order (including rejected ones). */
   readonly requests: FakeRequest[] = [];
 
+  /** Rows served by `/webapp/templates/ticket` (MISA "Ticket" wire shape, §8.2). */
+  ticketTemplates: unknown[] = [
+    {
+      TicketTemplateID: 'tt-fake',
+      TemplateName: 'Fake ticket',
+      InvSeries: '5C26GAA',
+      Inactive: false,
+      TicketType: 1,
+      TemplateType: 5,
+      ServiceName: 'Fake service',
+      IsInheritFromOldTemplate: false,
+      IsTicketCode: true,
+    },
+  ];
+  /** Per-route envelope override (e.g. `'POST /webapp/templates/ticket'` → a `success:false` body). */
+  readonly envelopeOverrides = new Map<string, unknown>();
+
   /** Errors thrown while handling a request (the server answers those with a 500). */
   readonly errors: unknown[] = [];
   /** Delay (ms) before every non-token request is handled; lets tests abort mid-flight. */
@@ -267,7 +284,16 @@ function handle(state: FakeState, req: FakeRequest, res: ServerResponse): void {
     return;
   }
 
+  const override = state.envelopeOverrides.get(route);
+  if (override !== undefined) {
+    send(res, 200, override);
+    return;
+  }
+
   switch (route) {
+    case 'POST /webapp/templates/ticket':
+      send(res, 200, envelope(state.ticketTemplates));
+      return;
     case 'POST /webapp/templates':
       send(res, 200, envelope(state.templates));
       return;

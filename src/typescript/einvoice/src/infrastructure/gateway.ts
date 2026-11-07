@@ -5,7 +5,7 @@ import type {
   MeInvoiceTransport,
 } from '../application/ports.js';
 import { mapErrorCode } from '../application/error-mapper.js';
-import type { InvoiceSnapshotDto, TemplateDto } from '../domain/dtos.js';
+import type { InvoiceSnapshotDto, TemplateDto, TicketTemplateDto } from '../domain/dtos.js';
 import { MeInvoiceException } from '../domain/errors.js';
 import {
   extractErrorCode,
@@ -18,11 +18,17 @@ import { formatDateOnly } from './json.js';
 import { wireTaxCode } from './transport.js';
 import { fromWireSnapshot, type WireLookupRow } from './wire/lookup.js';
 import { toWireAmendment, toWireInvoice, type WireInvoice } from './wire/invoice.js';
-import { fromWireTemplate, type WireTemplate } from './wire/templates.js';
+import {
+  fromWireTemplate,
+  fromWireTicketTemplate,
+  type WireTemplate,
+  type WireTicketTemplate,
+} from './wire/templates.js';
 
 /** Port `MeInvoiceHttpRoutes`. */
 export const Routes = Object.freeze({
   Templates: 'webapp/templates',
+  TicketTemplates: 'webapp/templates/ticket',
   Preview: 'webapp/preview',
   ViewRefId: 'webapp/viewrefid',
   Insert: 'webapp/insert',
@@ -175,6 +181,45 @@ export function createMeInvoiceGateway(
         .map((w): TemplateDto =>
           fromWireTemplate(typeof w.InvSeries === 'string' ? w : { ...w, InvSeries: '' }, withCode),
         );
+    },
+
+    async listTicketTemplates(request, opts) {
+      // MISA documents only headers + query params here; the body is the one /webapp/templates takes.
+      const body = {
+        TaxCode: wireTaxCode(resolved.taxCode, resolved.appId),
+        UserName: resolved.userName,
+        Password: resolved.password,
+      };
+      const envelope = await transport.request<unknown>(
+        'POST',
+        Routes.TicketTemplates,
+        {
+          invoiceWithCode: flag(request.withCode),
+          start: String(request.start),
+          length: String(request.length),
+          invoiceCalcu: flag(request.fromCashRegister),
+        },
+        body,
+        opts,
+      );
+      if (!envelope.success) throwFromEnvelope(envelope);
+      const data = envelope.data;
+      if (data === undefined || data === null) return [];
+      if (!Array.isArray(data)) {
+        throw new MeInvoiceException('MisaUnknown', {
+          rawErrorCode: 'InvalidResponse',
+          message: 'MISA returned a ticket templates payload that is not an array.',
+        });
+      }
+      // Skip malformed rows (null / non-object, or no string TicketTemplateID), as listTemplates does.
+      return (data as unknown[])
+        .filter(
+          (w): w is WireTicketTemplate =>
+            typeof w === 'object' &&
+            w !== null &&
+            typeof (w as Record<string, unknown>)['TicketTemplateID'] === 'string',
+        )
+        .map((w): TicketTemplateDto => fromWireTicketTemplate(w));
     },
 
     async preview(invoice, refId, template, withCode, opts) {

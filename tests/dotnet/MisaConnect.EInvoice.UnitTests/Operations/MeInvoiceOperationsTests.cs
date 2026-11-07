@@ -14,7 +14,7 @@ public class MeInvoiceOperationsTests
         // (lookup-by-refid, lookup-paged-standard, lookup-paged-calculating).
         // Slice 6 appends two amendment operations (issue-replacement-invoice,
         // issue-adjustment-invoice).
-        Assert.Equal(10, MeInvoiceOperations.All.Count);
+        Assert.Equal(11, MeInvoiceOperations.All.Count);
     }
 
     [Fact]

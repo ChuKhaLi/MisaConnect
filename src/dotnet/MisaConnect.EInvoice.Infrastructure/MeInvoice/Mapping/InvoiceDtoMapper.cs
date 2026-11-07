@@ -109,4 +109,19 @@ internal static class InvoiceDtoMapper
             UsesTaxAuthorityCode: withCode,
             IsMoreVATRate: dto.IsMoreVATRate);
     }
+
+    public static TicketTemplate FromWire(TicketTemplateDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        return new TicketTemplate(
+            TicketTemplateID: dto.TicketTemplateID ?? string.Empty,
+            TemplateName: dto.TemplateName ?? string.Empty,
+            InvSeries: dto.InvSeries ?? string.Empty,
+            IsActive: !dto.Inactive,
+            TicketType: dto.TicketType ?? 0,
+            TemplateType: dto.TemplateType ?? 0,
+            ServiceName: dto.ServiceName,
+            IsInheritFromOldTemplate: dto.IsInheritFromOldTemplate ?? false,
+            IsTicketCode: dto.IsTicketCode ?? false);
+    }
 }

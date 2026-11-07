@@ -92,4 +92,11 @@ internal static class DtoMapper
     public static TemplateDto ToDto(Domain.Templates.Template t) => new(
         t.IPTemplateID, t.InvSeries, t.TemplateName, t.InvTemplateNo, t.TemplateType,
         t.UsesTaxAuthorityCode, t.IsActive, t.IsMoreVATRate);
+
+    public static TicketTemplateDto ToDto(Domain.Templates.TicketTemplate t) => new(
+        t.TicketTemplateID, t.TemplateName, t.InvSeries, t.IsActive, t.TicketType, t.TemplateType,
+        t.ServiceName, t.IsInheritFromOldTemplate, t.IsTicketCode);
+
+    public static Application.UseCases.TicketTemplateListRequest ToDomain(TicketTemplateListRequestDto r) => new(
+        r.WithCode, r.Start, r.Length, r.FromCashRegister);
 }

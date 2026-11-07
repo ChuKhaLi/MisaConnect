@@ -15,9 +15,9 @@ Community .NET SDK for MISA cloud APIs. Two independent NuGet packages ship from
 
 | Package | Covers | Docs |
 | --- | --- | --- |
-| **[`MisaConnect.EInvoice`](https://www.nuget.org/packages/MisaConnect.EInvoice)** | MISA MeInvoice — token acquisition, template lookup, invoice preview / save / PDF / delete, lookup, replacement & adjustment invoices. | [docs/einvoice/](docs/einvoice/) |
+| **[`MisaConnect.EInvoice`](https://www.nuget.org/packages/MisaConnect.EInvoice)** | MISA MeInvoice — token acquisition, template lookup, e-ticket template lookup, invoice preview / save / PDF / delete, lookup, replacement & adjustment invoices. | [docs/einvoice/](docs/einvoice/) |
 | **[`MisaConnect.ESign`](https://www.nuget.org/packages/MisaConnect.ESign)** | MISA eSign RemoteSigning — PDF / XML / Word / Excel signing, 2FA / OTP (explicit + transparent), webhook-mode (non-blocking) signing, optional per-call credentials via `IMisaCredentialsAccessor`. | [docs/esign/](docs/esign/) |
-| **[`@misaconnect/einvoice`](https://www.npmjs.com/package/@misaconnect/einvoice)** (TypeScript / npm) | Same ten MeInvoice operations as the .NET package — templates, preview, save / PDF / delete draft, lookups, replacement & adjustment invoices. Node >= 22, ESM + CJS. | [src/typescript/einvoice/README.md](src/typescript/einvoice/README.md) |
+| **[`@misaconnect/einvoice`](https://www.npmjs.com/package/@misaconnect/einvoice)** (TypeScript / npm) | Same eleven MeInvoice operations as the .NET package — templates, e-ticket templates, preview, save / PDF / delete draft, lookups, replacement & adjustment invoices. Node >= 22, ESM + CJS. | [src/typescript/einvoice/README.md](src/typescript/einvoice/README.md) |
 | **[`@misaconnect/esign`](https://www.npmjs.com/package/@misaconnect/esign)** (TypeScript / npm) | Same eSign RemoteSigning operations as the .NET package — PDF / XML / Word / Excel signing, explicit and transparent 2FA / OTP, webhook-mode (non-blocking) signing, per-call or provider credentials. Node >= 22, ESM + CJS. Live signing against MISA is not yet verified (tested against an in-repo fake server). | [src/typescript/esign/README.md](src/typescript/esign/README.md) |
 
 Both packages target **.NET 8 and .NET 10** and share the same layered architecture, options-pattern configuration, swappable ports, and wire-format fidelity with MISA's published APIs.

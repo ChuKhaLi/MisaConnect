@@ -145,6 +145,13 @@ describe.skipIf(!runnable)('MISA sandbox (live)', () => {
     expect(second.map((t) => t.ipTemplateID)).toEqual(first.map((t) => t.ipTemplateID));
   });
 
+  it('listTicketTemplates succeeds (the account may have none); every row has a TicketTemplateID', async () => {
+    const rows = await client.listTicketTemplates();
+    // Logged so a run shows whether the field mapping met real rows or only an empty list.
+    console.log(`ticket templates returned: ${rows.length}`);
+    for (const row of rows) expect(row.ticketTemplateID).not.toBe('');
+  });
+
   it('wrong password surfaces a MeInvoiceException', async () => {
     const bad = createClient('wrong-password-on-purpose');
     const err = await bad.listTemplates().catch((e: unknown) => e);

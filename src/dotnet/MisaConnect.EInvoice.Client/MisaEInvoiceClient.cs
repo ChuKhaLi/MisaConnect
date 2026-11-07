@@ -23,7 +23,13 @@ public sealed class MisaEInvoiceClient : IMisaEInvoiceClient
     private readonly LookupCalculating _lookupCalculating;
     private readonly IssueReplacementInvoice _issueReplacement;
     private readonly IssueAdjustmentInvoice _issueAdjustment;
+    private readonly ListTicketTemplates? _listTicketTemplates;
 
+    /// <summary>
+    /// Constructor kept for callers that build the client by hand (2.9.0 and earlier).
+    /// <see cref="ListTicketTemplatesAsync"/> throws <see cref="InvalidOperationException"/> on an instance built this way;
+    /// DI uses the constructor that also takes <see cref="ListTicketTemplates"/>.
+    /// </summary>
     public MisaEInvoiceClient(
         ListActiveTemplates listTemplates,
         PreviewInvoice preview,
@@ -35,7 +41,25 @@ public sealed class MisaEInvoiceClient : IMisaEInvoiceClient
         LookupCalculating lookupCalculating,
         IssueReplacementInvoice issueReplacement,
         IssueAdjustmentInvoice issueAdjustment)
+        : this(listTemplates, preview, saveDraft, getPdf, deleteDraft, lookupByRefIds, lookupStandard,
+            lookupCalculating, issueReplacement, issueAdjustment, listTicketTemplates: null)
     {
+    }
+
+    public MisaEInvoiceClient(
+        ListActiveTemplates listTemplates,
+        PreviewInvoice preview,
+        SaveDraftInvoices saveDraft,
+        GetDraftPdfByRefId getPdf,
+        DeleteDraftInvoice deleteDraft,
+        LookupByRefIds lookupByRefIds,
+        LookupStandard lookupStandard,
+        LookupCalculating lookupCalculating,
+        IssueReplacementInvoice issueReplacement,
+        IssueAdjustmentInvoice issueAdjustment,
+        ListTicketTemplates? listTicketTemplates)
+    {
+        _listTicketTemplates = listTicketTemplates;
         _listTemplates = listTemplates;
         _preview = preview;
         _saveDraft = saveDraft;
@@ -53,6 +77,24 @@ public sealed class MisaEInvoiceClient : IMisaEInvoiceClient
         var templates = await _listTemplates.ExecuteAsync(withCode, ct).ConfigureAwait(false);
         var list = new List<TemplateDto>(templates.Count);
         foreach (var t in templates) list.Add(DtoMapper.ToDto(t));
+        return list;
+    }
+
+    public async Task<IReadOnlyList<TicketTemplateDto>> ListTicketTemplatesAsync(
+        TicketTemplateListRequestDto? request = null,
+        CancellationToken ct = default)
+    {
+        if (_listTicketTemplates is null)
+        {
+            throw new InvalidOperationException(
+                "This MisaEInvoiceClient was constructed without ListTicketTemplates; resolve IMisaEInvoiceClient from DI (AddEInvoiceClient).");
+        }
+
+        var rows = await _listTicketTemplates
+            .ExecuteAsync(DtoMapper.ToDomain(request ?? new TicketTemplateListRequestDto()), ct)
+            .ConfigureAwait(false);
+        var list = new List<TicketTemplateDto>(rows.Count);
+        foreach (var t in rows) list.Add(DtoMapper.ToDto(t));
         return list;
     }
 

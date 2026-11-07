@@ -12,6 +12,28 @@ public sealed record TemplateDto(
 
 public sealed record TemplateRefDto(string IPTemplateID, string InvSeries);
 
+/// <summary>An e-ticket template ("mẫu vé") from MISA <c>/webapp/templates/ticket</c>.</summary>
+public sealed record TicketTemplateDto(
+    string TicketTemplateID,
+    string TemplateName,
+    string InvSeries,
+    bool IsActive,
+    int TicketType,
+    int TemplateType,
+    string? ServiceName,
+    bool IsInheritFromOldTemplate,
+    bool IsTicketCode);
+
+/// <summary>
+/// Paging query for <see cref="IMisaEInvoiceClient.ListTicketTemplatesAsync"/>. <paramref name="Length"/> is 1–100
+/// (MISA default 20); <paramref name="FromCashRegister"/> maps to MISA's <c>invoiceCalcu</c> (cash-register / MTT templates).
+/// </summary>
+public sealed record TicketTemplateListRequestDto(
+    bool WithCode = true,
+    int Start = 0,
+    int Length = 20,
+    bool FromCashRegister = false);
+
 public sealed record BuyerInfoDto(
     string Name,
     string? TaxCode = null,

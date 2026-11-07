@@ -43,6 +43,9 @@ public sealed class MeInvoiceCallLogger : IMeInvoiceClient
     public Task<IReadOnlyList<Template>> ListTemplatesAsync(bool invoiceWithCode, CancellationToken ct) =>
         Wrap("ListTemplates", null, null, () => _inner.ListTemplatesAsync(invoiceWithCode, ct));
 
+    public Task<IReadOnlyList<TicketTemplate>> ListTicketTemplatesAsync(TicketTemplateListRequest request, CancellationToken ct) =>
+        Wrap("ListTicketTemplates", null, null, () => _inner.ListTicketTemplatesAsync(request, ct));
+
     public Task<PdfDocument> PreviewAsync(Invoice invoice, bool invoiceWithCode, CancellationToken ct) =>
         Wrap("Preview", invoice.RefId.Value, invoice.Template?.IPTemplateID, () => _inner.PreviewAsync(invoice, invoiceWithCode, ct));
 

@@ -76,6 +76,7 @@ public static class ServiceCollectionExtensions
                 () => WireTaxCode.Compose(options.Value));
         });
         services.AddScoped<ListActiveTemplates>();
+        services.AddScoped<ListTicketTemplates>();
         services.TryAddScoped<ITemplateResolver, TemplateResolver>();
         services.AddScoped<PreviewInvoice>();
         services.AddScoped<SaveDraftInvoices>();

@@ -4,6 +4,7 @@ internal static class MeInvoiceHttpRoutes
 {
     public const string Token = "webapp/token";
     public const string Templates = "webapp/templates";
+    public const string TicketTemplates = "webapp/templates/ticket";
     public const string Preview = "webapp/preview";
     public const string Insert = "webapp/insert";
     public const string ViewRefId = "webapp/viewrefid";

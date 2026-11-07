@@ -70,4 +70,13 @@ public interface IMeInvoiceClient
         bool invoiceWithCode,
         CancellationToken ct)
         => throw new NotImplementedException();
+
+    // E-ticket templates (/webapp/templates/ticket). Default implementation throws
+    // NotImplementedException, like the slice 5/6 members above, so custom
+    // implementations of this port keep compiling.
+
+    Task<IReadOnlyList<TicketTemplate>> ListTicketTemplatesAsync(
+        TicketTemplateListRequest request,
+        CancellationToken ct)
+        => throw new NotImplementedException();
 }

@@ -17,6 +17,32 @@ export interface TemplateDto {
   isMoreVATRate: boolean;
 }
 
+/** An e-ticket template ("mẫu vé") from MISA `/webapp/templates/ticket` (API document §8.2). */
+export interface TicketTemplateDto {
+  ticketTemplateID: string;
+  templateName: string;
+  invSeries: string;
+  /** MISA's `Inactive`, inverted. Rows are returned active and inactive alike. */
+  isActive: boolean;
+  /** MISA's raw ticket type (no documented enum). */
+  ticketType: number;
+  templateType: number;
+  serviceName?: string;
+  isInheritFromOldTemplate: boolean;
+  isTicketCode: boolean;
+}
+
+/** Paging query for `listTicketTemplates`. Defaults: `withCode` true, `start` 0, `length` 20, `fromCashRegister` false. */
+export interface TicketTemplateListRequestDto {
+  withCode?: boolean;
+  /** Offset, >= 0. */
+  start?: number;
+  /** Page size, 1–100 (MISA's maximum). */
+  length?: number;
+  /** MISA `invoiceCalcu`: ticket templates from a cash register (MTT). */
+  fromCashRegister?: boolean;
+}
+
 export interface TemplateRefDto {
   ipTemplateID: string;
   invSeries: string;

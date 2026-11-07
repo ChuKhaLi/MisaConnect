@@ -16,3 +16,21 @@ internal sealed record TemplateDto(
     int TemplateType,
     bool Inactive,
     bool IsMoreVATRate);
+
+/// <summary>
+/// Incoming row from <c>/webapp/templates/ticket</c> (MISA API document §8.2 "Ticket").
+/// Field names are MISA's verbatim. Optional fields are nullable: MISA marks
+/// <c>ServiceName</c> and <c>IsTicketCode</c> as present in JSON but not in its table.
+/// </summary>
+internal sealed record TicketTemplateDto(
+    string? TicketTemplateID,
+    string? TemplateName,
+    string? InvSeries,
+    bool Inactive,
+    [property: System.Text.Json.Serialization.JsonNumberHandling(System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString)]
+    int? TicketType,
+    [property: System.Text.Json.Serialization.JsonNumberHandling(System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString)]
+    int? TemplateType,
+    string? ServiceName,
+    bool? IsInheritFromOldTemplate,
+    bool? IsTicketCode);

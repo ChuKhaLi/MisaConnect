@@ -18,6 +18,11 @@ public static class MeInvoiceOperations
             "GET /api/templates",
             "ListTemplatesAsync"),
         new MeInvoiceOperation(
+            "list-ticket-templates",
+            typeof(ListTicketTemplates),
+            "GET /api/templates/ticket",
+            "ListTicketTemplatesAsync"),
+        new MeInvoiceOperation(
             "preview-invoice",
             typeof(PreviewInvoice),
             "POST /api/invoices/preview",
