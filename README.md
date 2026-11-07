@@ -6,82 +6,74 @@
 
 [![Docs](https://img.shields.io/badge/docs-chukhali.github.io%2FMisaConnect-blue)](https://chukhali.github.io/MisaConnect/)
 [![MisaConnect.EInvoice](https://img.shields.io/nuget/v/MisaConnect.EInvoice.svg?label=MisaConnect.EInvoice)](https://www.nuget.org/packages/MisaConnect.EInvoice)
-[![Downloads](https://img.shields.io/nuget/dt/MisaConnect.EInvoice.svg?label=downloads)](https://www.nuget.org/packages/MisaConnect.EInvoice)
 [![MisaConnect.ESign](https://img.shields.io/nuget/v/MisaConnect.ESign.svg?label=MisaConnect.ESign)](https://www.nuget.org/packages/MisaConnect.ESign)
-[![Downloads](https://img.shields.io/nuget/dt/MisaConnect.ESign.svg?label=downloads)](https://www.nuget.org/packages/MisaConnect.ESign)
+[![@misaconnect/einvoice](https://img.shields.io/npm/v/@misaconnect/einvoice.svg?label=%40misaconnect%2Feinvoice)](https://www.npmjs.com/package/@misaconnect/einvoice)
+[![@misaconnect/esign](https://img.shields.io/npm/v/@misaconnect/esign.svg?label=%40misaconnect%2Fesign)](https://www.npmjs.com/package/@misaconnect/esign)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Community .NET SDK for MISA cloud APIs. Two independent NuGet packages ship from this repo, each a port-and-adapter facade over a separate MISA product:
+Community SDKs for MISA cloud APIs, for **.NET** and **TypeScript**. Four independent packages, one per MISA product and language, with the same operations in both languages. Not affiliated with MISA JSC.
 
-| Package | Covers | Docs |
-| --- | --- | --- |
-| **[`MisaConnect.EInvoice`](https://www.nuget.org/packages/MisaConnect.EInvoice)** | MISA MeInvoice — token acquisition, template lookup, e-ticket template lookup, invoice preview / save / PDF / delete, lookup, replacement & adjustment invoices. | [docs/einvoice/](docs/einvoice/) |
-| **[`MisaConnect.ESign`](https://www.nuget.org/packages/MisaConnect.ESign)** | MISA eSign RemoteSigning — PDF / XML / Word / Excel signing, 2FA / OTP (explicit + transparent), webhook-mode (non-blocking) signing, optional per-call credentials via `IMisaCredentialsAccessor`. | [docs/esign/](docs/esign/) |
-| **[`@misaconnect/einvoice`](https://www.npmjs.com/package/@misaconnect/einvoice)** (TypeScript / npm) | Same eleven MeInvoice operations as the .NET package — templates, e-ticket templates, preview, save / PDF / delete draft, lookups, replacement & adjustment invoices. Node >= 22, ESM + CJS. | [src/typescript/einvoice/README.md](src/typescript/einvoice/README.md) |
-| **[`@misaconnect/esign`](https://www.npmjs.com/package/@misaconnect/esign)** (TypeScript / npm) | Same eSign RemoteSigning operations as the .NET package — PDF / XML / Word / Excel signing, explicit and transparent 2FA / OTP, webhook-mode (non-blocking) signing, per-call or provider credentials. Node >= 22, ESM + CJS. Live signing against MISA is not yet verified (tested against an in-repo fake server). | [src/typescript/esign/README.md](src/typescript/esign/README.md) |
+| Product | .NET (NuGet) | TypeScript (npm) | Docs |
+| --- | --- | --- | --- |
+| **EInvoice** — MISA MeInvoice: invoice and e-ticket templates, preview, drafts, lookups, replacement and adjustment invoices | [`MisaConnect.EInvoice`](https://www.nuget.org/packages/MisaConnect.EInvoice) | [`@misaconnect/einvoice`](https://www.npmjs.com/package/@misaconnect/einvoice) | [docs/einvoice](docs/einvoice/index.md) |
+| **ESign** — MISA eSign RemoteSigning: PDF / XML / Word / Excel signing, two-factor sign-in, webhook mode, per-call credentials | [`MisaConnect.ESign`](https://www.nuget.org/packages/MisaConnect.ESign) | [`@misaconnect/esign`](https://www.npmjs.com/package/@misaconnect/esign) | [docs/esign](docs/esign/index.md) |
 
-Both packages target **.NET 8 and .NET 10** and share the same layered architecture, options-pattern configuration, swappable ports, and wire-format fidelity with MISA's published APIs.
-
-> 📖 **Full docs:** <https://chukhali.github.io/MisaConnect/>
-
-## Install
-
-```
-dotnet add package MisaConnect.EInvoice    # invoice operations
-dotnet add package MisaConnect.ESign       # digital-signature operations
-```
-
-The two packages are entirely independent — install whichever you need (or both).
-
-**Requirements:** .NET 8 or .NET 10 (each package ships a build for both). The packages depend on `Microsoft.Extensions.*` **10.0.14 or later**, which also runs on .NET 8. If your app pins a `Microsoft.Extensions.*` package below 10.0.14, restore fails with `NU1605` (package downgrade) naming it; raise that reference to 10.0.14 or later.
+Full documentation: <https://chukhali.github.io/MisaConnect/> (sources in [`docs/`](docs/index.md)).
 
 ## Quickstart
 
-See the per-package READMEs and getting-started guides for runnable examples:
+.NET 8 / .NET 10 (`dotnet add package MisaConnect.EInvoice`):
 
-- **EInvoice** — [package README](src/dotnet/MisaConnect.EInvoice.Client/README.md) · [getting started](docs/einvoice/getting-started.md)
-- **ESign** — [package README](src/dotnet/MisaConnect.ESign.Client/README.md) · [getting started](docs/esign/getting-started.md)
-
-## Project layout
-
-```
-src/
-  MisaConnect.EInvoice.Domain/         entities, value objects, errors
-  MisaConnect.EInvoice.Application/    use cases + port interfaces
-  MisaConnect.EInvoice.Infrastructure/ MISA HTTP client + DI
-  MisaConnect.EInvoice.Client/         consumer-facing facade (the NuGet package)
-  MisaConnect.ESign.Domain/            entities, value objects, errors
-  MisaConnect.ESign.Application/       use cases + port interfaces
-  MisaConnect.ESign.Infrastructure/    MISA HTTP client + DI
-  MisaConnect.ESign.Client/            consumer-facing facade (the NuGet package)
-samples/
-  MisaConnect.Samples.Console/         minimal DI wiring + ListTemplates demo (EInvoice)
-  MisaConnect.Samples.Api/             ASP.NET Core minimal-API reference host (both families)
-tests/
-  MisaConnect.EInvoice.UnitTests/      EInvoice unit tests, no network
-  MisaConnect.EInvoice.IntegrationTests/ EInvoice sandbox + fake-server tests
-  MisaConnect.ESign.UnitTests/         ESign unit tests, no network
-  MisaConnect.ESign.IntegrationTests/  ESign sandbox + EsignFake tests
-docs/
-  architecture.md                      layered design shared by both families
-  einvoice/                            EInvoice guides (getting-started, configuration, sandbox)
-  esign/                               ESign guides (getting-started, configuration, sandbox)
-  misa-api-reference/                  copies of MISA public reference docs
+<!-- snippet: partial -->
+```csharp
+services.AddEInvoiceClient(configuration);           // binds "Misa:EInvoice"
+var client = provider.GetRequiredService<IMisaEInvoiceClient>();
+var templates = await client.ListTemplatesAsync();
 ```
 
-See [docs/architecture.md](docs/architecture.md) for the layered (Domain → Application → Infrastructure → Client) design and [docs/constitution.md](docs/constitution.md) for the binding project principles.
+TypeScript, Node.js 22+ (`npm install @misaconnect/einvoice`):
 
-## Documentation
+<!-- snippet: partial -->
+```ts
+import { createMisaEInvoiceClient } from '@misaconnect/einvoice';
 
-- [Architecture](docs/architecture.md) — shared design across both families
-- [MisaConnect.EInvoice guides](docs/einvoice/) — getting started, configuration, sandbox setup
-- [MisaConnect.ESign guides](docs/esign/) — getting started, configuration, sandbox setup
-- [MISA API reference](docs/misa-api-reference/) — copies of MISA's official CURL/schema docs
-- [CHANGELOG](CHANGELOG.md) — per-release notes, both families
+const client = createMisaEInvoiceClient({ environment: 'sandbox', baseUrl, taxCode, userName, password, appId });
+const templates = await client.listTemplates();
+```
+
+Complete, runnable versions: [EInvoice for .NET](docs/einvoice/dotnet/getting-started.md) · [EInvoice for TypeScript](docs/einvoice/typescript/getting-started.md) · [ESign for .NET](docs/esign/dotnet/getting-started.md) · [ESign for TypeScript](docs/esign/typescript/getting-started.md).
+
+## Repository layout
+
+```
+src/dotnet/        MisaConnect.{EInvoice,ESign}.{Domain,Application,Infrastructure,Client}  (Client = the NuGet package)
+src/typescript/    einvoice/, esign/  (the npm packages)
+samples/dotnet/    MisaConnect.Samples.Console (EInvoice), MisaConnect.Samples.Api (ASP.NET Core, both products)
+samples/typescript express/, nestjs/
+tests/dotnet/      unit + integration tests per product (integration = in-repo fake servers + sandbox)
+tests/package-smoke/  consumer apps run against the packed NuGet packages
+docs/              documentation site (GitHub Pages), architecture, MISA API reference copies
+```
+
+The .NET layering (Domain → Application → Infrastructure → Client) is described in [docs/architecture.md](docs/architecture.md); project principles in [docs/constitution.md](docs/constitution.md).
+
+## Build and test
+
+```bash
+dotnet build MisaConnect.slnx
+dotnet test --project tests/dotnet/MisaConnect.EInvoice.UnitTests     # also: EInvoice.IntegrationTests, ESign.UnitTests, ESign.IntegrationTests
+dotnet format MisaConnect.slnx
+
+pnpm install --frozen-lockfile     # TypeScript workspace (pnpm 12 via packageManager; corepack pnpm works)
+pnpm test
+pnpm run lint && pnpm run format:check && pnpm run typecheck
+```
+
+Sandbox tests skip cleanly without MISA credentials; see the sandbox-setup pages in the docs.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Design-driven development: each change starts from a design in `docs/superpowers/specs/` and a plan in `docs/superpowers/plans/`.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Each change starts from a design in `docs/superpowers/specs/` and a plan in `docs/superpowers/plans/`. Release notes: [CHANGELOG.md](CHANGELOG.md) (NuGet packages), [einvoice](src/typescript/einvoice/CHANGELOG.md) and [esign](src/typescript/esign/CHANGELOG.md) CHANGELOGs (npm packages).
 
 ## License
 

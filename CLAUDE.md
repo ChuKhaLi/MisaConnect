@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # MisaConnect
 
-This repository is **MisaConnect** — a community .NET SDK for MISA cloud APIs. Two product families ship as independent NuGet packages: `MisaConnect.EInvoice` (v1.x, MISA eInvoice operations) and `MisaConnect.ESign` (v2.x, MISA eSign RemoteSigning operations). Each family is consumed via its own NuGet package; the API/host layer is shipped only as a sample under `samples/`. Development uses the superpowers flow: a design under `docs/superpowers/specs/`, then a plan under `docs/superpowers/plans/`. `specs/001`–`009` are archived Spec Kit slices (read-only). See [docs/architecture.md](docs/architecture.md) for the layered design (Domain → Application → Infrastructure → Client), [docs/constitution.md](docs/constitution.md) for the binding project principles, and [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
+This repository is **MisaConnect** — community .NET and TypeScript SDKs for MISA cloud APIs. Two product families ship as independent NuGet packages, `MisaConnect.EInvoice` and `MisaConnect.ESign` (both v2.x, released in lock-step), and as independent npm packages, `@misaconnect/einvoice` and `@misaconnect/esign` (0.x, under `src/typescript/`). Each family is consumed via its own package; the API/host layer is shipped only as a sample under `samples/`. Development uses the superpowers flow: a design under `docs/superpowers/specs/`, then a plan under `docs/superpowers/plans/`. `specs/001`–`009` are archived Spec Kit slices (read-only). See [docs/architecture.md](docs/architecture.md) for the layered design (Domain → Application → Infrastructure → Client), [docs/constitution.md](docs/constitution.md) for the binding project principles, and [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
 
 ## Build & test
 
@@ -53,23 +53,34 @@ All work, .NET and TypeScript, follows the superpowers flow (constitution v1.3.0
 1. Design + plan as above.
 2. Implement Domain types → Application use case + port → Infrastructure adapter → Client facade.
 3. Unit tests required. Integration tests against the relevant sandbox or in-repo fake server (`tests/dotnet/MisaConnect.EInvoice.IntegrationTests/MisaFake/` for EInvoice, `tests/dotnet/MisaConnect.ESign.IntegrationTests/EsignFake/` for ESign).
-4. Update `README.md` supported-operations table and add a `CHANGELOG.md` entry under `[Unreleased]`.
+4. Update the operations table in the package README and the language's `operations.md` page on the docs site (`docs/<product>/<dotnet|typescript>/`), and add a `CHANGELOG.md` entry under `[Unreleased]`.
 
 ## Public surface
 
-### MisaConnect.EInvoice (v1.x)
+### MisaConnect.EInvoice (v2.x, lock-step with ESign)
 
-- Entry point: `services.AddMisaConnectEInvoice(IConfiguration)` — binds the `Misa:EInvoice` section.
+- Entry points: `services.AddEInvoiceClient(IConfiguration)` (Client package: facade + correlation accessor) or `services.AddMisaConnectEInvoice(IConfiguration)` (Infrastructure only) — both bind the `Misa:EInvoice` section.
 - Options type: `MisaEInvoiceOptions` (section name constant `Misa:EInvoice`).
 - Client facade interface: `IMisaEInvoiceClient`.
-- Use cases (resolved via DI): `ListActiveTemplates`, `PreviewInvoice`, `SaveDraftInvoices`, `GetDraftPdfByRefId`, `DeleteDraftInvoice`, `LookupByRefIds`, `LookupStandard`, `LookupCalculating`, `IssueReplacementInvoice`, `IssueAdjustmentInvoice`.
+- Facade methods: `ListTemplatesAsync`, `ListTicketTemplatesAsync`, `PreviewAsync`, `SaveDraftAsync`, `GetDraftPdfAsync`, `DeleteDraftAsync`, `LookupByRefIdAsync`, `LookupStandardAsync`, `LookupCalculatingAsync`, `IssueReplacementAsync`, `IssueAdjustmentAsync`.
+- Use cases (resolved via DI): `ListActiveTemplates`, `ListTicketTemplates`, `PreviewInvoice`, `SaveDraftInvoices`, `GetDraftPdfByRefId`, `DeleteDraftInvoice`, `LookupByRefIds`, `LookupStandard`, `LookupCalculating`, `IssueReplacementInvoice`, `IssueAdjustmentInvoice`.
 
 ### MisaConnect.ESign (v2.x)
 
 - Entry point: `services.AddMisaConnectESign(IConfiguration)` — binds the `Misa:ESign` section.
 - Options type: `MisaESignOptions` (section name constant `Misa:ESign`).
 - Client facade interface: `IMisaESignClient`.
-- Facade methods (resolved via DI): `SignPdfAsync`, `SignInWithOtpAsync`, `ResendOtpAsync`, `SignXmlAsync` (string + bytes overloads), `SignWordAsync`, `SignExcelAsync`, `BeginSignPdfAsync`, `BeginSignXmlAsync`, `BeginSignWordAsync`, `BeginSignExcelAsync`, `HandleWebhookAsync`.
+- Facade methods (resolved via DI): `SignPdfAsync`, `SignInWithOtpAsync`, `ResendOtpAsync`, `SignXmlAsync` (request from `SignXmlRequest.FromString` / `FromUtf8Bytes`), `SignWordAsync`, `SignExcelAsync`, `BeginSignPdfAsync`, `BeginSignXmlAsync`, `BeginSignWordAsync`, `BeginSignExcelAsync`, `HandleWebhookAsync`.
+
+### TypeScript packages (0.x, versioned independently)
+
+- `@misaconnect/einvoice` (`src/typescript/einvoice`): `createMisaEInvoiceClient(options)` → `IMisaEInvoiceClient`, same 11 operations as .NET (camelCase).
+- `@misaconnect/esign` (`src/typescript/esign`): `createMisaESignClient(options)` → `IMisaESignClient`, same operations as .NET.
+- Public surface = what each package's `src/index.ts` exports; per-package `CHANGELOG.md`; tags `einvoice-ts-v*` / `esign-ts-v*`.
+
+### Documentation site
+
+- GitHub Pages from `main:/docs` (just-the-docs); merging to `main` publishes. Layout: `docs/<product>/index.md` (shared MISA concepts) → `docs/<product>/{dotnet,typescript}/` (getting-started, configuration, operations, errors, sandbox-setup; ESign also two-factor, webhooks, credentials). Package READMEs stay short and link to the site with absolute URLs.
 
 ## Logging
 
