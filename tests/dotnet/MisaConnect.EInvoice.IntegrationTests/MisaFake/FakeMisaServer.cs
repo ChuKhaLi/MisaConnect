@@ -95,6 +95,17 @@ internal sealed class FakeMisaServer : IAsyncDisposable
             await ctx.Response.WriteAsync(body);
         });
 
+        app.MapPost("/webapp/templates/ticket", async (HttpContext ctx) =>
+        {
+            await self!.CaptureAsync(ctx);
+            // One active e-ticket template in MISA's Ticket wire shape (API document §8.2).
+            // The request body is deliberately not asserted.
+            const string body = """{"success":true,"data":"[{\"TicketTemplateID\":\"tt-fake\",\"TemplateName\":\"Fake ticket\",\"InvSeries\":\"5C26GAA\",\"Inactive\":false,\"TicketType\":1,\"TemplateType\":5,\"ServiceName\":\"Fake service\",\"IsInheritFromOldTemplate\":false,\"IsTicketCode\":true}]","error":null,"errorCode":null}""";
+            ctx.Response.StatusCode = 200;
+            ctx.Response.ContentType = "application/json";
+            await ctx.Response.WriteAsync(body);
+        });
+
         app.MapDelete("/webapp/delete", async (HttpContext ctx) =>
         {
             await self!.CaptureAsync(ctx);

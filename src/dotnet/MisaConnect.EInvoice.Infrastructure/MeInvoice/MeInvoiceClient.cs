@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -87,6 +88,43 @@ internal sealed class MeInvoiceClient : IMeInvoiceClient
         foreach (var dto in dtos)
         {
             output.Add(InvoiceDtoMapper.FromWire(dto, defaultWithCode: invoiceWithCode));
+        }
+        return output;
+    }
+
+    public async Task<IReadOnlyList<TicketTemplate>> ListTicketTemplatesAsync(TicketTemplateListRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var opts = _options.Value;
+        // MISA documents only headers + query params for this endpoint; the credential body is the
+        // same one /webapp/templates takes (see the 2026-11-07 ticket-templates design).
+        var body = new TemplateRequestDto(
+            TaxCode: WireTaxCode.Compose(opts),
+            UserName: opts.UserName,
+            Password: opts.Password);
+
+        var url = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{MeInvoiceHttpRoutes.TicketTemplates}?invoiceWithCode={(request.InvoiceWithCode ? "true" : "false")}&start={request.Start}&length={request.Length}&invoiceCalcu={(request.FromCashRegister ? "true" : "false")}");
+        var envelope = await PostEnvelopeAsync(url, body, ct).ConfigureAwait(false);
+
+        if (!envelope.success)
+        {
+            ThrowFromEnvelope(envelope);
+        }
+
+        if (string.IsNullOrEmpty(envelope.data))
+        {
+            return Array.Empty<TicketTemplate>();
+        }
+
+        var dtos = JsonSerializer.Deserialize<IReadOnlyList<TicketTemplateDto>>(envelope.data, MeInvoiceJsonOptions.Wire)
+            ?? Array.Empty<TicketTemplateDto>();
+
+        var output = new List<TicketTemplate>(dtos.Count);
+        foreach (var dto in dtos)
+        {
+            output.Add(InvoiceDtoMapper.FromWire(dto));
         }
         return output;
     }
