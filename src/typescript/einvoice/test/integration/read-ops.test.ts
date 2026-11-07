@@ -171,6 +171,99 @@ describe('listTemplates', () => {
   });
 });
 
+describe('listTicketTemplates', () => {
+  const route = 'POST /webapp/templates/ticket';
+
+  it('posts the documented query params (defaults) and the templates body, and maps rows', async () => {
+    const rows = await client().listTicketTemplates();
+    expect(rows).toEqual([
+      {
+        ticketTemplateID: 'tt-fake',
+        templateName: 'Fake ticket',
+        invSeries: '5C26GAA',
+        isActive: true,
+        ticketType: 1,
+        templateType: 5,
+        serviceName: 'Fake service',
+        isInheritFromOldTemplate: false,
+        isTicketCode: true,
+      },
+    ]);
+    const [req] = nonToken();
+    expect(req?.method).toBe('POST');
+    expect(req?.path).toBe('/webapp/templates/ticket');
+    expect(req?.query).toBe('invoiceWithCode=true&start=0&length=20&invoiceCalcu=false');
+    expect(JSON.parse(req?.bodyText ?? '')).toEqual({
+      TaxCode: '0101243150-APP-1',
+      UserName: 'user@example.com',
+      Password: PASSWORD,
+    });
+  });
+
+  it('sends the caller values', async () => {
+    await client().listTicketTemplates({
+      withCode: false,
+      start: 40,
+      length: 100,
+      fromCashRegister: true,
+    });
+    expect(nonToken()[0]?.query).toBe(
+      'invoiceWithCode=false&start=40&length=100&invoiceCalcu=true',
+    );
+  });
+
+  it('returns inactive rows too, defaults missing optional fields, and skips rows without a string TicketTemplateID', async () => {
+    fake.state.ticketTemplates.push({ TicketTemplateID: 'tt-old', Inactive: true }, null, 'junk', {
+      TicketTemplateID: 7,
+    });
+    const rows = await client().listTicketTemplates();
+    expect(rows.map((r) => r.ticketTemplateID)).toEqual(['tt-fake', 'tt-old']);
+    expect(rows[1]).toEqual({
+      ticketTemplateID: 'tt-old',
+      templateName: '',
+      invSeries: '',
+      isActive: false,
+      ticketType: 0,
+      templateType: 0,
+      isInheritFromOldTemplate: false,
+      isTicketCode: false,
+    });
+  });
+
+  it('null data returns an empty list', async () => {
+    fake.state.envelopeOverrides.set(route, { success: true, data: null });
+    expect(await client().listTicketTemplates()).toEqual([]);
+  });
+
+  it('a failure envelope maps to the same category as listTemplates', async () => {
+    const failure = { success: false, errorCode: 'InvalidTokenCode', error: 'InvalidTokenCode' };
+    fake.state.envelopeOverrides.set(route, failure);
+    fake.state.envelopeOverrides.set('POST /webapp/templates', failure);
+    const tickets = await caught(client().listTicketTemplates());
+    const templates = await caught(client().listTemplates());
+    expect(tickets.category).toBe(templates.category);
+    expect(tickets.rawErrorCode).toBe(templates.rawErrorCode);
+  });
+
+  it.each([
+    [{ start: -1 }, 'start'],
+    [{ start: 1.5 }, 'start'],
+    [{ length: 0 }, 'length'],
+    [{ length: 101 }, 'length'],
+  ])('rejects %o with Validation on %s and sends nothing', async (request, field) => {
+    const err = await caught(client().listTicketTemplates(request));
+    expect(err.category).toBe('Validation');
+    expect(err.field).toBe(field);
+    expect(fake.state.requests).toHaveLength(0);
+  });
+
+  it('accepts the bounds start 0 / length 1 and length 100', async () => {
+    await client().listTicketTemplates({ start: 0, length: 1 });
+    await client().listTicketTemplates({ length: 100 });
+    expect(nonToken().map((r) => new URLSearchParams(r.query).get('length'))).toEqual(['1', '100']);
+  });
+});
+
 describe('preview', () => {
   it('invalid invoice throws Validation with failures and makes no HTTP request', async () => {
     const err = await caught(client().preview(invoice({ lines: [] })));

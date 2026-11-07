@@ -1,6 +1,7 @@
 import { deleteDraftInvoice } from './application/use-cases/delete-draft.js';
 import { getDraftPdf } from './application/use-cases/get-draft-pdf.js';
 import { listActiveTemplates } from './application/use-cases/list-templates.js';
+import { listTicketTemplates } from './application/use-cases/list-ticket-templates.js';
 import { lookupByRefIds } from './application/use-cases/lookup-by-ref-ids.js';
 import { lookupPaged } from './application/use-cases/lookup-paged.js';
 import { issueAmendment } from './application/use-cases/issue-amendment.js';
@@ -109,6 +110,11 @@ export function createMisaEInvoiceClientInternal(
   return {
     listTemplates: (withCode = true, opts) =>
       run('ListTemplates', opts, {}, () => listActiveTemplates(gateway, withCode, signalOf(opts))),
+
+    listTicketTemplates: (request, opts) =>
+      run('ListTicketTemplates', opts, {}, () =>
+        listTicketTemplates(gateway, request, signalOf(opts)),
+      ),
 
     preview: (invoice, withCode = true, opts) => {
       const ctx: CallLogContext = {};

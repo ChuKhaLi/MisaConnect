@@ -6,6 +6,8 @@ import type {
   ReplacementRequestDto,
   TemplateDto,
   TemplateRefDto,
+  TicketTemplateDto,
+  TicketTemplateListRequestDto,
 } from '../domain/dtos.js';
 import type { MeInvoiceErrorCategory, ValidationFailure } from '../domain/errors.js';
 import type { TemplateResolution } from './template-resolver.js';
@@ -121,6 +123,11 @@ export interface GatewayCallOptions {
 export interface MeInvoiceGateway {
   /** All templates (active and inactive), mapped. */
   listTemplates(withCode: boolean, opts?: GatewayCallOptions): Promise<TemplateDto[]>;
+  /** One page of e-ticket templates (active and inactive), mapped; request already validated. */
+  listTicketTemplates(
+    request: Required<TicketTemplateListRequestDto>,
+    opts?: GatewayCallOptions,
+  ): Promise<TicketTemplateDto[]>;
   /** PDF bytes of the rendered preview. */
   preview(
     invoice: InvoiceDto,

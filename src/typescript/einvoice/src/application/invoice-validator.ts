@@ -265,6 +265,20 @@ export const defaultInvoiceValidator: InvoiceValidator = {
   validateBatch,
 };
 
+/** Port of TicketTemplateListRequest.Validate (same bounds as paged lookup); first violation only. */
+export function validateTicketTemplateList(req: {
+  start: number;
+  length: number;
+}): ValidationFailure[] {
+  if (!Number.isInteger(req.start) || req.start < 0) {
+    return [fail('start', 'Start must be >= 0.', 'FR-047')];
+  }
+  if (!Number.isInteger(req.length) || req.length < 1 || req.length > 100) {
+    return [fail('length', 'Length must be in [1, 100].', 'FR-047')];
+  }
+  return [];
+}
+
 /** Port of PagedLookupRequest.Validate: only the first violation is surfaced. */
 export function validatePagedLookup(req: PagedLookupRequestDto): ValidationFailure[] {
   if (req.start < 0) return [fail('start', 'Start must be >= 0.', 'FR-047')];

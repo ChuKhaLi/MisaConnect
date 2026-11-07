@@ -10,6 +10,8 @@ import type {
   ReplacementRequestDto,
   SaveResultDto,
   TemplateDto,
+  TicketTemplateDto,
+  TicketTemplateListRequestDto,
 } from './domain/dtos.js';
 import type { DeleteDraftOutcome } from './domain/statuses.js';
 import type { MisaEInvoiceOptions } from './infrastructure/options.js';
@@ -25,6 +27,14 @@ export interface CallOptions {
 /** Port of the .NET `IMisaEInvoiceClient` facade. */
 export interface IMisaEInvoiceClient {
   listTemplates(withCode?: boolean, opts?: CallOptions): Promise<TemplateDto[]>;
+  /**
+   * One page of e-ticket templates (MISA `/webapp/templates/ticket`), active and inactive.
+   * Throws `MeInvoiceException` (`Validation`) for `start < 0` or `length` outside 1–100, before any request.
+   */
+  listTicketTemplates(
+    request?: TicketTemplateListRequestDto,
+    opts?: CallOptions,
+  ): Promise<TicketTemplateDto[]>;
   preview(invoice: InvoiceDto, withCode?: boolean, opts?: CallOptions): Promise<PdfDocumentDto>;
   saveDraft(
     invoices: readonly InvoiceDto[],
