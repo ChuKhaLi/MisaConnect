@@ -8,7 +8,8 @@ on:
       - "src/typescript/**"
       - "samples/typescript/**"
       - "package.json"
-      - "package-lock.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
       - "tsconfig.base.json"
       - "eslint.config.mjs"
       - ".prettierrc.json"
@@ -23,7 +24,8 @@ on:
       - "src/typescript/**"
       - "samples/typescript/**"
       - "package.json"
-      - "package-lock.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
       - "tsconfig.base.json"
       - "eslint.config.mjs"
       - ".prettierrc.json"
@@ -53,7 +55,8 @@ jobs:
           filters: |
             shared: &shared
               - "package.json"
-              - "package-lock.json"
+              - "pnpm-lock.yaml"
+              - "pnpm-workspace.yaml"
               - "tsconfig.base.json"
               - "eslint.config.mjs"
               - ".prettierrc.json"
@@ -75,13 +78,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version from package.json packageManager
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run format:check
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run format:check
       # Release tag → workspace mapping used by release-ts.yml (fixed strings only).
       - run: bash .github/scripts/ts-release-target.sh --self-test
 
@@ -95,14 +99,15 @@ jobs:
         node: [ 22, 24 ]
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version from package.json packageManager
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck -w @misaconnect/einvoice
-      - run: npm test -w @misaconnect/einvoice
-      - run: npm run smoke -w @misaconnect/einvoice
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @misaconnect/einvoice run typecheck
+      - run: pnpm --filter @misaconnect/einvoice run test
+      - run: pnpm --filter @misaconnect/einvoice run smoke
       - uses: actions/upload-artifact@v7
         if: matrix.node == 22
         with:
@@ -126,7 +131,9 @@ jobs:
           node-version: '22.0.0'
       - name: Link workspace package without installing dev tooling
         run: mkdir -p node_modules/@misaconnect && ln -s ../../src/typescript/einvoice node_modules/@misaconnect/einvoice
-      - run: node --version && npm run smoke -w @misaconnect/einvoice
+      # No pnpm here: the dev toolchain needs Node >= 22.18. npm runs the package script from its directory.
+      - working-directory: src/typescript/einvoice
+        run: node --version && npm run smoke
 
   esign:
     needs: changes
@@ -138,14 +145,15 @@ jobs:
         node: [ 22, 24 ]
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version from package.json packageManager
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck -w @misaconnect/esign
-      - run: npm test -w @misaconnect/esign
-      - run: npm run smoke -w @misaconnect/esign
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @misaconnect/esign run typecheck
+      - run: pnpm --filter @misaconnect/esign run test
+      - run: pnpm --filter @misaconnect/esign run smoke
       - uses: actions/upload-artifact@v7
         if: matrix.node == 22
         with:
@@ -168,4 +176,6 @@ jobs:
           node-version: '22.0.0'
       - name: Link workspace package without installing dev tooling
         run: mkdir -p node_modules/@misaconnect && ln -s ../../src/typescript/esign node_modules/@misaconnect/esign
-      - run: node --version && npm run smoke -w @misaconnect/esign
+      # No pnpm here: the dev toolchain needs Node >= 22.18. npm runs the package script from its directory.
+      - working-directory: src/typescript/esign
+        run: node --version && npm run smoke

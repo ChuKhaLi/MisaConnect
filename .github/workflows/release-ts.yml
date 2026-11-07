@@ -41,18 +41,19 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       # No `registry-url`: setup-node would then write an .npmrc auth line and a placeholder
       # NODE_AUTH_TOKEN, which overrides OIDC. The default registry is registry.npmjs.org.
+      - uses: pnpm/action-setup@v6 # version from package.json packageManager
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
       - name: npm CLI with trusted + staged publishing support (>= 11.15.0)
         run: npm install -g "npm@>=11.15.0 <12" && npm --version
       - name: Self-test tag mapping
         run: bash .github/scripts/ts-release-target.sh --self-test
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test -w "${{ steps.target.outputs.package }}"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run typecheck
+      - run: pnpm --filter "${{ steps.target.outputs.package }}" run test
       - name: Verify tag matches package version
         env:
           TAG: ${{ github.ref_name }}
@@ -64,7 +65,7 @@ jobs:
             echo "Tag '$TAG' does not match package version '$version' (expected $PREFIX$version)." >&2
             exit 1
           fi
-      - run: npm run build -w "${{ steps.target.outputs.package }}"
+      - run: pnpm --filter "${{ steps.target.outputs.package }}" run build
       # Trusted publishing: npm exchanges the GitHub OIDC token for a short-lived publish
       # credential — no NPM_TOKEN secret. Requires the trusted publisher to be configured on
       # npmjs.com (owner ChuKhaLi, repo MisaConnect, workflow release-ts.yml, environment

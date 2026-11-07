@@ -1,6 +1,7 @@
 version: 2
 updates:
-  # npm workspace root: src/typescript/* packages (zero runtime deps) + samples/typescript/*.
+  # pnpm workspace root (pnpm-lock.yaml; Dependabot's `npm` ecosystem covers pnpm):
+  # src/typescript/* packages (zero runtime deps) + samples/typescript/*.
   - package-ecosystem: npm
     directory: /
     schedule:
