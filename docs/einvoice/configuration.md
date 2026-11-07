@@ -43,7 +43,7 @@ Never commit real credentials. Sample appsettings ship with empty placeholders.
 
 ## Custom DI overrides
 
-Register your own adapter before `AddMisaConnectEInvoice`, or just after — both work because `AddMisaConnectEInvoice` uses `TryAdd*` semantics for swappable services. Example:
+Register your own adapter before `AddMisaConnectEInvoice`, or just after — both work because `AddMisaConnectEInvoice` uses `TryAdd*` semantics for swappable services (`ISystemClock`, `IRefIdGenerator`, `ITokenCache`, `IInvoiceValidator`, `ITemplateResolver`, `IDeleteOptionsAccessor`, and `ICorrelationIdAccessor` via `AddEInvoiceClient`). This holds since **2.9.0**; in 2.8.0 and earlier a registration made before the call was overridden, so register after it there. Example:
 
 ```csharp
 services.AddSingleton<ITokenCache, RedisTokenCache>();
