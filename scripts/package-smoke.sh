@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Packs MisaConnect.ESign and MisaConnect.EInvoice, then builds and runs two net8.0 consumer apps
-# (console, ASP.NET Core) against the packed packages from a local feed. Fails when a package does
+# Packs MisaConnect.ESign and MisaConnect.EInvoice, then builds and runs two consumer apps
+# (console, ASP.NET Core) on net8.0 and on net10.0 against the packed packages from a local feed. Fails when a package does
 # not declare a dependency that its bundled assemblies load at runtime.
 #
 # To smoke-test packages that are already packed (release.yml), set SMOKE_FEED to the folder
@@ -42,14 +42,16 @@ XML
 status=0
 for app in Console Web; do
   proj="$root/tests/package-smoke/$app/PackageSmoke.$app.csproj"
-  echo "== package smoke: $app (net8.0, MisaConnect $version)"
   dotnet restore "$proj" --configfile "$work/nuget.config" -p:SmokePackageVersion="$version" --nologo -v q
-  if ! out="$(dotnet run --project "$proj" --no-restore -p:SmokePackageVersion="$version" 2>&1)"; then
-    echo "$out" | head -20
-    status=1
-    continue
-  fi
-  echo "$out" | tail -1
-  case "$out" in *"SMOKE OK"*) ;; *) status=1 ;; esac
+  for tfm in net8.0 net10.0; do
+    echo "== package smoke: $app ($tfm, MisaConnect $version)"
+    if ! out="$(dotnet run --project "$proj" --framework "$tfm" --no-restore -p:SmokePackageVersion="$version" 2>&1)"; then
+      echo "$out" | head -20
+      status=1
+      continue
+    fi
+    echo "$out" | tail -1
+    case "$out" in *"SMOKE OK"*) ;; *) status=1 ;; esac
+  done
 done
 exit $status

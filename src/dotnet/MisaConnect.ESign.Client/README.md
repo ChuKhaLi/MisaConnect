@@ -8,7 +8,7 @@
 [![Downloads](https://img.shields.io/nuget/dt/MisaConnect.ESign.svg)](https://www.nuget.org/packages/MisaConnect.ESign)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/ChuKhaLi/MisaConnect/blob/main/LICENSE)
 
-Community .NET SDK for the **MISA eSign RemoteSigning** HTTP API. End-to-end PDF / XML / Word / Excel signing, two-factor (OTP) authentication, and webhook-mode (non-blocking) signing — all behind a single `IMisaESignClient` facade. Targets .NET 8.
+Community .NET SDK for the **MISA eSign RemoteSigning** HTTP API. End-to-end PDF / XML / Word / Excel signing, two-factor (OTP) authentication, and webhook-mode (non-blocking) signing — all behind a single `IMisaESignClient` facade. Targets .NET 8 and .NET 10.
 
 > Looking for invoice operations (templates, save/preview/lookup/amend)? Install the sibling [`MisaConnect.EInvoice`](https://www.nuget.org/packages/MisaConnect.EInvoice) package.
 

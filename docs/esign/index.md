@@ -8,7 +8,7 @@ permalink: /esign/
 
 # MisaConnect.ESign
 
-Community .NET SDK for the **MISA eSign RemoteSigning** HTTP API. End-to-end PDF / XML / Word / Excel signing, two-factor (OTP) authentication, and webhook-mode (non-blocking) signing — all behind a single `IMisaESignClient` facade. Targets .NET 8.
+Community .NET SDK for the **MISA eSign RemoteSigning** HTTP API. End-to-end PDF / XML / Word / Excel signing, two-factor (OTP) authentication, and webhook-mode (non-blocking) signing — all behind a single `IMisaESignClient` facade. Targets .NET 8 and .NET 10.
 
 ```
 dotnet add package MisaConnect.ESign

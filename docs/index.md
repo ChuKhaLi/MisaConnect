@@ -31,7 +31,7 @@ Community .NET SDK for MISA cloud APIs. Two independent NuGet packages ship from
 [![Downloads](https://img.shields.io/nuget/dt/MisaConnect.ESign.svg?label=downloads)](https://www.nuget.org/packages/MisaConnect.ESign)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/ChuKhaLi/MisaConnect/blob/main/LICENSE)
 
-Both packages target **.NET 8** and share the same layered architecture, options-pattern configuration, swappable ports, and wire-format fidelity with MISA's published APIs.
+Both packages target **.NET 8 and .NET 10** and share the same layered architecture, options-pattern configuration, swappable ports, and wire-format fidelity with MISA's published APIs.
 
 ## Install
 

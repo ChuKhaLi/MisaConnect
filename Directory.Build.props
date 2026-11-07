@@ -1,7 +1,19 @@
 <Project>
 
+  <!--
+    Target frameworks. The shipped libraries build for net8.0 and net10.0, and so do the unit tests
+    and the test-support project, so both builds are tested. Integration tests (*.IntegrationTests)
+    and samples (*.Samples.*) run on net10.0 (ASP.NET Core 10).
+  -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup Condition="!$(MSBuildProjectName.Contains('.Samples.')) And !$(MSBuildProjectName.EndsWith('.IntegrationTests'))">
+    <TargetFramework></TargetFramework>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
