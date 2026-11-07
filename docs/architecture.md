@@ -60,7 +60,7 @@ Domain has zero dependencies. Application has zero infrastructure concerns. This
 
 ### EInvoice ports
 
-Consumers swap any of these by registering their own implementation **after** `AddMisaConnectEInvoice`. EInvoice registers its defaults with `Add…` (not `TryAdd…`), so the last registration wins and one made before the call is overridden. ESign differs; see below.
+Consumers swap any of these by registering their own implementation before or after `AddMisaConnectEInvoice` (since 2.9.0 EInvoice registers its defaults with `TryAdd…`, so an earlier registration is kept and a later one wins). In 2.8.0 and earlier only a registration made **after** the call took effect. `IMeInvoiceClient` is not a `TryAdd…` default: replace it after the call. The `ICorrelationIdAccessor` default comes from `AddEInvoiceClient`; with `AddMisaConnectEInvoice` alone you must register one.
 
 | Port | Default adapter | Why swap? |
 | --- | --- | --- |

@@ -4,7 +4,7 @@
     <RootNamespace>MisaConnect.EInvoice.Client</RootNamespace>
     <AssemblyName>MisaConnect.EInvoice.Client</AssemblyName>
     <PackageId>MisaConnect.EInvoice</PackageId>
-    <Version>2.8.0</Version> <!-- release.yml overrides this from the v* tag; keep in step -->
+    <Version>2.9.0</Version> <!-- release.yml overrides this from the v* tag; keep in step -->
     <Description>Community .NET SDK for MISA MeInvoice. Provides a port-and-adapter facade for the MISA eInvoice HTTP API: token acquisition, template lookup, invoice preview/save/PDF/delete, lookup, and amendments.</Description>
     <PackageTags>misa;meinvoice;einvoice;vietnam;invoice;sdk;hoadon</PackageTags>
     <IsPackable>true</IsPackable>
