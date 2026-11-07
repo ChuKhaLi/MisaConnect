@@ -69,27 +69,30 @@ jobs:
       - name: Build
         run: dotnet build MisaConnect.slnx --no-restore --configuration ${{ inputs.configuration || 'Release' }}
 
+      # Tests run on Microsoft Testing Platform (global.json "test.runner"): `dotnet test --project`,
+      # xunit's built-in TRX report, VSTest-syntax `--filter`. A filter that matches no test in a
+      # project exits 8 ("zero tests ran"); that is ignored only when a test_filter is given.
       - name: Unit tests (EInvoice)
-        run: dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests/MisaConnect.EInvoice.UnitTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFilePrefix=einvoice-unit-tests" --results-directory artifacts/test-results
+        run: dotnet test --project tests/dotnet/MisaConnect.EInvoice.UnitTests/MisaConnect.EInvoice.UnitTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}" --ignore-exit-code 8', inputs.test_filter) || '' }} --report-xunit-trx --results-directory artifacts/test-results
 
       - name: Unit tests (ESign)
-        run: dotnet test tests/dotnet/MisaConnect.ESign.UnitTests/MisaConnect.ESign.UnitTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFilePrefix=esign-unit-tests" --results-directory artifacts/test-results
+        run: dotnet test --project tests/dotnet/MisaConnect.ESign.UnitTests/MisaConnect.ESign.UnitTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}" --ignore-exit-code 8', inputs.test_filter) || '' }} --report-xunit-trx --results-directory artifacts/test-results
 
       # Fake-server + sample-host integration tests. No network: [SandboxFact] tests skip
       # because MISACONNECT_*SANDBOX_* secrets are not exposed to this workflow
       # (real sandbox runs live in integration.yml).
       - name: Integration tests (EInvoice, no sandbox)
-        run: dotnet test tests/dotnet/MisaConnect.EInvoice.IntegrationTests/MisaConnect.EInvoice.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --logger "trx;LogFileName=einvoice-integration-tests.trx" --results-directory artifacts/test-results
+        run: dotnet test --project tests/dotnet/MisaConnect.EInvoice.IntegrationTests/MisaConnect.EInvoice.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --report-xunit-trx --results-directory artifacts/test-results
 
       - name: Integration tests (ESign, no sandbox)
-        run: dotnet test tests/dotnet/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --logger "trx;LogFileName=esign-integration-tests.trx" --results-directory artifacts/test-results
+        run: dotnet test --project tests/dotnet/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --report-xunit-trx --results-directory artifacts/test-results
 
       # A broken fact-attribute or runner setup does not fail: the ESign sandbox tests just vanish
       # from discovery and CI stays green (this happened with Xunit.SkippableFact 1.5.x under
       # xunit 2). Fail loudly if any of them stop being discovered.
       - name: Guard ESign sandbox test discovery
         run: |
-          listed=$(dotnet test tests/dotnet/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --list-tests)
+          listed=$(dotnet test --project tests/dotnet/MisaConnect.ESign.IntegrationTests/MisaConnect.ESign.IntegrationTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} --list-tests)
           missing=0
           for t in SignXmlSandboxTests SignWordSandboxTests SignExcelSandboxTests SignViaWebhookSandboxTests TwoFactorAuthSandboxTests; do
             if ! grep -q "Sandbox\.$t\." <<<"$listed"; then echo "::error::ESign sandbox test class $t is not discovered"; missing=1; fi

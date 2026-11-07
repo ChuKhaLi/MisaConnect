@@ -49,10 +49,10 @@ jobs:
         run: dotnet build MisaConnect.slnx --no-restore --configuration Release -p:Version=${{ steps.ver.outputs.version }}
 
       - name: Unit tests (EInvoice)
-        run: dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests/MisaConnect.EInvoice.UnitTests.csproj --no-build --configuration Release
+        run: dotnet test --project tests/dotnet/MisaConnect.EInvoice.UnitTests/MisaConnect.EInvoice.UnitTests.csproj --no-build --configuration Release
 
       - name: Unit tests (ESign)
-        run: dotnet test tests/dotnet/MisaConnect.ESign.UnitTests/MisaConnect.ESign.UnitTests.csproj --no-build --configuration Release
+        run: dotnet test --project tests/dotnet/MisaConnect.ESign.UnitTests/MisaConnect.ESign.UnitTests.csproj --no-build --configuration Release
 
       - name: Pack (EInvoice)
         run: dotnet pack src/dotnet/MisaConnect.EInvoice.Client/MisaConnect.EInvoice.Client.csproj --configuration Release -p:Version=${{ steps.ver.outputs.version }} -o artifacts
