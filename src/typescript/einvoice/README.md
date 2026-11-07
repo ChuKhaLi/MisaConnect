@@ -291,7 +291,7 @@ Dates: `yyyy-MM-dd` strings (a `Date` is also accepted and formatted from its lo
 Sandbox tests skip cleanly unless all four variables are set (`MISACONNECT_SANDBOX_TAXCODE`, `MISACONNECT_SANDBOX_USERNAME`, `MISACONNECT_SANDBOX_PASSWORD`, `MISACONNECT_SANDBOX_APPID`):
 
 ```
-npm run test:sandbox -w @misaconnect/einvoice
+pnpm --filter @misaconnect/einvoice run test:sandbox
 ```
 
 ## License

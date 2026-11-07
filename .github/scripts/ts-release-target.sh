@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Maps a release tag to its npm workspace. Usage: ts-release-target.sh <tag>
+# Maps a release tag to its pnpm workspace package. Usage: ts-release-target.sh <tag>
 # Prints "<package> <directory> <tag-prefix>" or exits 1 for an unknown tag.
 # Self-check: ts-release-target.sh --self-test
 set -euo pipefail

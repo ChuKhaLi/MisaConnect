@@ -31,12 +31,13 @@ jobs:
         node: [22, 24]
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1; pnpm version from package.json packageManager
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
-      - run: npm ci
-      - run: npm run build -w @misaconnect/einvoice
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @misaconnect/einvoice run build
       # The path from GitHub runners (outside Vietnam) to MISA is a path-MTU blackhole: TCP
       # segments near 1500 B are dropped and the ICMP that would shrink them never arrives, so
       # any request over ~1.4 KB (every authenticated call: the bearer JWT alone is ~2 KB) hangs
@@ -57,7 +58,7 @@ jobs:
           MISACONNECT_SANDBOX_APPID: ${{ secrets.MISA_APP_ID }}
           # Fail instead of skipping when credentials are missing or the host is unreachable.
           MISACONNECT_SANDBOX_REQUIRED: '1'
-        run: npm run test:sandbox -w @misaconnect/einvoice
+        run: pnpm --filter @misaconnect/einvoice run test:sandbox
 
   esign-sandbox:
     name: esign-sandbox (node ${{ matrix.node }})
@@ -71,12 +72,13 @@ jobs:
         node: [22, 24]
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1; pnpm version from package.json packageManager
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
-      - run: npm ci
-      - run: npm run build -w @misaconnect/esign
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @misaconnect/esign run build
       # Same path-MTU blackhole to MISA as the einvoice job above.
       - name: Lower MTU (path-MTU blackhole to MISA)
         run: sudo ip link set dev eth0 mtu 1280
@@ -91,4 +93,4 @@ jobs:
           # REQUIRED, the sign tests skip (not fail) on NoActiveCertificateException, as they do
           # when credentials are missing or the host is unreachable. Add
           # MISACONNECT_ESIGN_SANDBOX_REQUIRED: '1' (every skip becomes a failure) once it has one.
-        run: npm run test:sandbox -w @misaconnect/esign
+        run: pnpm --filter @misaconnect/esign run test:sandbox
