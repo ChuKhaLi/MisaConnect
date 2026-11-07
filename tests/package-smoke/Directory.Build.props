@@ -2,7 +2,8 @@
   <!-- Isolated from the repo build: the smoke apps consume the packed NuGet packages exactly as
        an external app would, so they must not inherit the repo's props, analyzers or versions. -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <!-- Both shipped targets: each app is run once per framework by scripts/package-smoke.sh. -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>

@@ -51,7 +51,8 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          # 8.0.x: runtime for the net8.0 package smoke apps (and tests); 10.0.x: the SDK (global.json).
+          # 8.0.x: runtime for the net8.0 unit-test and package-smoke runs; 10.0.x: the SDK (global.json)
+          # and the net10.0 runtime.
           dotnet-version: |
             8.0.x
             10.0.x
@@ -69,10 +70,10 @@ jobs:
         run: dotnet build MisaConnect.slnx --no-restore --configuration ${{ inputs.configuration || 'Release' }}
 
       - name: Unit tests (EInvoice)
-        run: dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests/MisaConnect.EInvoice.UnitTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFileName=einvoice-unit-tests.trx" --results-directory artifacts/test-results
+        run: dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests/MisaConnect.EInvoice.UnitTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFilePrefix=einvoice-unit-tests" --results-directory artifacts/test-results
 
       - name: Unit tests (ESign)
-        run: dotnet test tests/dotnet/MisaConnect.ESign.UnitTests/MisaConnect.ESign.UnitTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFileName=esign-unit-tests.trx" --results-directory artifacts/test-results
+        run: dotnet test tests/dotnet/MisaConnect.ESign.UnitTests/MisaConnect.ESign.UnitTests.csproj --no-build --configuration ${{ inputs.configuration || 'Release' }} ${{ inputs.test_filter && format('--filter "{0}"', inputs.test_filter) || '' }} --logger "trx;LogFilePrefix=esign-unit-tests" --results-directory artifacts/test-results
 
       # Fake-server + sample-host integration tests. No network: [SandboxFact] tests skip
       # because MISACONNECT_*SANDBOX_* secrets are not exposed to this workflow
