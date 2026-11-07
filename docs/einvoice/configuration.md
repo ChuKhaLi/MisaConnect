@@ -49,3 +49,5 @@ Register your own adapter before `AddMisaConnectEInvoice`, or just after — bot
 services.AddSingleton<ITokenCache, RedisTokenCache>();
 services.AddMisaConnectEInvoice(config);
 ```
+
+Register `ITokenCache` as a **singleton**. The bearer-token handler resolves it inside the `IHttpClientFactory` handler scope, not the request scope, so a scoped cache would be shared per handler lifetime (about two minutes), not per request.

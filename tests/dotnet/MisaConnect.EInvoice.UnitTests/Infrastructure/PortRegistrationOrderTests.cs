@@ -69,15 +69,16 @@ public class PortRegistrationOrderTests
         Assert.IsType(port.Default, Resolve(services, port.Service));
     }
 
-    [Fact]
-    public void Calling_AddMisaConnectEInvoice_twice_registers_one_token_cache()
+    [Theory]
+    [MemberData(nameof(PortNames))]
+    public void Calling_AddMisaConnectEInvoice_twice_registers_one_default(string name)
     {
+        var port = Ports[name];
         var services = BaseServices();
         services.AddMisaConnectEInvoice(Configure);
         services.AddMisaConnectEInvoice(Configure);
 
-        using var sp = services.BuildServiceProvider();
-        Assert.Single(sp.GetServices<ITokenCache>());
+        Assert.Single(services, d => d.ServiceType == port.Service);
     }
 
     [Fact]
