@@ -11,7 +11,7 @@ import type {
 import { defaultInvoiceValidator, resolveTemplate } from '@misaconnect/einvoice';
 
 // Type-level check: the swappable collaborators advertised in the README are implementable
-// from the public entry point alone (`npm run typecheck` fails if a port type is not exported).
+// from the public entry point alone (`pnpm run typecheck` fails if a port type is not exported).
 describe('public collaborator types', () => {
   it('can implement every port from the package entry point', async () => {
     const store = new Map<string, string>();

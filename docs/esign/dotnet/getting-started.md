@@ -15,9 +15,7 @@ This guide installs `MisaConnect.ESign`, wires DI, and signs a first PDF through
 dotnet add package MisaConnect.ESign
 ```
 
-Targets .NET 8 and .NET 10. Depends only on `Microsoft.Extensions.{Configuration,DependencyInjection,Http,Options,Logging.Abstractions}` and `System.Text.Json` — no Polly, no third-party HTTP plumbing.
-
-**Requirements:** .NET 8 or .NET 10 (the package ships a build for both). The package depends on `Microsoft.Extensions.*` **10.0.14 or later**, which also runs on .NET 8. If your app pins a `Microsoft.Extensions.*` package below 10.0.14, restore fails with `NU1605` (package downgrade) naming it; raise that reference to 10.0.14 or later.
+**Requirements:** .NET 8 or .NET 10 (the package ships a build for both). It depends only on `Microsoft.Extensions.{Configuration,DependencyInjection,Http,Options,Logging.Abstractions}` **10.0.14 or later** (these also run on .NET 8) and `System.Text.Json` — no Polly, no third-party HTTP plumbing. If your app pins a `Microsoft.Extensions.*` package below 10.0.14, restore fails with `NU1605` (package downgrade) naming it; raise that reference to 10.0.14 or later.
 
 You also need MISA credentials (client ID / key, user name / password, base URL) and an account with an `ACTIVE` certificate — see [Sandbox setup](./sandbox-setup) and [Certificates](../index#certificates).
 

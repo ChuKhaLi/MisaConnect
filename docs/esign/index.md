@@ -37,7 +37,7 @@ MISA signs a **hash** of the document, not the document itself. One sign call ru
 1. **Sign in** (`login-api`) — or reuse a cached token. MISA returns a `remoteSigningAccessToken`, sent as the `AuthorizationRM` header; every call also carries `x-clientId` / `x-clientKey`.
 2. **List certificates** and pick an active one (see [Certificates](#certificates)).
 3. **Hash the document** (`documents/hash`) — MISA computes the hash server side, per format (`pdfDocs`, `xmlDocs`, `wordDocs`, `excelDocs`).
-4. **Submit the hash for signing** (`Signing/hash`) — this starts a transaction (`transactionId`) and sends an approval request to the signer's phone.
+4. **Submit the hash for signing** (`Signing/hash`) — this starts a transaction (`transactionId`) and sends an approval request to the signer's phone. Because a repeated call would start a second transaction (a second approval request), both SDKs retry `Signing/hash` only on HTTP 429 or when the connection was never made (DNS or connection failure), never on 5xx, timeouts or resets.
 5. **Wait for the signer** — poll `Signing/status` until the transaction is `SUCCESS`, `FAILED` or `CANCELLED`, or until the total timeout (default 60 s). In [webhook mode](#webhook-mode) this step is replaced by MISA's callback.
 6. **Attach the signature** (`documents/attachment`) — MISA embeds the signature into the document and the SDK returns the signed bytes.
 
@@ -99,7 +99,7 @@ MISA's raw `userMsg` / `devMsg` text is left out of error details unless you opt
 
 ### Calling MISA from outside Vietnam
 
-MISA's servers are reached reliably from Vietnam. From abroad (measured from GitHub-hosted runners, 2026-11-03) the network path in front of MISA is a **path-MTU blackhole**: TCP segments near 1500 bytes are dropped and the ICMP message that would make the sender shrink them never arrives. Any request larger than about 1.4 KB hangs and ends in a connection reset. Authenticated calls carry a large bearer token, and signing calls carry base64 documents, so they are affected; small requests still succeed, which makes the failure look intermittent. Every HTTP client suffers equally (curl too), so no SDK setting fixes it.
+From Vietnam, MISA is reached reliably. From abroad, the path from GitHub-hosted runners to MISA's eInvoice sandbox host `testapi.meinvoice.vn` was measured (2026-11-03) as a **path-MTU blackhole**: TCP segments near 1500 bytes are dropped and the ICMP message that would make the sender shrink them never arrives. Any request larger than about 1.4 KB hangs and ends in a connection reset. Authenticated calls carry a large bearer token, and signing calls carry base64 documents, so they are affected; small requests still succeed, which makes the failure look intermittent. Every HTTP client suffers equally (curl too), so no SDK setting fixes it.
 
 - Lower the MTU of the interface that reaches MISA, e.g. `ip link set dev eth0 mtu 1280` on Linux (this is what the repository's CI does), or try TCP MTU probing (`sysctl -w net.ipv4.tcp_mtu_probing=1`; untested against MISA).
 - Some hosts also fail to open a TCP connection at all from abroad; retry from another host.

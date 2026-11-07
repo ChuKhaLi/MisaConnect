@@ -1,4 +1,4 @@
-// Same object as docs/einvoice/typescript/operations.md#a-complete-invoice; `npm run typecheck` proves it
+// Same object as docs/einvoice/typescript/operations.md#a-complete-invoice; `pnpm run typecheck` proves it
 // type-checks and test/integration/client-hardening.test.ts saves it against the fake server.
 import type { InvoiceDto } from '@misaconnect/einvoice';
 
