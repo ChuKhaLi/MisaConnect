@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AccessToken } from '../../src/application/ports.js';
+import type { AccessToken, TokenCache } from '../../src/application/ports.js';
 import type { MisaCredentials } from '../../src/domain/dtos.js';
 import {
   AuthenticationFailedException,
@@ -50,7 +50,10 @@ const loginOk = (token: string, extra: Record<string, unknown> = {}): Response =
     },
   });
 
-function setup(handlers: Partial<Record<string, Handler>>) {
+function setup(
+  handlers: Partial<Record<string, Handler>>,
+  cache: TokenCache = createInMemoryTokenCache(),
+) {
   let now = T0;
   const calls: { path: string; body: Record<string, unknown> }[] = [];
   const fetchFn = (async (url: string, init: RequestInit) => {
@@ -63,7 +66,6 @@ function setup(handlers: Partial<Record<string, Handler>>) {
     if (!h) throw new Error('unexpected route ' + path);
     return h(body);
   }) as unknown as typeof fetch;
-  const cache = createInMemoryTokenCache();
   const resolved = {
     origin: 'https://h.vn/',
     host: 'h.vn',
@@ -213,6 +215,82 @@ describe('token manager', () => {
     expect(count('login-api')).toBe(1);
     expect(t.value).toBe('T3');
     expect((await cache.get(KEY))?.value).toBe('T3');
+  });
+
+  describe('after a failed refresh, evicts only the stale token', () => {
+    it('reuses a fresh token another flow stored meanwhile (no login)', async () => {
+      const shared = createInMemoryTokenCache();
+      const { tm, count } = setup(
+        {
+          refreshtoken: async () => {
+            // Another flow (other single-flight slot) stores a fresh token while ours fails.
+            await shared.set(KEY, token({ value: 'T9', expiresAt: new Date(T0 + 3_600_000) }));
+            return json(500, {});
+          },
+          'login-api': () => loginOk('T3'),
+        },
+        shared,
+      );
+      await shared.set(KEY, token({ expiresAt: new Date(T0 - 1) }));
+      const t = await tm.getToken(creds, ctx);
+      expect(count('refreshtoken')).toBe(1);
+      expect(count('login-api')).toBe(0);
+      expect(t.value).toBe('T9');
+    });
+
+    it('never deletes a different token from a cache without deleteIfMatches', async () => {
+      const inner = createInMemoryTokenCache();
+      let deletes = 0;
+      const legacy: TokenCache = {
+        get: (k) => inner.get(k),
+        set: (k, t) => inner.set(k, t),
+        delete: (k) => {
+          deletes++;
+          return inner.delete(k);
+        },
+      };
+      const { tm, count } = setup(
+        {
+          refreshtoken: async () => {
+            // Replaced by another (already stale) token before our eviction runs.
+            await inner.set(KEY, token({ value: 'T9', expiresAt: new Date(T0 - 1) }));
+            return json(500, {});
+          },
+          'login-api': () => loginOk('T3'),
+        },
+        legacy,
+      );
+      await inner.set(KEY, token({ expiresAt: new Date(T0 - 1) }));
+      const t = await tm.getToken(creds, ctx);
+      expect(deletes).toBe(0);
+      expect(count('login-api')).toBe(1);
+      expect(t.value).toBe('T3');
+    });
+
+    it('evicts through deleteIfMatches with the stale value when the cache has it', async () => {
+      const inner = createInMemoryTokenCache();
+      const matched: string[] = [];
+      const atomic: TokenCache = {
+        get: (k) => inner.get(k),
+        set: (k, t) => inner.set(k, t),
+        delete: () => {
+          throw new Error('delete must not be used when deleteIfMatches exists');
+        },
+        deleteIfMatches: (k, v) => {
+          matched.push(v);
+          return inner.deleteIfMatches?.(k, v);
+        },
+      };
+      const { tm, count } = setup(
+        { refreshtoken: () => json(500, {}), 'login-api': () => loginOk('T3') },
+        atomic,
+      );
+      await inner.set(KEY, token({ expiresAt: new Date(T0 - 1) }));
+      const t = await tm.getToken(creds, ctx);
+      expect(matched).toEqual(['old']);
+      expect(count('login-api')).toBe(1);
+      expect(t.value).toBe('T3');
+    });
   });
 
   it('falls back to login when refresh returns 500', async () => {

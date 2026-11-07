@@ -182,14 +182,24 @@ export function createTokenManager(deps: TokenManagerDeps): TokenManager {
     return bound;
   }
 
-  /** Evicts the entry only while it still belongs to these credentials (never another user's). */
-  async function evictOwned(key: string, fp: string): Promise<void> {
-    if ((await readOwned(key, fp)) !== undefined) await tokenCache.delete(key);
+  /**
+   * Evicts the entry only while it still holds the stale token `value`: never a token another flow
+   * stored meanwhile, and never another user's (a different user's entry cannot hold this value).
+   * Uses the cache's atomic `deleteIfMatches` when it has one.
+   */
+  async function evictStale(key: string, fp: string, value: string): Promise<void> {
+    if (tokenCache.deleteIfMatches) {
+      await tokenCache.deleteIfMatches(key, value);
+      return;
+    }
+    const owned = await readOwned(key, fp);
+    if (owned !== undefined && owned.value === value) await tokenCache.delete(key);
   }
 
   /**
-   * Refreshes `previous` (merging omitted fields); on any failure, including a refresh result that
-   * is already expired, evicts and logs in once.
+   * Refreshes `previous` (merging omitted fields). On any failure, including a refresh result that
+   * is already expired: reuses a fresh token another flow stored meanwhile, otherwise evicts only
+   * the stale token and logs in once.
    * `previous` must belong to these credentials; with none, logs in directly.
    */
   async function renew(
@@ -218,7 +228,12 @@ export function createTokenManager(deps: TokenManagerDeps): TokenManager {
       if (refreshed !== undefined && expiryTime(refreshed.expiresAt) > clock.now().getTime()) {
         return store(key, fp, refreshed);
       }
-      await evictOwned(key, fp);
+      // The acquire and reauth flights use different slots, so another flow may have stored a
+      // fresh token while this refresh failed: reuse it rather than evicting it and logging in.
+      const current = await readOwned(key, fp);
+      if (current !== undefined && current.value !== previous.value && isFresh(current))
+        return current;
+      await evictStale(key, fp, previous.value);
     }
     return store(key, fp, await gateway.login(creds, ctx));
   }

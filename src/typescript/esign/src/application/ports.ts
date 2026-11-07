@@ -39,6 +39,14 @@ export interface TokenCache {
   get(key: string): AccessToken | undefined | Promise<AccessToken | undefined>;
   set(key: string, token: AccessToken): void | Promise<void>;
   delete(key: string): void | Promise<void>;
+  /**
+   * Optional compare-and-delete: removes the entry for `key` only while its token `value` equals
+   * `value`, so a token another flow stored meanwhile is never evicted. Implement it atomically
+   * (for example a Redis Lua script); without it the SDK reads, compares and deletes, which leaves
+   * a small race in which a just-stored token can be evicted (costing one extra login). A cache
+   * that wraps another should forward it.
+   */
+  deleteIfMatches?(key: string, value: string): void | Promise<void>;
 }
 
 export type CertificateSelector = (

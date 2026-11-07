@@ -257,6 +257,8 @@ Ports exported as types: `TokenCache`, `AccessToken`, `CertificateSelector`, `Ot
 
 Tokens are cached under `"{userName}|{clientId}|{host}"` (override with `tokenCacheKey`), refreshed 30 s before expiry, and a failed refresh falls back to one fresh login. A cached token is bound to a **salted fingerprint of password + clientKey** (`AccessToken.credentialFingerprint`): a custom `tokenCache` must store and return the token object exactly as given, and a custom `tokenCacheKey` cannot remove that binding (a token without a matching fingerprint is a miss). By default the salt is random per client instance, so a shared external cache (Redis) does not reuse tokens across processes or restarts: each process logs in once (and a 2FA account may be asked for an OTP again). To share tokens across hosts, set the same `tokenFingerprintSecret` (at least 32 characters, keep it as secret as the client key) on every host: the fingerprint then becomes HMAC-SHA256(secret, password + clientKey), identical on all hosts, and a caller with a wrong password still never matches a cached token.
 
+After a failed refresh the SDK evicts a cached token only while the entry still holds that stale token, so a token another call has just stored is reused, not thrown away. It does this through the optional `TokenCache.deleteIfMatches(key, value)` when your cache provides it: implement it atomically (for example a Redis Lua script) and forward it from any cache that wraps another. Without it the SDK reads, compares and deletes, which leaves a small race in which a just-stored token can be evicted (costing one extra login). `createInMemoryTokenCache()` implements it.
+
 An error thrown by your `tokenCache` propagates unchanged and is not wrapped.
 
 ## Error handling
