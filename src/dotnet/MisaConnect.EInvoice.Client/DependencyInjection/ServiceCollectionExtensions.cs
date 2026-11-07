@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Infrastructure.Configuration;
 using MisaConnect.EInvoice.Infrastructure.DependencyInjection;
@@ -30,7 +31,7 @@ public static class ServiceCollectionExtensions
 
     private static void AddClientFacade(IServiceCollection services)
     {
-        services.AddScoped<ICorrelationIdAccessor, LibraryCorrelationIdAccessor>();
+        services.TryAddScoped<ICorrelationIdAccessor, LibraryCorrelationIdAccessor>();
         services.AddScoped<IMisaEInvoiceClient, MisaEInvoiceClient>();
     }
 }

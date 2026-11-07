@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using MisaConnect.EInvoice.Application.Abstractions;
 using MisaConnect.EInvoice.Application.Errors;
@@ -57,10 +58,10 @@ public static class ServiceCollectionExtensions
         }
 
         services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<ISystemClock, SystemClock>();
-        services.AddSingleton<IRefIdGenerator, GuidRefIdGenerator>();
-        services.AddSingleton<ITokenCache, InMemoryTokenCache>();
-        services.AddSingleton<IInvoiceValidator, InvoiceValidator>();
+        services.TryAddSingleton<ISystemClock, SystemClock>();
+        services.TryAddSingleton<IRefIdGenerator, GuidRefIdGenerator>();
+        services.TryAddSingleton<ITokenCache, InMemoryTokenCache>();
+        services.TryAddSingleton<IInvoiceValidator, InvoiceValidator>();
 
         // The MeInvoiceCallLogger decorator captures ICorrelationIdAccessor whose
         // lifetime is per-request (scoped) in Api and singleton in Client. To
@@ -75,12 +76,12 @@ public static class ServiceCollectionExtensions
                 () => WireTaxCode.Compose(options.Value));
         });
         services.AddScoped<ListActiveTemplates>();
-        services.AddScoped<ITemplateResolver, TemplateResolver>();
+        services.TryAddScoped<ITemplateResolver, TemplateResolver>();
         services.AddScoped<PreviewInvoice>();
         services.AddScoped<SaveDraftInvoices>();
         services.AddScoped<GetDraftPdfByRefId>();
         services.AddSingleton<InvalidTransactionDisambiguator>();
-        services.AddSingleton<IDeleteOptionsAccessor, DeleteOptionsAccessor>();
+        services.TryAddSingleton<IDeleteOptionsAccessor, DeleteOptionsAccessor>();
         services.AddScoped<DeleteDraftInvoice>();
 
         // Slice 5 — read-only lookup operations.
