@@ -18,7 +18,7 @@ dotnet test tests/dotnet/MisaConnect.EInvoice.UnitTests --filter "FullyQualified
 dotnet format MisaConnect.slnx                                                                           # required before PR
 ```
 
-TypeScript (npm workspace at repo root; packages under `src/typescript/*`; dev toolchain needs Node ≥ 22.18, packages support Node ≥ 20):
+TypeScript (npm workspace at repo root; packages under `src/typescript/*`; dev toolchain needs Node ≥ 22.18, packages support Node ≥ 22):
 
 ```
 npm ci                                  # install workspace

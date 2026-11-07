@@ -1,6 +1,6 @@
 {
   "name": "@misaconnect/einvoice",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "TypeScript SDK for MISA meInvoice.",
   "license": "MIT",
   "homepage": "https://github.com/ChuKhaLi/MisaConnect/tree/main/src/typescript/einvoice#readme",
@@ -27,7 +27,7 @@
   "type": "module",
   "sideEffects": false,
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
